@@ -1,0 +1,723 @@
+/* ============================================================
+   TEMA VISUAL — inspirado no design mais atual do iOS
+   ------------------------------------------------------------
+   Carregado por TODAS as páginas, depois do <style> próprio de
+   cada uma. Como usa os mesmos nomes de classe já existentes,
+   ele substitui a aparência antiga sem precisar reescrever o
+   HTML/JS de cada módulo.
+   ============================================================ */
+
+:root{
+  /* Paleta de sistema (iOS) */
+  --ios-blue:#0A84FF;
+  --ios-blue-dark:#0060DF;
+  --ios-green:#30D158;
+  --ios-red:#FF453A;
+  --ios-orange:#FF9F0A;
+  --ios-yellow:#FFD60A;
+  --ios-purple:#BF5AF2;
+  --ios-teal:#40C8E0;
+
+  /* Paleta vibrante extra (identidade visual: gradiente roxo/azul + brilhos ciano/magenta) */
+  --vibe-indigo:#241259;
+  --vibe-purple:#4B2AA8;
+  --vibe-blue:#2C4BFF;
+  --vibe-cyan:#22E0D0;
+  --vibe-magenta:#E23FD1;
+  --vibe-gradient-dark:linear-gradient(135deg, var(--vibe-indigo) 0%, var(--vibe-purple) 55%, #17123f 100%);
+  --vibe-gradient-accent:linear-gradient(90deg, var(--vibe-blue), var(--vibe-cyan));
+  --vibe-gradient-accent-2:linear-gradient(90deg, var(--vibe-purple), var(--vibe-magenta));
+  --vibe-wash:radial-gradient(1200px 600px at 100% -10%, rgba(34,224,208,0.10), transparent 60%),
+              radial-gradient(1000px 500px at -10% 0%, rgba(226,63,209,0.08), transparent 55%);
+
+  --ios-bg:#F2F2F7;                 /* fundo agrupado (atrás dos cards) */
+  --ios-card:#FFFFFF;               /* fundo dos cards */
+  --ios-card-alt:#F9F9FB;           /* linhas alternadas dentro de cards */
+  --ios-label:#1C1C1E;              /* texto principal */
+  --ios-label-2:rgba(60,60,67,0.68);/* texto secundário */
+  --ios-label-3:rgba(60,60,67,0.42);/* texto terciário / placeholders */
+  --ios-separator:rgba(60,60,67,0.16);
+  --ios-fill:rgba(120,120,128,0.12);/* preenchimento de inputs/segmented */
+  --ios-fill-strong:rgba(120,120,128,0.20);
+
+  --ios-radius-lg:20px;
+  --ios-radius-md:14px;
+  --ios-radius-sm:10px;
+  --ios-radius-pill:999px;
+
+  --ios-shadow:0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+  --ios-shadow-sm:0 1px 2px rgba(0,0,0,0.05);
+
+  /* Remapeia os tokens antigos do sistema para a nova paleta,
+     para que qualquer var(--blue-dark) etc. já usado no HTML/JS
+     de cada módulo passe a usar as cores novas automaticamente. */
+  --blue-dark:var(--ios-blue);
+  --blue-med:var(--ios-blue);
+  --blue-head:var(--ios-fill);
+  --blue-light:var(--ios-bg);
+  --line:var(--ios-separator);
+  --line-light:var(--ios-separator);
+  --ink:var(--ios-label);
+  --muted:var(--ios-label-2);
+  --green:var(--ios-green);
+  --red:var(--ios-red);
+  --amber:var(--ios-orange);
+  --bg:var(--ios-bg);
+}
+
+/* Modo escuro do aparelho DESATIVADO propositalmente — o visual atual (fundo branco,
+   cabeçalho claro) foi desenhado só para modo claro. Ativar de novo aqui misturaria
+   elementos claros e escuros e pode deixar botões/textos invisíveis feito aconteceu
+   com o botão de voltar ao início. */
+
+/* ---------- Base ---------- */
+html{ -webkit-text-size-adjust:100%; }
+body{
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  background:
+    var(--vibe-wash),
+    var(--ios-bg) !important;
+  background-attachment:fixed !important;
+  color:var(--ios-label) !important;
+  -webkit-font-smoothing:antialiased;
+  letter-spacing:-0.01em;
+}
+main{ max-width:1600px !important; width:100% !important; box-sizing:border-box !important; }
+
+/* ---------- Cabeçalho (large title com efeito de vidro) ---------- */
+header.topbar{
+  background:var(--vibe-gradient-dark) !important;
+  position:relative;
+  overflow:hidden;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+  border-bottom:none !important;
+  box-shadow:0 4px 24px rgba(36,18,89,0.35) !important;
+  padding:22px 20px 20px !important;
+  text-align:left !important;
+  display:block !important;
+}
+header.topbar::before{
+  content:'';
+  position:absolute; inset:0;
+  background:
+    radial-gradient(220px 220px at 92% -10%, rgba(34,224,208,0.55), transparent 65%),
+    radial-gradient(260px 260px at -5% 110%, rgba(226,63,209,0.45), transparent 65%);
+  pointer-events:none;
+}
+header.topbar > *{ position:relative; z-index:1; }
+
+/* ---------- Botão "voltar ao início" ---------- */
+.home-nav-btn{
+  position:absolute;
+  top:18px;
+  right:20px;
+  z-index:2;
+  width:38px; height:38px;
+  display:flex; align-items:center; justify-content:center;
+  background:#F2F2F2;
+  color:#1A1A1A !important;
+  border-radius:50%;
+  font-size:19px;
+  text-decoration:none !important;
+  transition:background .15s, transform .05s;
+}
+.home-nav-btn:hover{ background:#E5E5E5; }
+.home-nav-btn:active{ transform:scale(0.92); }
+header.topbar h1{
+  font-size:28px !important;
+  font-weight:800 !important;
+  letter-spacing:-0.02em !important;
+  margin:0 !important;
+  text-shadow:0 1px 12px rgba(0,0,0,0.25);
+}
+header.topbar p{
+  color:rgba(255,255,255,0.72) !important;
+  font-size:13px !important;
+  font-style:normal !important;
+  margin:2px 0 0 !important;
+}
+header.topbar .logo-box{
+  border-radius:var(--ios-radius-sm) !important;
+  border:none !important;
+  background:rgba(255,255,255,0.14) !important;
+  color:#fff !important;
+}
+#statusServidor{ color:var(--vibe-cyan) !important; justify-content:flex-start !important; }
+#userBar{ justify-content:flex-start !important; color:rgba(255,255,255,0.75) !important; }
+#userBar span{ color:rgba(255,255,255,0.9) !important; }
+
+/* ---------- Navegação por abas → estilo "segmented control" ---------- */
+nav.steps{
+  background:transparent !important;
+  border-bottom:none !important;
+  gap:6px;
+  padding:10px 16px 4px !important;
+  position:sticky;
+  backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+}
+nav.steps button{
+  background:var(--ios-fill) !important;
+  color:var(--ios-label-2) !important;
+  border-radius:var(--ios-radius-pill) !important;
+  padding:9px 16px !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  border-bottom:none !important;
+  transition:background .15s, color .15s;
+}
+nav.steps button.active{
+  background:var(--vibe-gradient-accent) !important;
+  color:#fff !important;
+  box-shadow:0 3px 10px rgba(44,75,255,0.25);
+}
+
+/* Alternadores de visão (Dia/Semana/Mês/Ano, filtros de status etc.) */
+.view-toggle{
+  background:var(--ios-fill) !important;
+  border-radius:var(--ios-radius-sm) !important;
+  padding:3px !important;
+}
+.view-toggle button{
+  color:var(--ios-label-2) !important;
+  border-radius:calc(var(--ios-radius-sm) - 3px) !important;
+  font-weight:600 !important;
+}
+.view-toggle button.active{
+  background:var(--ios-card) !important;
+  color:var(--vibe-purple) !important;
+  box-shadow:var(--ios-shadow-sm) !important;
+}
+.filter-row{ gap:8px !important; }
+.filter-chip{
+  background:var(--ios-fill) !important;
+  border:none !important;
+  color:var(--ios-label-2) !important;
+  border-radius:var(--ios-radius-pill) !important;
+  font-weight:600 !important;
+}
+.filter-chip.selected{
+  background:var(--vibe-gradient-accent-2) !important;
+  color:#fff !important;
+}
+
+/* ---------- Títulos de seção → cabeçalho de grupo (estilo Ajustes) ---------- */
+.section-title{
+  background:transparent !important;
+  color:var(--ios-label-2) !important;
+  font-size:12px !important;
+  font-weight:600 !important;
+  letter-spacing:0.02em !important;
+  text-transform:uppercase !important;
+  padding:0 6px 6px !important;
+  border-radius:0 !important;
+  margin:26px 0 8px !important;
+}
+
+/* ---------- Cards (agrupa a maioria dos "blocos brancos" do sistema) ---------- */
+.card, .card-form, .menu-card, .pac-card, .year-card, .summary-card,
+.q-card, .mini-card, .util-item, .week-day-header, .login-box,
+.empty-hint, .hint, .install-hint, .error-box, .success-box,
+.dia-coluna, .month-cell{
+  background:var(--ios-card) !important;
+  border:none !important;
+  border-radius:var(--ios-radius-md) !important;
+  box-shadow:var(--ios-shadow-sm) !important;
+}
+.card, .card-form{ padding:16px !important; }
+.card-title, .pac-name, .month-name, .wd-title, .name{
+  color:var(--ios-label) !important;
+  font-weight:700 !important;
+}
+.card-sub, .pac-sub, .desc, .month-count-label{
+  color:var(--ios-label-2) !important;
+}
+.empty-hint, .install-hint, .hint{
+  border:none !important;
+  color:var(--ios-label-2) !important;
+}
+.error-box{ background:rgba(255,69,58,0.12) !important; color:var(--ios-red) !important; }
+.success-box{ background:rgba(48,209,88,0.12) !important; color:#1E7A38 !important; }
+@media (prefers-color-scheme: dark){ .success-box{ color:#5FE082 !important; } }
+
+/* ---------- Campos de formulário (estilo "form" do iOS: preenchido, sem borda) ---------- */
+.field label{
+  color:var(--ios-label) !important;
+  font-weight:600 !important;
+  font-size:13px !important;
+}
+.field input, .field select, .field textarea,
+.pac-search, .search-field input, table.pay-info-table input,
+table.tx-table input, .gallery-caption{
+  background:var(--ios-fill) !important;
+  border:none !important;
+  border-radius:var(--ios-radius-sm) !important;
+  color:var(--ios-label) !important;
+  box-shadow:none !important;
+}
+.field input:focus, .field select:focus, .field textarea:focus,
+.pac-search:focus, .search-field input:focus{
+  background:var(--ios-card) !important;
+  box-shadow:0 0 0 2px var(--ios-blue) !important;
+}
+.field input::placeholder, .search-field input::placeholder, .pac-search::placeholder{
+  color:var(--ios-label-3) !important;
+}
+
+/* ---------- Botões ---------- */
+.add-row-btn, .entrar-btn, .today-btn, #entrarBtn,
+.btn-next, .btn-prev, .modal-save{
+  background:var(--vibe-gradient-accent) !important;
+  color:#fff !important;
+  border:none !important;
+  border-radius:var(--ios-radius-sm) !important;
+  font-weight:600 !important;
+  box-shadow:0 4px 14px rgba(44,75,255,0.28) !important;
+  transition:opacity .15s, transform .05s;
+}
+.add-row-btn:active, .entrar-btn:active, .today-btn:active{ opacity:0.75; transform:scale(0.99); }
+
+/* Botões "fantasma"/cancelar (segunda ação numa dupla de botões) — detectados por
+   não terem fundo azul explícito e ficarem ao lado de um botão principal */
+.row > .add-row-btn:not([style*="background"]){
+  background:var(--ios-fill) !important;
+  color:var(--ios-blue) !important;
+}
+.today-btn{
+  display:inline-block !important;
+  border-radius:var(--ios-radius-pill) !important;
+  padding:8px 18px !important;
+}
+
+/* ---------- Chips / alternadores sim-não / status ---------- */
+.chip, .disease-chip, .yn-btn, .tipo-chip, .med-chip, .status-btn{
+  background:var(--ios-fill) !important;
+  border:none !important;
+  color:var(--ios-label-2) !important;
+  border-radius:var(--ios-radius-sm) !important;
+  font-weight:600 !important;
+  box-shadow:none !important;
+}
+.chip.selected, .yn-btn.selected,
+.tipo-chip.selected, .status-btn.selected{
+  background:var(--vibe-gradient-accent) !important;
+  color:#fff !important;
+}
+.disease-chip.checked{
+  background:var(--vibe-gradient-accent-2) !important;
+  color:#fff !important;
+}
+.yn-btn.nao.selected{ background:var(--ios-label-2) !important; }
+.tipo-chip.entrada.selected{ background:var(--ios-green) !important; }
+.tipo-chip.saida.selected{ background:var(--ios-red) !important; }
+.disease-chip .box{ border-color:var(--ios-separator) !important; }
+.disease-chip.checked .box{ color:var(--ios-blue) !important; }
+
+/* ---------- Selos / badges de status ---------- */
+.badge{ border-radius:var(--ios-radius-pill) !important; font-weight:600 !important; }
+.badge.status-agendado, .badge.origem{ background:rgba(10,132,255,0.14) !important; color:var(--ios-blue) !important; }
+.badge.status-confirmado, .badge.pago, .badge.ok{ background:rgba(48,209,88,0.14) !important; color:#1E7A38 !important; }
+.badge.status-faltou, .badge.status-vencido, .badge.baixo, .badge.vencido{ background:rgba(255,69,58,0.14) !important; color:var(--ios-red) !important; }
+.badge.status-cancelado{ background:var(--ios-fill) !important; color:var(--ios-label-2) !important; text-decoration:none !important; }
+.badge.pendente, .badge.vencendo, .badge.bloqueio{ background:rgba(255,159,10,0.16) !important; color:#B36B00 !important; }
+@media (prefers-color-scheme: dark){
+  .badge.status-confirmado, .badge.pago, .badge.ok{ color:#5FE082 !important; }
+  .badge.pendente, .badge.vencendo, .badge.bloqueio{ color:var(--ios-orange) !important; }
+}
+
+/* ---------- Tabelas → lista estilo iOS (sem grade pesada) ---------- */
+table.tx-table, table.pay-info-table{
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+  background:var(--ios-card) !important;
+  border-radius:var(--ios-radius-md) !important;
+  overflow:hidden;
+  box-shadow:var(--ios-shadow-sm) !important;
+}
+table.tx-table th{
+  background:transparent !important;
+  color:var(--ios-label-2) !important;
+  font-size:11px !important;
+  text-transform:uppercase !important;
+  letter-spacing:0.03em !important;
+  border:none !important;
+  border-bottom:0.5px solid var(--ios-separator) !important;
+}
+table.tx-table td, table.pay-info-table td{
+  border:none !important;
+  border-bottom:0.5px solid var(--ios-separator) !important;
+  background:transparent !important;
+}
+table.tx-table tr:last-child td{ border-bottom:none !important; }
+table.tx-table tr:nth-child(even) td{ background:transparent !important; }
+
+/* ---------- Cartões de resumo numérico ---------- */
+.summary-num{ color:var(--ios-label) !important; font-weight:800 !important; }
+.summary-label{ color:var(--ios-label-2) !important; font-weight:600 !important; }
+.summary-num.green, .summary-num.alert.green{ color:var(--ios-green) !important; }
+.summary-num.amber{ color:var(--ios-orange) !important; }
+.summary-num.alert{ color:var(--ios-red) !important; }
+
+/* ---------- Calendário (Agendamento) ---------- */
+.month-weekday{ color:var(--ios-label-3) !important; }
+.month-cell.today{ box-shadow:inset 0 0 0 2px var(--vibe-cyan) !important; }
+.month-cell.outside{ opacity:0.32 !important; }
+.evt-bar{ border-radius:6px !important; }
+.dia-coluna-header{ border-bottom:0.5px solid var(--ios-separator) !important; }
+
+/* ---------- Modais / caixas de diálogo (odontograma etc.) ---------- */
+.tooth-modal-overlay{
+  background:rgba(0,0,0,0.35) !important;
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+}
+.tooth-modal{
+  background:var(--ios-card) !important;
+  border-radius:var(--ios-radius-lg) !important;
+  box-shadow:var(--ios-shadow) !important;
+  border:none !important;
+}
+.modal-hdr, .modal-title{ color:var(--ios-label) !important; }
+
+/* ---------- Notificação flutuante ---------- */
+.toast{
+  background:rgba(28,18,60,0.94) !important;
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+  border-radius:var(--ios-radius-pill) !important;
+  font-weight:600 !important;
+  box-shadow:0 6px 20px rgba(74,42,168,0.35);
+}
+
+/* ---------- Utilitários / listas de links ---------- */
+.util-item{ text-decoration:none !important; }
+.util-item .icon{ background:var(--ios-fill); border-radius:10px; padding:8px; }
+.arrow{ color:var(--ios-label-3) !important; }
+
+/* ---------- Menu inicial (cards de módulos) ---------- */
+.menu-card{ text-decoration:none !important; }
+.menu-card .icon{
+  font-size:26px !important;
+  width:52px; height:52px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:16px;
+  background:var(--vibe-gradient-accent);
+  box-shadow:0 4px 14px rgba(44,75,255,0.22);
+}
+.menu-card:nth-child(2) .icon, .menu-card:nth-child(5) .icon{ background:var(--vibe-gradient-accent-2); box-shadow:0 4px 14px rgba(226,63,209,0.22); }
+.menu-card:nth-child(3) .icon{ background:linear-gradient(90deg, var(--vibe-cyan), var(--ios-green)); box-shadow:0 4px 14px rgba(34,224,208,0.22); }
+.menu-card .name{ color:var(--ios-label) !important; }
+.menu-card .desc{ color:var(--ios-label-2) !important; }
+
+/* ---------- Foco de teclado visível (acessibilidade) ---------- */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
+  outline:2px solid var(--ios-blue) !important;
+  outline-offset:2px;
+}
+
+/* Anima suavemente troca de estado de botões/chips */
+@media (prefers-reduced-motion: no-preference){
+  .add-row-btn, .chip, .yn-btn, .tipo-chip, .filter-chip, .view-toggle button, nav.steps button{
+    transition:background .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+}
+
+/* ============================================================
+   CAMADA DE REFINO — profundidade, tipografia e espaçamento
+   mais sofisticados (menos "caixas com borda", mais elevação
+   e hierarquia). Vem depois de tudo acima, então prevalece.
+   ============================================================ */
+
+/* ---------- Tipografia refinada ---------- */
+body{
+  letter-spacing:-0.011em !important;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+h1, h2, h3, .section-title, .card-title, .pac-name, .clinica-nome, .name,
+.summary-num, .alerta-titulo, header.topbar h1{
+  letter-spacing:-0.02em !important;
+}
+.section-title{
+  font-weight:650 !important;
+  font-size:11.5px !important;
+  letter-spacing:0.06em !important;
+  opacity:0.75;
+}
+p, .card-sub, .pac-sub, .desc, .hint, .alerta-sub, .mi-sub{
+  line-height:1.5 !important;
+}
+
+/* ---------- Elevação: todas as superfícies "cartão" do sistema ---------- */
+.card, .card-form, .menu-card, .pac-card, .year-card, .summary-card,
+.q-card, .mini-card, .util-item, .week-day-header, .login-box,
+.dia-coluna, .month-cell, .box, .alerta-card, .clinica-card,
+.module-card, .tooth-modal{
+  border:none !important;
+  border-radius:18px !important;
+  box-shadow:
+    0 0.5px 0 rgba(255,255,255,0.6) inset,
+    0 1px 2px rgba(15,23,42,0.04),
+    0 6px 20px -4px rgba(15,23,42,0.10) !important;
+  transition:box-shadow .18s ease, transform .18s ease;
+}
+@media (prefers-color-scheme: dark){
+  .card, .card-form, .menu-card, .pac-card, .year-card, .summary-card,
+  .q-card, .mini-card, .util-item, .week-day-header, .login-box,
+  .dia-coluna, .month-cell, .box, .alerta-card, .clinica-card, .module-card{
+    box-shadow:0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -4px rgba(0,0,0,0.45) !important;
+  }
+}
+/* Cartões clicáveis ganham um leve "levante" ao passar o mouse (só em telas com mouse) */
+@media (hover:hover) and (pointer:fine){
+  a.menu-card:hover, a.module-card:hover, a.util-item:hover,
+  .pac-card[style*="cursor:pointer"]:hover{
+    transform:translateY(-2px);
+    box-shadow:
+      0 0.5px 0 rgba(255,255,255,0.6) inset,
+      0 2px 4px rgba(15,23,42,0.06),
+      0 14px 28px -6px rgba(15,23,42,0.16) !important;
+  }
+}
+
+/* Molduras internas (linha fininha) viram divisórias sutis, não bordas grossas */
+.card-top, .clinica-top{ border:none !important; }
+
+/* ---------- Espaçamento mais generoso ---------- */
+.card, .box{ padding:20px !important; }
+main{ padding-left:16px !important; padding-right:16px !important; }
+.section-title{ margin-top:28px !important; margin-bottom:12px !important; }
+
+/* ---------- Botões: sistema unificado ---------- */
+.add-row-btn, .entrar-btn, .today-btn, #entrarBtn, .btn-next, .btn-prev,
+.modal-save, .criar-btn, .btn-primary, .btn-resolver, .btn-ok, .btn-pdf{
+  border-radius:14px !important;
+  font-weight:600 !important;
+  letter-spacing:-0.005em;
+  border:none !important;
+  transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease !important;
+}
+.add-row-btn:active, .entrar-btn:active, .today-btn:active, .criar-btn:active,
+.btn-primary:active, .btn-resolver:active{
+  transform:scale(0.97) !important;
+}
+@media (hover:hover) and (pointer:fine){
+  .add-row-btn:hover, .entrar-btn:hover, .criar-btn:hover, .btn-primary:hover, .btn-resolver:hover{
+    filter:brightness(1.06);
+  }
+}
+.btn-resolver{ background:linear-gradient(135deg, var(--ios-green), #1FAE63) !important; box-shadow:0 4px 12px -2px rgba(46,139,87,0.35) !important; }
+.btn-abrir, .btn-toggle, .voltar-login, .btn-danger{
+  border-radius:14px !important;
+  font-weight:600 !important;
+}
+
+/* ---------- Campos de formulário: sem borda dura, preenchimento suave ---------- */
+.field input, .field select, .field textarea, .pac-search, .search-field input,
+.search-input, table input, textarea{
+  border-radius:12px !important;
+  border:1.5px solid transparent !important;
+  background:var(--ios-fill) !important;
+  transition:background .15s ease, box-shadow .15s ease;
+}
+.field input:focus, .field select:focus, .field textarea:focus,
+.pac-search:focus, .search-field input:focus, .search-input:focus{
+  background:var(--ios-card) !important;
+  box-shadow:0 0 0 3px rgba(10,132,255,0.22), 0 1px 2px rgba(15,23,42,0.06) !important;
+}
+.field label{
+  font-weight:600 !important;
+  font-size:12.5px !important;
+  letter-spacing:0.01em;
+  opacity:0.82;
+}
+
+/* ---------- Badges/chips: tintados, sem contorno duro ---------- */
+.badge, .chip, .disease-chip, .yn-btn, .tipo-chip, .med-chip, .status-btn,
+.filter-chip, .view-toggle button{
+  border:none !important;
+  font-weight:600 !important;
+  letter-spacing:-0.005em;
+}
+
+/* ---------- Cabeçalho: mais espaço, título maior, sombra mais suave ---------- */
+header.topbar{
+  padding-top:24px !important;
+  padding-bottom:22px !important;
+  box-shadow:0 8px 30px -8px rgba(36,18,89,0.45) !important;
+}
+header.topbar h1{
+  font-size:26px !important;
+  font-weight:750 !important;
+}
+header.topbar p{ opacity:0.8; }
+
+/* ---------- Empty states: convite claro, não caixa tímida ---------- */
+.empty-hint, .tudo-ok, .mini-empty{
+  border:1.5px dashed rgba(120,120,128,0.28) !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  border-radius:16px !important;
+  font-weight:500 !important;
+}
+
+/* ---------- Tabelas: linhas mais respiráveis ---------- */
+table.tx-table td, table.pay-info-table td{ padding-top:11px !important; padding-bottom:11px !important; }
+
+/* ---------- Modal do dente / diálogos: elevação forte, sem moldura dura ---------- */
+.tooth-modal{
+  box-shadow:0 24px 60px -12px rgba(15,23,42,0.35), 0 4px 16px rgba(15,23,42,0.1) !important;
+}
+
+/* ============================================================
+   CAMADA "MINIMAL" — nova linguagem visual, inspirada em apps
+   como Instagram: fundo branco/neutro, cor usada com moderação
+   (só como destaque, não como papel de parede), ícones de linha
+   fina em vez de emoji colorido, divisórias finas em vez de
+   sombra pesada. Vem por último, então prevalece sobre tudo.
+   ============================================================ */
+
+:root{
+  --acc:#0A84FF;              /* cor de destaque única — troque pela cor da clínica se preciso */
+  --minimal-line:#EFEFEF;
+  --minimal-ink:#262626;
+  --minimal-muted:#8E8E8E;
+  --minimal-bg:#FAFAFA;
+  /* Neutraliza a lavagem de gradiente de fundo — a página volta a ser branca/neutra */
+  --vibe-wash: none;
+}
+body{ background:#fff !important; }
+
+/* ---------- Cabeçalho: branco, texto escuro, sem gradiente ---------- */
+header.topbar{
+  background:#fff !important;
+  color:var(--minimal-ink) !important;
+  box-shadow:none !important;
+  border-bottom:1px solid var(--minimal-line) !important;
+  padding-top:20px !important;
+  padding-bottom:16px !important;
+}
+header.topbar::before, header.topbar::after{ display:none !important; content:none !important; }
+header.topbar h1{
+  color:var(--minimal-ink) !important;
+  font-size:20px !important;
+  font-weight:700 !important;
+  text-shadow:none !important;
+}
+header.topbar p{ color:var(--minimal-muted) !important; opacity:1 !important; }
+header.topbar #userBar, header.topbar #userBar span{ color:var(--minimal-muted) !important; }
+header.topbar #userBar span[style*="color:var(--red)"]{ color:#ED4956 !important; }
+header.topbar .home-btn, a.home-btn{
+  background:var(--minimal-bg) !important; color:var(--minimal-ink) !important; box-shadow:none !important;
+  border:1px solid var(--minimal-line) !important;
+}
+
+/* ---------- Cartões: divisória fina, sem sombra ---------- */
+.card, .card-form, .menu-card, .pac-card, .year-card, .summary-card,
+.q-card, .mini-card, .util-item, .week-day-header, .login-box,
+.dia-coluna, .month-cell, .box, .alerta-card, .clinica-card, .module-card{
+  box-shadow:none !important;
+  border:1px solid var(--minimal-line) !important;
+  border-radius:14px !important;
+}
+@media (hover:hover) and (pointer:fine){
+  a.menu-card:hover, a.module-card:hover, a.util-item:hover{
+    transform:none !important;
+    box-shadow:none !important;
+    background:var(--minimal-bg) !important;
+  }
+}
+
+/* ---------- Ícones dos módulos: monocromáticos, sem caixinha colorida ---------- */
+.menu-card .icon, .util-item .icon{
+  background:none !important; box-shadow:none !important;
+  color:var(--minimal-ink) !important; font-size:26px !important;
+  width:auto !important; height:auto !important;
+}
+
+/* ---------- Botões: sólidos, sem gradiente arco-íris ---------- */
+.add-row-btn, .entrar-btn, #entrarBtn, .modal-save, .criar-btn, .btn-primary, .btn-resolver, .btn-pdf{
+  background:var(--minimal-ink) !important;
+  color:#fff !important;
+  box-shadow:none !important;
+}
+.add-row-btn.secondary{
+  background:#fff !important; color:var(--minimal-ink) !important; border:1px solid var(--minimal-line) !important;
+}
+.today-btn, .btn-next, .btn-prev{ background:var(--minimal-bg) !important; color:var(--minimal-ink) !important; box-shadow:none !important; }
+
+/* ---------- Chips/badges/abas selecionadas: preto sólido no lugar do gradiente ---------- */
+.filter-chip.active, .view-toggle button.active, .status-btn.active, .yn-btn.active,
+.tab.active, .step.active{
+  background:var(--minimal-ink) !important;
+  color:#fff !important;
+  box-shadow:none !important;
+}
+
+/* ---------- Campos: fundo neutro claro, sem cor ---------- */
+.field input, .field select, .field textarea{
+  background:var(--minimal-bg) !important;
+}
+.field input:focus, .field select:focus, .field textarea:focus{
+  box-shadow:0 0 0 2px rgba(10,132,255,0.35) !important;
+}
+
+
+/* ============================================================
+   CAMADA "FACELIFT" — nova identidade visual (tons terrosos:
+   terracota + sálvia, tipografia arredondada Caprasimo/Figtree,
+   ícones em selos circulares com gradiente). Vem por último,
+   então prevalece sobre a camada minimal acima.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap');
+
+:root{
+  --fl-bg:#f5ead8; --fl-surface:#ebddc5; --fl-ink:#201e1d; --fl-muted:color-mix(in srgb, #201e1d 55%, transparent);
+  --fl-accent:#c67139; --fl-accent-2:#7a8a5e;
+  --fl-accent-100:#fff2eb; --fl-accent-300:#ffc6a5; --fl-accent-600:#b2622d; --fl-accent-700:#8c491a; --fl-accent-800:#643312;
+  --fl-accent2-100:#f0fae1; --fl-accent2-300:#ccdbb2; --fl-accent2-600:#728157; --fl-accent2-700:#56633f; --fl-accent2-800:#3d472b;
+  --fl-line: color-mix(in srgb, #201e1d 14%, transparent);
+  --fl-font-heading:'Caprasimo', system-ui, sans-serif; --fl-font-body:'Figtree', system-ui, sans-serif;
+  --fl-radius:20px; --fl-radius-lg:28px;
+  --fl-shadow-sm:0 1px 2px color-mix(in srgb, #2e2b25 14%, transparent);
+  --fl-shadow-md:0 4px 14px color-mix(in srgb, #2e2b25 16%, transparent);
+}
+body{ background:var(--fl-bg) !important; font-family:var(--fl-font-body) !important; color:var(--fl-ink) !important; }
+h1, h2, h3, h4{ font-family:var(--fl-font-heading) !important; font-weight:400 !important; letter-spacing:-0.01em !important; }
+.section-title{ font-family:var(--fl-font-heading) !important; font-size:19px !important; text-transform:none !important;
+  letter-spacing:normal !important; color:var(--fl-ink) !important; font-weight:400 !important; }
+
+/* Cartões de módulo: selo circular com gradiente "esfera" atrás do ícone, cantos bem arredondados */
+.menu-card{
+  background:color-mix(in srgb, var(--fl-surface) 55%, white) !important;
+  border:none !important; border-radius:var(--fl-radius-lg) !important;
+  box-shadow:var(--fl-shadow-sm) !important; padding:18px 14px !important;
+  transition:transform .15s ease, box-shadow .15s ease !important;
+}
+.menu-card:active{ transform:translateY(-2px) !important; box-shadow:var(--fl-shadow-md) !important; background:color-mix(in srgb, var(--fl-surface) 55%, white) !important; }
+.menu-card .icon{
+  width:52px !important; height:52px !important; border-radius:999px !important; overflow:hidden !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
+  box-shadow:inset 0 2px 4px color-mix(in srgb, white 45%, transparent), inset 0 -4px 6px color-mix(in srgb, black 18%, transparent), 0 4px 8px color-mix(in srgb, black 20%, transparent) !important;
+}
+.menu-card:nth-child(odd) .icon{ background:radial-gradient(circle at 32% 28%, var(--fl-accent-300) 0%, var(--fl-accent-600) 55%, color-mix(in srgb, var(--fl-accent-600) 70%, black) 100%) !important; }
+.menu-card:nth-child(even) .icon{ background:radial-gradient(circle at 32% 28%, var(--fl-accent2-300) 0%, var(--fl-accent2-600) 55%, color-mix(in srgb, var(--fl-accent2-600) 70%, black) 100%) !important; }
+.menu-card .icon img{ width:82% !important; height:82% !important; border-radius:999px !important; object-fit:cover !important; }
+.menu-card .name{ font-family:var(--fl-font-heading) !important; font-weight:400 !important; font-size:15px !important; color:var(--fl-ink) !important; }
+.menu-card .desc{ color:var(--fl-muted) !important; }
+
+.summary-card{
+  border:none !important; border-radius:var(--fl-radius-lg) !important; box-shadow:var(--fl-shadow-md) !important;
+  padding:16px 14px !important; position:relative !important; overflow:hidden !important; text-align:left !important;
+}
+.summary-card:nth-child(4n+1){ background:var(--fl-accent-700) !important; }
+.summary-card:nth-child(4n+2){ background:var(--fl-accent2-700) !important; }
+.summary-card:nth-child(4n+3){ background:#2e2b25 !important; }
+.summary-card:nth-child(4n+4){ background:var(--fl-accent-600) !important; }
+.summary-card .summary-num{ font-family:var(--fl-font-heading) !important; color:#fff !important; font-size:26px !important; }
+.summary-card .summary-label{ color:color-mix(in srgb, white 85%, transparent) !important; text-transform:none !important; letter-spacing:normal !important; font-weight:600 !important; }
+
+body header.topbar h1{ font-family:var(--fl-font-heading) !important; font-weight:400 !important; }
+body .add-row-btn{ border-radius:999px !important; font-family:var(--fl-font-heading) !important; font-weight:400 !important; background:var(--fl-accent) !important; }

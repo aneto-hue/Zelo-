@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Entrar — Zelo</title>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --red:#C0392B; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  html body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:Arial, Helvetica, sans-serif; color:var(--ink); padding:20px;
+    background:
+      linear-gradient(rgba(10,10,10,0.20), rgba(10,10,10,0.30)),
+      url('img/clinica-bg.jpg') center/cover no-repeat fixed !important;
+  }
+  .login-box{
+    width:100%; max-width:380px; background:rgba(255,255,255,0.96); border:none; border-radius:18px;
+    padding:32px 26px; text-align:center; box-shadow:0 24px 60px -14px rgba(0,0,0,0.45);
+    backdrop-filter:blur(6px);
+  }
+  .login-box h1{font-size:20px; color:var(--blue-dark); margin:0 0 4px;}
+  .login-box p.sub{font-size:12.5px; color:var(--muted); margin:0 0 22px;}
+  .field{margin-bottom:14px; text-align:left;}
+  .field label{display:block; font-size:12.5px; font-weight:700; margin-bottom:5px;}
+  .field input{
+    width:100%; padding:12px 10px; font-size:15px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit;
+  }
+  .field input:focus{outline:none; border-color:var(--blue-dark); box-shadow:0 0 0 3px var(--blue-head);}
+  .entrar-btn{
+    width:100%; padding:13px; border:none; border-radius:8px; background:var(--blue-dark); color:#fff;
+    font-weight:700; font-size:15px; cursor:pointer; margin-top:6px;
+  }
+  .entrar-btn:disabled{opacity:0.6; cursor:default;}
+  .erro-msg{
+    background:#FBEAEA; color:var(--red); border:1.5px solid var(--red); border-radius:8px;
+    padding:10px 12px; font-size:12.5px; margin-bottom:14px; display:none; text-align:left;
+  }
+  .erro-msg.show{display:block;}
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="login-box">
+  <h1><img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Tooth/3D/tooth_3d.png" alt="" style="width:26px;height:26px;vertical-align:-8px;margin-right:6px;object-fit:contain;">Zelo</h1>
+  <p class="sub" style="margin-bottom:2px;">Gestão para clínicas odontológicas</p>
+  <p class="sub">Entre com seu e-mail e senha de profissional</p>
+
+  <div class="erro-msg" id="erroMsg"></div>
+
+  <div class="field">
+    <label>E-mail</label>
+    <input type="email" id="email" autocomplete="username" />
+  </div>
+  <div class="field">
+    <label>Senha</label>
+    <input type="password" id="senha" autocomplete="current-password" />
+  </div>
+  <button class="entrar-btn" id="entrarBtn">Entrar</button>
+  <a href="criar-clinica.html" style="display:block;text-align:center;margin-top:16px;font-size:12.5px;color:var(--blue-dark);text-decoration:none;font-weight:700;">Ainda não tem uma clínica cadastrada? Criar conta</a>
+  <span id="esqueciSenhaLink" style="display:block;text-align:center;margin-top:10px;font-size:12.5px;color:var(--muted);text-decoration:underline;cursor:pointer;">Esqueci minha senha</span>
+  <div id="esqueciSenhaInfo" style="display:none;margin-top:12px;padding:12px 14px;background:#F4F8FB;border-radius:10px;font-size:12px;color:var(--ink);line-height:1.5;">
+    Se você é <strong>profissional da equipe</strong>, peça para o administrador da sua clínica trocar sua senha (Perfil da Clínica → Profissionais da equipe).<br><br>
+    Se você é o <strong>administrador</strong> e não tem outro admin pra te ajudar, peça pra quem cuida do sistema pra você (o responsável técnico) resetar sua senha pelo Painel do Sistema.
+  </div>
+</div>
+
+<script>
+const emailInput = document.getElementById('email');
+const senhaInput = document.getElementById('senha');
+const entrarBtn = document.getElementById('entrarBtn');
+const erroMsg = document.getElementById('erroMsg');
+
+document.getElementById('esqueciSenhaLink').onclick = () => {
+  const info = document.getElementById('esqueciSenhaInfo');
+  info.style.display = info.style.display === 'none' ? 'block' : 'none';
+};
+
+async function tentarLogin(){
+  const email = emailInput.value.trim();
+  const senha = senhaInput.value;
+  if(!email || !senha){
+    erroMsg.textContent = 'Preencha e-mail e senha.';
+    erroMsg.classList.add('show');
+    return;
+  }
+  entrarBtn.disabled = true;
+  entrarBtn.textContent = 'Entrando...';
+  erroMsg.classList.remove('show');
+  try{
+    const resp = await fetch('/api/login', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, senha })
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      erroMsg.textContent = data.erro || 'Não foi possível entrar.';
+      erroMsg.classList.add('show');
+      entrarBtn.disabled = false;
+      entrarBtn.textContent = 'Entrar';
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    window.location.href = params.get('voltar') || '/index.html';
+  }catch(e){
+    erroMsg.textContent = 'Não foi possível conectar ao servidor. Verifique sua internet.';
+    erroMsg.classList.add('show');
+    entrarBtn.disabled = false;
+    entrarBtn.textContent = 'Entrar';
+  }
+}
+
+entrarBtn.onclick = tentarLogin;
+senhaInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') tentarLogin(); });
+emailInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') senhaInput.focus(); });
+</script>
+</body>
+</html>

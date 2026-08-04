@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Financeiro — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="shared-data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+  document.head.appendChild(s);
+"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{
+    background:#fff; border-bottom:3px solid var(--blue-dark); padding:14px 16px;
+    display:flex; align-items:center; gap:14px; position:sticky; top:0; z-index:20;
+  }
+  header.topbar h1{font-size:18px; margin:0; color:var(--blue-dark); font-weight:700;}
+  header.topbar p{margin:2px 0 0; font-size:12px; color:var(--muted); font-style:italic;}
+
+  nav.steps{
+    display:flex; overflow-x:auto; background:#fff; border-bottom:1px solid var(--line-light);
+    position:sticky; top:62px; z-index:19; -webkit-overflow-scrolling:touch;
+  }
+  nav.steps button{
+    flex:0 0 auto; padding:12px 16px; font-size:13px; font-weight:700; border:none; background:transparent;
+    color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap;
+  }
+  nav.steps button.active{color:var(--blue-dark); border-bottom-color:var(--blue-dark);}
+
+  main{max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto; padding:18px 14px 40px;}
+
+  .section-title{
+    background:var(--blue-dark); color:#fff; font-weight:700; font-size:14px; letter-spacing:.5px;
+    padding:10px 14px; border-radius:6px; margin:18px 0 12px; text-transform:uppercase;
+  }
+  .section-title:first-child{margin-top:0;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; font-weight:700; margin-bottom:5px; color:var(--ink);}
+  .field input[type=text], .field input[type=date], .field input[type=number], .field select{
+    width:100%; padding:12px 10px; font-size:16px; border:1.5px solid var(--line); border-radius:8px;
+    background:#fff; font-family:inherit;
+  }
+  .field input:focus, .field select:focus{outline:none; border-color:var(--blue-dark); box-shadow:0 0 0 3px var(--blue-head);}
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:130px;}
+
+  .add-row-btn{
+    margin-top:8px; padding:12px 14px; border:1.5px dashed var(--line); background:#fff; border-radius:8px;
+    color:var(--blue-dark); font-weight:700; font-size:14px; cursor:pointer; text-align:center; position:relative; overflow:hidden;
+  }
+  .add-row-btn input[type=file]{position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;}
+
+  .card{background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:14px; margin-bottom:12px;}
+  .card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .card-title{font-size:15px; font-weight:700; color:var(--blue-dark);}
+  .card-sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .card-actions{display:flex; gap:14px; flex-shrink:0;}
+  .card-actions span{cursor:pointer; font-size:13.5px; font-weight:700;}
+
+  .badge{display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700;}
+  .badge.pago{background:#E4F3EA; color:var(--green);}
+  .badge.pendente{background:#FCF1DC; color:var(--amber);}
+  .badge.origem{background:var(--blue-head); color:var(--blue-dark);}
+
+  .empty-hint{text-align:center; padding:20px; color:var(--muted); font-size:13px; background:#fff; border:1.5px dashed var(--line-light); border-radius:10px;}
+
+  table.tx-table{width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;}
+  table.tx-table th{background:var(--blue-head); color:var(--blue-dark); font-weight:700; padding:8px 6px; border:1px solid var(--line-light); text-align:left;}
+  table.tx-table td{border:1px solid var(--line-light); padding:8px 6px;}
+  table.tx-table tr:nth-child(even) td{background:var(--blue-light);}
+  table.tx-table td.remove-cell{width:34px; text-align:center; cursor:pointer; color:var(--red); font-weight:900; font-size:15px;}
+
+  .summary-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
+  @media(min-width:520px){.summary-grid{grid-template-columns:repeat(3,1fr);}}
+  .summary-card{background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:12px; text-align:center;}
+  .summary-num{font-size:20px; font-weight:700; color:var(--blue-dark);}
+  .summary-num.green{color:var(--green);}
+  .summary-num.amber{color:var(--amber);}
+  .summary-label{font-size:10.5px; color:var(--muted); font-weight:700; text-transform:uppercase; margin-top:2px;}
+
+  .filter-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+  .filter-chip{
+    padding:8px 13px; border-radius:20px; border:1.5px solid var(--line); background:#fff;
+    font-weight:700; font-size:12px; color:var(--muted); cursor:pointer; user-select:none;
+  }
+  .filter-chip.selected{background:var(--blue-dark); border-color:var(--blue-dark); color:#fff;}
+
+  .parcela-row{
+    display:flex; align-items:center; gap:8px; padding:10px; border:1.5px solid var(--line-light); border-radius:8px;
+    margin-bottom:8px; background:#fff;
+  }
+  .parcela-row.pago{background:#F3FBF6; border-color:var(--green);}
+  .parcela-info{flex:1; font-size:12.5px;}
+  .parcela-info .p-valor{font-weight:700; font-size:14px; color:var(--ink);}
+  .parcela-info .p-sub{color:var(--muted); font-size:11.5px; margin-top:2px;}
+  .parcela-toggle{
+    padding:8px 12px; border-radius:8px; border:1.5px solid var(--green); background:#fff; color:var(--green);
+    font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap;
+  }
+  .parcela-toggle.marcado{background:var(--green); color:#fff;}
+
+  .toast{
+    position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; transition:all .25s; z-index:50; pointer-events:none; text-align:center; max-width:90%;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+<link rel="stylesheet" href="theme.css">
+<script src="nav-home.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>Controle de Pagamentos e Comissões</h1>
+    <p>Alimentado pelas fichas de anamnese</p>
+  </div>
+</header>
+
+<nav class="steps" id="stepsNav"></nav>
+
+<main id="main"></main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ ESTADO ============
+function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+const state = {
+  profissionais: [], // {id, nome, comissaoPercent}
+  rateiosFixos: [],  // {id, nome, percentual} — ex: "Clínica" 30%, "Secretária" 5% — aplicado sobre TODO valor recebido, além da comissão do profissional
+  lancamentos: []    // {id, paciente, profissionalId, profissionalNomeOriginal, clinicaNome, dataContrato, valorTotal, tratamentos:[{descricao,valor}], parcelas:[{id,valor,data,forma,pago,dataRecebimento}], origem}
+};
+
+const STEPS = ['Profissionais','Lançamentos','Parcelas e Recebimentos','Comissões'];
+let currentStep = 1;
+
+// ============ PERSISTÊNCIA (servidor com reserva local) ============
+const STORAGE_KEY = 'controle_pagamentos_comissoes_v1';
+function saveProgress(){ ClinicaStorage.save(STORAGE_KEY, state); }
+let _saveTimer=null;
+function saveProgressDebounced(){ clearTimeout(_saveTimer); _saveTimer=setTimeout(saveProgress,400); }
+async function loadProgress(){
+  const saved = await ClinicaStorage.load(STORAGE_KEY);
+  if(!saved) return false;
+  Object.keys(state).forEach(k => { if(saved[k]!==undefined) state[k]=saved[k]; });
+  return true;
+}
+function clearProgress(){ ClinicaStorage.save(STORAGE_KEY, null); try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
+
+// A partir de agora, quem cadastra profissionais é o Perfil da Clínica (lista compartilhada,
+// a mesma usada no Agendamento). Aqui, só migra dados antigos (se o Financeiro já tinha
+// profissionais cadastrados por ele mesmo, antes dessa mudança) e depois só faz leitura.
+const CHAVE_PROFISSIONAIS_COMPARTILHADA = 'clinica_profissionais_agenda_v1';
+async function carregarProfissionaisCompartilhados(){
+  let compartilhados = await ClinicaStorage.load(CHAVE_PROFISSIONAIS_COMPARTILHADA);
+  if((!compartilhados || !compartilhados.length) && state.profissionais && state.profissionais.length){
+    // Migração única: leva os profissionais (com forma de pagamento) que já existiam
+    // localmente no Financeiro para o local compartilhado, preservando os IDs.
+    compartilhados = state.profissionais;
+    await ClinicaStorage.save(CHAVE_PROFISSIONAIS_COMPARTILHADA, compartilhados);
+  }
+  state.profissionais = compartilhados || [];
+  state.profissionais.forEach(p => { if(!p.pagamento) p.pagamento = { percentual: p.comissaoPercent||'', diaria:'', fixo:'' }; });
+}
+
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+// ============ HELPERS DE RENDER ============
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function textField(label, store, key, opts={}){
+  const f=el('div',{class:'field'});
+  f.appendChild(el('label',{},document.createTextNode(label)));
+  const input=el('input',{type:opts.type||'text', value:store[key]||''});
+  input.oninput=(e)=>{ store[key]=e.target.value; saveProgressDebounced(); };
+  f.appendChild(input);
+  return f;
+}
+function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function formatDateBR(str){ if(!str) return '—'; const [y,m,d]=str.split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
+
+function getProfissional(id){ return state.profissionais.find(p=>p.id===id); }
+
+// ============ IMPORTAÇÃO DE PDF DA FICHA DE ANAMNESE ============
+const FINANCEIRO_TAG = 'FICHA_FINANCEIRO_DATA:';
+function decodePdfData(code){
+  try{
+    let b64 = String(code).trim().replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length % 4) b64 += '=';
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  }catch(e){ return null; }
+}
+function extractFinanceiroFromPDFBytes(bytes){
+  let raw = '';
+  const chunk = 0x8000;
+  for(let i=0;i<bytes.length;i+=chunk){
+    raw += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  const m = raw.match(/\/Keywords\s*\(([^)]*)\)/);
+  if(!m) return null;
+  const kwIdx = m[1].indexOf(FINANCEIRO_TAG);
+  if(kwIdx === -1) return null;
+  const codeMatch = m[1].slice(kwIdx + FINANCEIRO_TAG.length).match(/[A-Za-z0-9_-]+/);
+  if(!codeMatch) return null;
+  return decodePdfData(codeMatch[0]);
+}
+function encontrarProfissionalPorNome(nome){
+  if(!nome) return '';
+  const alvo = nome.trim().toLowerCase();
+  const achado = state.profissionais.find(p => p.nome.trim().toLowerCase() === alvo);
+  return achado ? achado.id : '';
+}
+function importarPDFAnamnese(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const bytes = new Uint8Array(reader.result);
+      const dados = extractFinanceiroFromPDFBytes(bytes);
+      if(!dados || typeof dados !== 'object'){
+        alert('Não foi possível encontrar dados financeiros neste PDF. Confirme se ele foi gerado pelo botão "Gerar PDF da ficha completa" na Ficha de Anamnese.');
+        return;
+      }
+      const lancamento = {
+        id: uid(),
+        paciente: dados.paciente || '(sem nome)',
+        profissionalId: encontrarProfissionalPorNome(dados.profissionalNome),
+        profissionalNomeOriginal: dados.profissionalNome || '',
+        clinicaNome: dados.clinicaNome || '',
+        dataContrato: dados.dataContrato || '',
+        valorTotal: parseFloat(dados.valorTotal)||0,
+        tratamentos: Array.isArray(dados.tratamentos) ? dados.tratamentos : [],
+        parcelas: (Array.isArray(dados.parcelas)?dados.parcelas:[]).map(p => ({
+          id: uid(), valor: parseFloat(p.valor)||0, data: p.data||'', forma: p.forma||'', pago:false, dataRecebimento:''
+        })),
+        origem: 'importado'
+      };
+      state.lancamentos.unshift(lancamento);
+      if(typeof clinicaUpsertPaciente === 'function' && lancamento.paciente && lancamento.paciente !== '(sem nome)'){
+        const pac = clinicaUpsertPaciente({ nome: lancamento.paciente });
+        if(pac) lancamento.pacienteId = pac.id;
+      }
+      saveProgress();
+      refreshPanel();
+      toast(lancamento.profissionalId ? 'Ficha importada e profissional identificado automaticamente!' : 'Ficha importada! Atribua um profissional a este lançamento.');
+    }catch(err){
+      alert('Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ============ RENDER: PROFISSIONAIS ============
+let novoProfissionalAberto = false;
+let profissionalEmEdicao = null;
+let novoRateioAberto = false;
+let rateioEmEdicao = null;
+
+function renderRateioForm(container, rateio, onSalvar, onCancelar){
+  const form = el('div', { class:'card', style:'border-color:var(--blue-dark);' });
+  form.appendChild(textField('Nome (ex: Clínica, Secretária Ana)', rateio, 'nome'));
+  const pctField = el('div', { class:'field' });
+  pctField.appendChild(el('label', {}, document.createTextNode('Percentual (%) sobre TODO valor recebido')));
+  const pctInput = el('input', { type:'number', min:'0', max:'100', step:'0.1', value: rateio.percentual||'', placeholder:'Ex: 30' });
+  pctInput.oninput = (e) => { rateio.percentual = e.target.value; };
+  pctField.appendChild(pctInput);
+  form.appendChild(pctField);
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' }, document.createTextNode('Salvar'));
+  salvarBtn.onclick = () => {
+    if(!(rateio.nome||'').trim()){ alert('Informe um nome (ex: Clínica, Secretária).'); return; }
+    onSalvar();
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = onCancelar;
+  btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+  container.appendChild(form);
+}
+
+function renderRateiosFixos(container){
+  container.appendChild(el('div', { class:'section-title', style:'margin-top:26px;' }, document.createTextNode('Rateios fixos (Clínica, Secretária etc.)')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
+    document.createTextNode('Percentuais que saem de TODO valor recebido, além da comissão do profissional que atendeu — por exemplo, quanto a clínica retém e quanto uma secretária recebe por cada pagamento.')));
+
+  if(novoRateioAberto){
+    const novo = { id: uid(), nome:'', percentual:'' };
+    renderRateioForm(container, novo,
+      () => { state.rateiosFixos.push(novo); novoRateioAberto=false; saveProgress(); refreshPanel(); toast('Rateio adicionado!'); },
+      () => { novoRateioAberto=false; refreshPanel(); }
+    );
+  } else {
+    const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Novo rateio fixo'));
+    addBtn.onclick = () => { novoRateioAberto = true; refreshPanel(); };
+    container.appendChild(addBtn);
+  }
+
+  if(!state.rateiosFixos.length && !novoRateioAberto){
+    container.appendChild(el('div', { class:'empty-hint', style:'margin-top:14px;' }, document.createTextNode('Nenhum rateio fixo cadastrado ainda.')));
+    return;
+  }
+
+  state.rateiosFixos.forEach(rateio => {
+    if(rateioEmEdicao === rateio.id){
+      renderRateioForm(container, rateio,
+        () => { rateioEmEdicao=null; saveProgress(); refreshPanel(); toast('Rateio atualizado!'); },
+        () => { rateioEmEdicao=null; refreshPanel(); }
+      );
+      return;
+    }
+    const card = el('div', { class:'card' });
+    const top = el('div', { class:'card-top' });
+    const info = el('div', {});
+    info.appendChild(el('div', { class:'card-title' }, document.createTextNode(rateio.nome)));
+    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode('Rateio: '+(rateio.percentual||'0')+'% de todo valor recebido')));
+    top.appendChild(info);
+    const actions = el('div', { class:'card-actions' });
+    const editIcon = el('span', { style:'color:var(--blue-dark);' }, document.createTextNode('✎ Editar'));
+    editIcon.onclick = () => { rateioEmEdicao = rateio.id; refreshPanel(); };
+    const delIcon = el('span', { style:'color:var(--red);' }, document.createTextNode('✕ Excluir'));
+    delIcon.onclick = () => {
+      if(confirm('Excluir o rateio "'+rateio.nome+'"?')){
+        state.rateiosFixos = state.rateiosFixos.filter(r=>r.id!==rateio.id);
+        saveProgress(); refreshPanel(); toast('Rateio excluído.');
+      }
+    };
+    actions.appendChild(editIcon); actions.appendChild(delIcon);
+    top.appendChild(actions);
+    card.appendChild(top);
+    container.appendChild(card);
+  });
+}
+
+function renderProfissionalForm(container, prof, onSalvar, onCancelar){
+  if(!prof.pagamento) prof.pagamento = { percentual: prof.comissaoPercent||'', diaria:'', fixo:'' };
+  const form = el('div', { class:'card', style:'border-color:var(--blue-dark);' });
+  form.appendChild(textField('Nome do profissional', prof, 'nome'));
+
+  form.appendChild(el('div', { style:'font-weight:700;font-size:13px;color:var(--blue-dark);margin:14px 0 6px;' },
+    document.createTextNode('Forma de pagamento')));
+  form.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:0;margin-bottom:10px;' },
+    document.createTextNode('Marque quantas opções fizerem sentido — dá pra combinar (ex: diária + percentual).')));
+
+  function linhaPagamento(label, campo, placeholder, prefixo){
+    const linha = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:10px;' });
+    const cb = el('input', { type:'checkbox' });
+    cb.checked = !!(prof.pagamento[campo] && parseFloat(prof.pagamento[campo])>0);
+    const valInput = el('input', { type:'number', min:'0', step:'0.01', value: prof.pagamento[campo]||'', placeholder,
+      style:'flex:1;padding:9px;font-size:14px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;'+(cb.checked?'':'opacity:0.4;') });
+    valInput.disabled = !cb.checked;
+    cb.onchange = (e) => {
+      valInput.disabled = !e.target.checked;
+      valInput.style.opacity = e.target.checked ? '1' : '0.4';
+      if(!e.target.checked) { prof.pagamento[campo] = ''; valInput.value=''; }
+    };
+    valInput.oninput = (e) => { prof.pagamento[campo] = e.target.value; };
+    const labelEl = el('label', { style:'display:flex;align-items:center;gap:6px;width:110px;font-size:13px;font-weight:600;flex-shrink:0;' }, [cb, document.createTextNode(label)]);
+    linha.appendChild(labelEl);
+    if(prefixo) linha.appendChild(el('span', { style:'font-size:13px;color:var(--muted);' }, document.createTextNode(prefixo)));
+    linha.appendChild(valInput);
+    return linha;
+  }
+
+  form.appendChild(linhaPagamento('% Comissão', 'percentual', 'Ex: 40', null));
+  form.appendChild(linhaPagamento('Diária', 'diaria', 'Ex: 150,00', 'R$'));
+  form.appendChild(linhaPagamento('Fixo mensal', 'fixo', 'Ex: 2000,00', 'R$'));
+
+  const btnRow = el('div', { class:'row', style:'margin-top:8px;' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' }, document.createTextNode('Salvar'));
+  salvarBtn.onclick = () => {
+    if(!(prof.nome||'').trim()){ alert('Informe o nome do profissional.'); return; }
+    if(!parseFloat(prof.pagamento.percentual) && !parseFloat(prof.pagamento.diaria) && !parseFloat(prof.pagamento.fixo)){
+      if(!confirm('Nenhuma forma de pagamento foi configurada. Salvar mesmo assim?')) return;
+    }
+    prof.comissaoPercent = prof.pagamento.percentual || ''; // mantém compatibilidade com relatórios antigos
+    onSalvar();
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = onCancelar;
+  btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+  container.appendChild(form);
+}
+
+function renderProfissionais(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Profissionais e comissões')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
+    document.createTextNode('Para adicionar, editar ou remover um profissional (nome, cor e forma de pagamento), use o Perfil da Clínica.')));
+
+  const irBtn = el('a', { href:'perfil-clinica.html', class:'add-row-btn', style:'display:block;text-align:center;text-decoration:none;margin-bottom:14px;' },
+    document.createTextNode('Gerenciar profissionais no Perfil da Clínica →'));
+  container.appendChild(irBtn);
+
+  if(!state.profissionais.length){
+    container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum profissional cadastrado ainda.')));
+    renderRateiosFixos(container);
+    return;
+  }
+
+  state.profissionais.forEach(prof => {
+    const card = el('div', { class:'card' });
+    const top = el('div', { class:'card-top' });
+    const info = el('div', {});
+    info.appendChild(el('div', { class:'card-title' }, [
+      el('span', { style:'display:inline-block;width:11px;height:11px;border-radius:50%;background:'+(prof.cor||'#1F5C8B')+';margin-right:7px;' }),
+      document.createTextNode(prof.nome)
+    ]));
+    const pg = prof.pagamento || { percentual: prof.comissaoPercent||'', diaria:'', fixo:'' };
+    const partes = [];
+    if((pg.percentual!==undefined && pg.percentual!=='')) partes.push(pg.percentual+'% comissão');
+    if(parseFloat(pg.diaria)>0) partes.push('R$ '+formatMoney(parseFloat(pg.diaria))+'/diária');
+    if(parseFloat(pg.fixo)>0) partes.push('R$ '+formatMoney(parseFloat(pg.fixo))+'/fixo mensal');
+    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(partes.length ? partes.join(' + ') : 'Sem forma de pagamento configurada')));
+    top.appendChild(info);
+    card.appendChild(top);
+    container.appendChild(card);
+  });
+
+  renderRateiosFixos(container);
+}
+
+// ============ RENDER: LANÇAMENTOS ============
+let novoLancamentoAberto = false;
+let lancamentoExpandido = null;
+
+function renderNovoLancamentoForm(container){
+  const form = el('div', { class:'card', style:'border-color:var(--blue-dark);' });
+  const dadosTemp = { paciente:'', profissionalId:'', valorTotal:'' };
+  const pacField = el('div', { class:'field' });
+  pacField.appendChild(el('label', {}, document.createTextNode('Paciente')));
+  const pacDatalistId = typeof clinicaGarantirDatalist === 'function' ? clinicaGarantirDatalist() : null;
+  const pacInput = el('input', { type:'text', value:'' });
+  if(pacDatalistId) pacInput.setAttribute('list', pacDatalistId);
+  pacInput.oninput = (e) => { dadosTemp.paciente = e.target.value; };
+  pacField.appendChild(pacInput);
+  form.appendChild(pacField);
+
+  const profField = el('div', { class:'field' });
+  profField.appendChild(el('label', {}, document.createTextNode('Profissional')));
+  const profSelect = el('select', {});
+  profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Selecione...')));
+  state.profissionais.forEach(p => profSelect.appendChild(el('option', { value:p.id }, document.createTextNode(p.nome))));
+  profSelect.onchange = (e) => { dadosTemp.profissionalId = e.target.value; };
+  profField.appendChild(profSelect);
+  form.appendChild(profField);
+
+  const valorField = el('div', { class:'field' });
+  valorField.appendChild(el('label', {}, document.createTextNode('Valor total (R$)')));
+  const valorInput = el('input', { type:'number', min:'0', step:'0.01', value:'' });
+  valorInput.oninput = (e) => { dadosTemp.valorTotal = e.target.value; };
+  valorField.appendChild(valorInput);
+  form.appendChild(valorField);
+
+  form.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:-8px;' },
+    document.createTextNode('Você poderá adicionar as parcelas depois de salvar, na própria lista de lançamentos.')));
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' }, document.createTextNode('Salvar lançamento'));
+  salvarBtn.onclick = () => {
+    if(!(dadosTemp.paciente||'').trim()){ alert('Informe o nome do paciente.'); return; }
+    const valorNum = parseFloat(dadosTemp.valorTotal)||0;
+    const novoLancamento = {
+      id: uid(), paciente: dadosTemp.paciente, profissionalId: dadosTemp.profissionalId,
+      profissionalNomeOriginal:'', clinicaNome:'', dataContrato:'', valorTotal: valorNum,
+      tratamentos: [], parcelas: [], origem:'manual'
+    };
+    if(typeof clinicaUpsertPaciente === 'function'){
+      const pac = clinicaUpsertPaciente({ nome: dadosTemp.paciente });
+      if(pac) novoLancamento.pacienteId = pac.id;
+    }
+    state.lancamentos.unshift(novoLancamento);
+    novoLancamentoAberto = false;
+    saveProgress(); refreshPanel(); toast('Lançamento criado!');
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = () => { novoLancamentoAberto=false; refreshPanel(); };
+  btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+  container.appendChild(form);
+}
+
+function renderLancamentoExpandido(container, lanc){
+  const wrap = el('div', { style:'margin-top:10px;padding-top:10px;border-top:1.5px dashed var(--line-light);' });
+
+  if(lanc.tratamentos && lanc.tratamentos.length){
+    wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;color:var(--blue-dark);margin-bottom:6px;' }, document.createTextNode('Tratamentos')));
+    lanc.tratamentos.forEach(t => {
+      wrap.appendChild(el('div', { style:'font-size:12px;color:var(--ink);margin-bottom:3px;' },
+        document.createTextNode('• '+(t.descricao||'')+(t.valor?(' — R$ '+formatMoney(t.valor)):''))));
+    });
+  }
+
+  wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;color:var(--blue-dark);margin:10px 0 6px;' }, document.createTextNode('Parcelas')));
+  if(!lanc.parcelas.length){
+    wrap.appendChild(el('div', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode('Nenhuma parcela cadastrada.')));
+  } else {
+    lanc.parcelas.forEach(p => {
+      const row = el('div', { class:'parcela-row'+(p.pago?' pago':'') });
+      const info = el('div', { class:'parcela-info' });
+      info.appendChild(el('div', { class:'p-valor' }, document.createTextNode('R$ '+formatMoney(p.valor))));
+      info.appendChild(el('div', { class:'p-sub' }, document.createTextNode(
+        [p.data?formatDateBR(p.data):'', p.forma].filter(Boolean).join(' • ') + (p.pago && p.dataRecebimento ? (' • Recebido em '+formatDateBR(p.dataRecebimento)) : '')
+      )));
+      row.appendChild(info);
+      const toggle = el('div', { class:'parcela-toggle'+(p.pago?' marcado':'') }, document.createTextNode(p.pago?'✓ Recebido':'Marcar recebido'));
+      toggle.onclick = () => {
+        p.pago = !p.pago;
+        p.dataRecebimento = p.pago ? new Date().toISOString().slice(0,10) : '';
+        saveProgress(); refreshPanel();
+      };
+      row.appendChild(toggle);
+      wrap.appendChild(row);
+    });
+  }
+
+  const addParcelaBtn = el('div', { class:'add-row-btn', style:'margin-top:4px;' }, document.createTextNode('+ Adicionar parcela'));
+  addParcelaBtn.onclick = () => {
+    lanc.parcelas.push({ id: uid(), valor:0, data:'', forma:'', pago:false, dataRecebimento:'' });
+    saveProgress(); refreshPanel();
+  };
+  wrap.appendChild(addParcelaBtn);
+
+  container.appendChild(wrap);
+}
+
+function renderLancamentos(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Importar da ficha de anamnese')));
+  const importBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-light);border-color:var(--blue-dark);color:var(--blue-dark);' },
+    document.createTextNode('📥 Importar PDF da Ficha de Anamnese'));
+  const importInput = el('input', { type:'file', accept:'.pdf,application/pdf' });
+  importInput.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    importarPDFAnamnese(file);
+  };
+  importBtn.appendChild(importInput);
+  container.appendChild(importBtn);
+  container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:6px;' },
+    document.createTextNode('Use o PDF gerado pelo botão "Gerar PDF da ficha completa" na Ficha de Anamnese — os dados de paciente, profissional, valor e parcelas são importados automaticamente.')));
+
+  container.appendChild(el('div', { class:'section-title', style:'margin-top:22px;' }, document.createTextNode('Lançamentos')));
+
+  if(novoLancamentoAberto){
+    renderNovoLancamentoForm(container);
+  } else {
+    const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Novo lançamento manual'));
+    addBtn.onclick = () => { novoLancamentoAberto = true; refreshPanel(); };
+    container.appendChild(addBtn);
+  }
+
+  if(!state.lancamentos.length){
+    container.appendChild(el('div', { class:'empty-hint', style:'margin-top:14px;' }, document.createTextNode('Nenhum lançamento ainda. Importe um PDF ou crie um manualmente.')));
+    return;
+  }
+
+  const listWrap = el('div', { style:'margin-top:14px;' });
+  container.appendChild(listWrap);
+
+  state.lancamentos.forEach(lanc => {
+    const pagas = lanc.parcelas.filter(p=>p.pago).length;
+    const card = el('div', { class:'card' });
+    const top = el('div', { class:'card-top' });
+    const info = el('div', {});
+    info.appendChild(el('div', { class:'card-title' }, document.createTextNode(lanc.paciente)));
+    const prof = getProfissional(lanc.profissionalId);
+    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(
+      'Valor total: R$ '+formatMoney(lanc.valorTotal) + ' • ' + pagas + '/' + lanc.parcelas.length + ' parcela(s) recebida(s)'
+    )));
+    const badges = el('div', { style:'margin-top:6px;' });
+    badges.appendChild(el('span', { class:'badge origem' }, document.createTextNode(lanc.origem==='importado'?'Importado':'Manual')));
+    top.appendChild(info);
+
+    const actions = el('div', { class:'card-actions' });
+    const expandIcon = el('span', { style:'color:var(--blue-dark);' }, document.createTextNode(lancamentoExpandido===lanc.id?'▲':'▼'));
+    expandIcon.onclick = () => { lancamentoExpandido = lancamentoExpandido===lanc.id ? null : lanc.id; refreshPanel(); };
+    const delIcon = el('span', { style:'color:var(--red);' }, document.createTextNode('✕'));
+    delIcon.onclick = () => {
+      if(confirm('Excluir este lançamento e todas as suas parcelas?')){
+        state.lancamentos = state.lancamentos.filter(l=>l.id!==lanc.id);
+        saveProgress(); refreshPanel(); toast('Lançamento excluído.');
+      }
+    };
+    actions.appendChild(expandIcon); actions.appendChild(delIcon);
+    top.appendChild(actions);
+    card.appendChild(top);
+    card.appendChild(badges);
+
+    // Seletor de profissional (sempre visível, para permitir atribuir/corrigir)
+    const profField = el('div', { class:'field', style:'margin-top:10px;margin-bottom:0;' });
+    profField.appendChild(el('label', {}, document.createTextNode('Profissional responsável'
+      + (lanc.profissionalNomeOriginal && !lanc.profissionalId ? ' (sugerido pela ficha: "'+lanc.profissionalNomeOriginal+'" — cadastre-o ou selecione abaixo)' : ''))));
+    const profSelect = el('select', {});
+    profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Não atribuído')));
+    state.profissionais.forEach(p => {
+      const opt = el('option', { value:p.id }, document.createTextNode(p.nome));
+      if(lanc.profissionalId===p.id) opt.setAttribute('selected','selected');
+      profSelect.appendChild(opt);
+    });
+    profSelect.onchange = (e) => { lanc.profissionalId = e.target.value; saveProgress(); };
+    profField.appendChild(profSelect);
+    card.appendChild(profField);
+
+    if(lancamentoExpandido === lanc.id){
+      renderLancamentoExpandido(card, lanc);
+    }
+
+    listWrap.appendChild(card);
+  });
+}
+
+// ============ RENDER: PARCELAS E RECEBIMENTOS ============
+let filtroStatusParcela = 'todas'; // todas | pagas | pendentes
+let filtroProfissionalParcela = '';
+let parcelaConfirmandoId = null;
+
+function todasParcelasComContexto(){
+  const lista = [];
+  state.lancamentos.forEach(lanc => {
+    lanc.parcelas.forEach(p => {
+      lista.push({ parcela:p, lancamento:lanc });
+    });
+  });
+  return lista;
+}
+
+function renderParcelasRecebimentos(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Parcelas e recebimentos')));
+
+  const todas = todasParcelasComContexto();
+  const totalGeral = todas.reduce((s,x)=>s+x.parcela.valor,0);
+  const totalRecebido = todas.filter(x=>x.parcela.pago).reduce((s,x)=>s+x.parcela.valor,0);
+  const totalPendente = totalGeral - totalRecebido;
+
+  const summary = el('div', { class:'summary-grid' });
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num' }, document.createTextNode('R$ '+formatMoney(totalGeral))),
+    el('div', { class:'summary-label' }, document.createTextNode('Total geral'))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num green' }, document.createTextNode('R$ '+formatMoney(totalRecebido))),
+    el('div', { class:'summary-label' }, document.createTextNode('Recebido'))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num amber' }, document.createTextNode('R$ '+formatMoney(totalPendente))),
+    el('div', { class:'summary-label' }, document.createTextNode('Pendente'))
+  ]));
+  container.appendChild(summary);
+
+  const filterRow = el('div', { class:'filter-row' });
+  [['todas','Todas'],['pagas','Recebidas'],['pendentes','Pendentes']].forEach(([key,label]) => {
+    const chip = el('div', { class:'filter-chip'+(filtroStatusParcela===key?' selected':'') }, document.createTextNode(label));
+    chip.onclick = () => { filtroStatusParcela = key; refreshPanel(); };
+    filterRow.appendChild(chip);
+  });
+  container.appendChild(filterRow);
+
+  if(state.profissionais.length){
+    const profField = el('div', { class:'field' });
+    profField.appendChild(el('label', {}, document.createTextNode('Filtrar por profissional')));
+    const profSelect = el('select', {});
+    profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Todos')));
+    state.profissionais.forEach(p => {
+      const opt = el('option', { value:p.id }, document.createTextNode(p.nome));
+      if(filtroProfissionalParcela===p.id) opt.setAttribute('selected','selected');
+      profSelect.appendChild(opt);
+    });
+    profSelect.onchange = (e) => { filtroProfissionalParcela = e.target.value; refreshPanel(); };
+    profField.appendChild(profSelect);
+    container.appendChild(profField);
+  }
+
+  let filtradas = todas;
+  if(filtroStatusParcela==='pagas') filtradas = filtradas.filter(x=>x.parcela.pago);
+  if(filtroStatusParcela==='pendentes') filtradas = filtradas.filter(x=>!x.parcela.pago);
+  if(filtroProfissionalParcela) filtradas = filtradas.filter(x=>x.lancamento.profissionalId===filtroProfissionalParcela);
+  filtradas.sort((a,b) => (a.parcela.data||'').localeCompare(b.parcela.data||''));
+
+  if(!filtradas.length){
+    container.appendChild(el('div', { class:'empty-hint', style:'margin-top:10px;' }, document.createTextNode('Nenhuma parcela encontrada com esse filtro.')));
+    return;
+  }
+
+  const listWrap = el('div', { style:'margin-top:10px;' });
+  filtradas.forEach(({parcela:p, lancamento:lanc}) => {
+    const prof = getProfissional(lanc.profissionalId);
+    const row = el('div', { class:'parcela-row'+(p.pago?' pago':'') });
+    const info = el('div', { class:'parcela-info' });
+    info.appendChild(el('div', { class:'p-valor' }, document.createTextNode('R$ '+formatMoney(p.valor)+' — '+lanc.paciente)));
+    info.appendChild(el('div', { class:'p-sub' }, document.createTextNode(
+      [p.data?formatDateBR(p.data):'sem data', p.forma, prof?prof.nome:'sem profissional'].filter(Boolean).join(' • ')
+      + (p.pago && p.dataRecebimento ? (' • Recebido em '+formatDateBR(p.dataRecebimento)+(p.horaRecebimento?(' às '+p.horaRecebimento):'')) : '')
+    )));
+    row.appendChild(info);
+
+    if(p.pago){
+      const toggle = el('div', { class:'parcela-toggle marcado' }, document.createTextNode('✓ Recebido'));
+      toggle.onclick = () => {
+        if(!confirm('Desmarcar esse recebimento?')) return;
+        p.pago = false; p.dataRecebimento = ''; p.horaRecebimento = '';
+        saveProgress(); refreshPanel();
+      };
+      row.appendChild(toggle);
+    } else {
+      const toggle = el('div', { class:'parcela-toggle' }, document.createTextNode('Marcar recebido'));
+      toggle.onclick = () => { parcelaConfirmandoId = (parcelaConfirmandoId===p.id) ? null : p.id; refreshPanel(); };
+      row.appendChild(toggle);
+    }
+    listWrap.appendChild(row);
+
+    if(!p.pago && parcelaConfirmandoId === p.id){
+      const formConf = el('div', { class:'card', style:'margin:-4px 0 10px;border-color:var(--blue-dark);' });
+      const hoje = new Date();
+      const hojeISO2 = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+      const horaAgora = String(hoje.getHours()).padStart(2,'0')+':'+String(hoje.getMinutes()).padStart(2,'0');
+      const confDados = { data: hojeISO2, hora: horaAgora, forma: p.forma || '' };
+
+      const row1 = el('div', { class:'row' });
+      const dataField = el('div', { class:'field' });
+      dataField.appendChild(el('label', {}, document.createTextNode('Dia do pagamento')));
+      const dataInput = el('input', { type:'date', value: confDados.data });
+      dataInput.oninput = (e) => { confDados.data = e.target.value; };
+      dataField.appendChild(dataInput);
+      row1.appendChild(dataField);
+
+      const horaField = el('div', { class:'field' });
+      horaField.appendChild(el('label', {}, document.createTextNode('Hora (opcional)')));
+      const horaInput = el('input', { type:'time', value: confDados.hora });
+      horaInput.oninput = (e) => { confDados.hora = e.target.value; };
+      horaField.appendChild(horaInput);
+      row1.appendChild(horaField);
+      formConf.appendChild(row1);
+
+      const formaField = el('div', { class:'field' });
+      formaField.appendChild(el('label', {}, document.createTextNode('Forma de pagamento')));
+      const formaSelect = el('select', {});
+      ['', 'Cartão de crédito', 'Cartão de Débito', 'Pix', 'Dinheiro', 'Promissória', 'Boleto'].forEach(opt => {
+        const optEl = el('option', { value: opt }, document.createTextNode(opt || 'Selecione...'));
+        if(confDados.forma === opt) optEl.setAttribute('selected','selected');
+        formaSelect.appendChild(optEl);
+      });
+      formaSelect.onchange = (e) => { confDados.forma = e.target.value; };
+      formaField.appendChild(formaSelect);
+      formConf.appendChild(formaField);
+
+      const btnRow = el('div', { class:'row', style:'margin-top:8px;' });
+      const confirmarBtn = el('div', { class:'add-row-btn', style:'flex:1;background:var(--green);color:#fff;border:none;' }, document.createTextNode('✓ Confirmar pagamento'));
+      confirmarBtn.onclick = () => {
+        p.pago = true;
+        p.dataRecebimento = confDados.data || hojeISO2;
+        p.horaRecebimento = confDados.hora || '';
+        if(confDados.forma) p.forma = confDados.forma;
+        parcelaConfirmandoId = null;
+        saveProgress(); refreshPanel(); toast('Pagamento confirmado!');
+      };
+      const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+      cancelarBtn.onclick = () => { parcelaConfirmandoId = null; refreshPanel(); };
+      btnRow.appendChild(confirmarBtn); btnRow.appendChild(cancelarBtn);
+      formConf.appendChild(btnRow);
+
+      listWrap.appendChild(formConf);
+    }
+  });
+  container.appendChild(listWrap);
+}
+
+// ============ RENDER: COMISSÕES ============
+let agendamentoConsultasCache = [];
+async function carregarAgendamentoConsultasCache(){
+  try{
+    const dados = await ClinicaStorage.load('controle_agendamento_progresso_v1');
+    const profissionaisAgenda = (dados && dados.profissionais) || [];
+    const consultas = (dados && dados.consultas) || [];
+    agendamentoConsultasCache = consultas.map(c => {
+      const profAgenda = profissionaisAgenda.find(p => p.id === c.profissionalId);
+      return Object.assign({}, c, { __profNome: profAgenda ? profAgenda.nome : '' });
+    });
+  }catch(e){
+    agendamentoConsultasCache = [];
+  }
+}
+
+function calcularComissoes(){
+  const agora = new Date();
+  const hojeISO = agora.getFullYear()+'-'+String(agora.getMonth()+1).padStart(2,'0')+'-'+String(agora.getDate()).padStart(2,'0');
+  const horaAtual = agora.getHours() + agora.getMinutes()/60;
+  const ultimoDiaMesAtual = new Date(agora.getFullYear(), agora.getMonth()+1, 0).getDate();
+  const mesFechado = agora.getDate() >= ultimoDiaMesAtual; // o fixo só vence no último dia do mês
+
+  const porProfissional = state.profissionais.map(prof => {
+    const lancsDoProf = state.lancamentos.filter(l => l.profissionalId === prof.id);
+    let recebido = 0, pendente = 0, totalContratado = 0;
+    lancsDoProf.forEach(l => {
+      l.parcelas.forEach(p => {
+        totalContratado += p.valor;
+        if(p.pago) recebido += p.valor; else pendente += p.valor;
+      });
+    });
+    const pct = parseFloat(prof.comissaoPercent)||0;
+
+    // Consultas confirmadas desse profissional na Agenda (fonte da verdade pra saber quanto pagar).
+    const nomeNorm = (prof.nome||'').trim().toLowerCase();
+    const consultasDoProf = agendamentoConsultasCache.filter(c =>
+      c.status === 'confirmado' && (c.__profNome || '').trim().toLowerCase() === nomeNorm
+    );
+
+    // Percentual: só conta quando o profissional FINALIZA o procedimento no Prontuário
+    // (consulta.percentualDevido = true). Antes disso, mesmo com valor calculado, não entra na conta.
+    const consultasPercentualDevido = consultasDoProf.filter(c => c.percentualDevido && parseFloat(c.valorPercentual) > 0);
+    const comissaoPercentual = consultasPercentualDevido.reduce((s,c) => s + (parseFloat(c.valorPercentual)||0), 0);
+
+    // Diária: conta automaticamente a partir das 19h do dia em que o profissional teve paciente
+    // agendado (não depende de nada ser finalizado no Prontuário — é só o dia + horário passando).
+    const consultasDiariaDevida = consultasDoProf.filter(c => {
+      const valorDiaria = parseFloat(c.valorDiaria)||0;
+      if(valorDiaria <= 0) return false;
+      if(c.data < hojeISO) return true;
+      if(c.data === hojeISO && horaAtual >= 19) return true;
+      return false;
+    });
+    const comissaoDiaria = consultasDiariaDevida.reduce((s,c) => s + (parseFloat(c.valorDiaria)||0), 0);
+
+    const comissaoAgendamento = comissaoPercentual + comissaoDiaria;
+
+    // Fixo: só vence no último dia de cada mês.
+    const fixoConfigurado = parseFloat(prof.pagamento && prof.pagamento.fixo) || 0;
+    const fixoMensal = mesFechado ? fixoConfigurado : 0;
+
+    return {
+      prof, totalContratado, recebido, pendente, comissao: recebido*pct/100, pct,
+      comissaoAgendamento, comissaoPercentual, comissaoDiaria,
+      qtdConsultasPercentual: consultasPercentualDevido.length, qtdConsultasDiaria: consultasDiariaDevida.length,
+      fixoMensal, fixoConfigurado, mesFechado, ultimoDiaMesAtual,
+    };
+  });
+  const semProfissional = state.lancamentos.filter(l => !l.profissionalId);
+  let semProfTotal = 0, semProfRecebido = 0;
+  semProfissional.forEach(l => l.parcelas.forEach(p => { semProfTotal+=p.valor; if(p.pago) semProfRecebido+=p.valor; }));
+
+  // Rateios fixos (Clínica, Secretária etc.) incidem sobre TODO valor recebido, de qualquer lançamento
+  let totalRecebidoGeralBruto = 0;
+  state.lancamentos.forEach(l => l.parcelas.forEach(p => { if(p.pago) totalRecebidoGeralBruto += p.valor; }));
+  const porRateioFixo = state.rateiosFixos.map(rateio => {
+    const pct = parseFloat(rateio.percentual)||0;
+    return { rateio, pct, valor: totalRecebidoGeralBruto*pct/100 };
+  });
+
+  return { porProfissional, semProfTotal, semProfRecebido, temSemProfissional: semProfissional.length>0, porRateioFixo, totalRecebidoGeralBruto };
+}
+
+function renderComissoes(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Comissões por profissional')));
+
+  if(!state.profissionais.length && !state.rateiosFixos.length){
+    container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Cadastre profissionais e/ou rateios fixos na aba "Profissionais" para calcular as comissões.')));
+    return;
+  }
+
+  const { porProfissional, semProfTotal, semProfRecebido, temSemProfissional, porRateioFixo, totalRecebidoGeralBruto } = calcularComissoes();
+
+  const totalComissoes = porProfissional.reduce((s,x)=>s+x.comissaoAgendamento+x.fixoMensal,0) + porRateioFixo.reduce((s,x)=>s+x.valor,0);
+  const totalRecebidoGeral = porProfissional.reduce((s,x)=>s+x.recebido,0) + semProfRecebido;
+  const summary = el('div', { class:'summary-grid' });
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num green' }, document.createTextNode('R$ '+formatMoney(totalRecebidoGeral))),
+    el('div', { class:'summary-label' }, document.createTextNode('Total recebido'))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num' }, document.createTextNode('R$ '+formatMoney(totalComissoes))),
+    el('div', { class:'summary-label' }, document.createTextNode('Total rateado (profissionais + fixos)'))
+  ]));
+  container.appendChild(summary);
+
+  if(state.profissionais.length){
+    container.appendChild(el('div', { style:'font-size:13px;font-weight:700;color:var(--blue-dark);margin:16px 0 8px;' }, document.createTextNode('Por profissional (sobre o que cada um atendeu)')));
+  }
+  porProfissional.forEach(({prof, totalContratado, recebido, pendente, comissao, pct, comissaoAgendamento, comissaoPercentual, comissaoDiaria, qtdConsultasPercentual, qtdConsultasDiaria, fixoMensal, fixoConfigurado, mesFechado, ultimoDiaMesAtual}) => {
+    const card = el('div', { class:'card' });
+    const pg = prof.pagamento || {};
+    const descPagamento = [
+      (pg.percentual!==undefined && pg.percentual!=='') ? pg.percentual+'% comissão' : null,
+      parseFloat(pg.diaria)>0 ? 'R$ '+formatMoney(parseFloat(pg.diaria))+'/diária' : null,
+      parseFloat(pg.fixo)>0 ? 'R$ '+formatMoney(parseFloat(pg.fixo))+'/fixo mensal' : null,
+    ].filter(Boolean).join(' + ') || 'sem forma de pagamento configurada';
+    card.appendChild(el('div', { class:'card-title' }, document.createTextNode(prof.nome)));
+    card.appendChild(el('div', { class:'card-sub' }, document.createTextNode(descPagamento)));
+
+    card.appendChild(el('div', { style:'margin-top:10px;font-size:19px;font-weight:700;color:var(--green);' },
+      document.createTextNode('Total devido agora: R$ '+formatMoney(comissaoAgendamento+fixoMensal))));
+
+    if((pg.percentual!==undefined && pg.percentual!=='')){
+      card.appendChild(el('div', { class:'card-sub', style:'margin-top:6px;' }, document.createTextNode(
+        '• Percentual: R$ '+formatMoney(comissaoPercentual)+' ('+qtdConsultasPercentual+' procedimento(s) finalizado(s) no Prontuário)'
+      )));
+    }
+    if(parseFloat(pg.diaria)>0){
+      card.appendChild(el('div', { class:'card-sub' }, document.createTextNode(
+        '• Diária: R$ '+formatMoney(comissaoDiaria)+' ('+qtdConsultasDiaria+' dia(s), a partir das 19h do dia com paciente agendado)'
+      )));
+    }
+    if(parseFloat(pg.fixo)>0){
+      card.appendChild(el('div', { class:'card-sub' }, document.createTextNode(
+        mesFechado
+          ? ('• Fixo mensal: R$ '+formatMoney(fixoMensal)+' (venceu no dia '+ultimoDiaMesAtual+', último dia do mês)')
+          : ('• Fixo mensal: R$ '+formatMoney(fixoConfigurado)+' — ainda não venceu (vence só no dia '+ultimoDiaMesAtual+', último dia do mês)')
+      )));
+    }
+
+    card.appendChild(el('div', { style:'font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--line-light);' },
+      document.createTextNode('Referência (baseado em pagamentos recebidos): total contratado R$ '+formatMoney(totalContratado)+' • recebido R$ '+formatMoney(recebido)+' • pendente R$ '+formatMoney(pendente))));
+    container.appendChild(card);
+  });
+
+  if(porRateioFixo.length){
+    container.appendChild(el('div', { style:'font-size:13px;font-weight:700;color:var(--blue-dark);margin:16px 0 8px;' }, document.createTextNode('Rateios fixos (sobre TODO valor recebido: R$ '+formatMoney(totalRecebidoGeralBruto)+')')));
+    porRateioFixo.forEach(({rateio, pct, valor}) => {
+      const card = el('div', { class:'card' });
+      card.appendChild(el('div', { class:'card-title' }, document.createTextNode(rateio.nome + ' — '+pct+'%')));
+      card.appendChild(el('div', { style:'margin-top:8px;font-size:18px;font-weight:700;color:var(--green);' },
+        document.createTextNode('Valor rateado: R$ '+formatMoney(valor))));
+      container.appendChild(card);
+    });
+  }
+
+  if(temSemProfissional){
+    const card = el('div', { class:'card', style:'border-color:var(--amber);background:#FFFBF2;' });
+    card.appendChild(el('div', { class:'card-title', style:'color:var(--amber);' }, document.createTextNode('⚠ Lançamentos sem profissional atribuído')));
+    card.appendChild(el('div', { class:'card-sub' }, document.createTextNode('Total recebido não considerado em nenhuma comissão: R$ '+formatMoney(semProfRecebido))));
+    card.appendChild(el('div', { class:'card-sub' }, document.createTextNode('Vá em "Lançamentos" e atribua um profissional a cada um para incluir na comissão.')));
+    container.appendChild(card);
+  }
+
+  const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:16px;background:var(--green);border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
+    document.createTextNode('📄 Gerar PDF do relatório de comissões'));
+  pdfBtn.onclick = () => generateComissoesPDF(porProfissional, semProfTotal, semProfRecebido, temSemProfissional, porRateioFixo, totalRecebidoGeralBruto);
+  container.appendChild(pdfBtn);
+}
+
+function generateComissoesPDF(porProfissional, semProfTotal, semProfRecebido, temSemProfissional, porRateioFixo, totalRecebidoGeralBruto){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW=595.28, pageH=841.89, marginX=40, contentW=pageW-marginX*2;
+  const BLUE=window._clinicaCorPrimariaRGB||[31,92,139], INK=[26,26,26], MUTED=[91,107,122], GREEN=[46,139,87], LINECOL=[155,187,212], BLUEHEAD=window.clarearCor(BLUE,0.85), BLUELIGHT=window.clarearCor(BLUE,0.93);
+  let y=50;
+  function ensureSpace(needed){ if(y+needed>pageH-50){ doc.addPage(); desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil); y=50; } }
+
+  desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil);
+
+  const perfil = window._clinicaPerfil;
+  if(perfil && (perfil.nome || perfil.logo)){
+    if(perfil.logo){
+      try{
+        const fmt = perfil.logo.includes('image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(perfil.logo, fmt, marginX, y-14, 30, 30);
+      }catch(e){}
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+    doc.text(perfil.nome || '', marginX + (perfil.logo?36:0), y);
+    y += 16;
+  }
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...BLUE);
+  doc.text('Relatório de Comissões', marginX, y);
+  y += 18;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+  const hoje = new Date();
+  doc.text('Gerado em ' + String(hoje.getDate()).padStart(2,'0')+'/'+String(hoje.getMonth()+1).padStart(2,'0')+'/'+hoje.getFullYear(), marginX, y);
+  y += 14;
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.2);
+  doc.line(marginX, y, pageW-marginX, y);
+  y += 22;
+
+  const headers = ['Profissional','Forma de pagamento','Consultas','A pagar'];
+  const widths = [contentW*0.28, contentW*0.34, contentW*0.16, contentW*0.22];
+  const rowH = 22;
+  function drawHeader(){
+    let cx = marginX;
+    headers.forEach((h,i) => {
+      doc.setFillColor(...BLUEHEAD); doc.setDrawColor(...LINECOL);
+      doc.rect(cx, y, widths[i], rowH, 'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+      doc.text(h, cx+5, y+rowH-7);
+      cx += widths[i];
+    });
+    y += rowH;
+  }
+  ensureSpace(rowH*2);
+  drawHeader();
+  let totalComissoes = 0, totalRecebido = 0;
+  porProfissional.forEach((item, ri) => {
+    if(y+rowH>pageH-50){ doc.addPage(); y=50; drawHeader(); }
+    const aPagar = item.comissaoAgendamento + item.fixoMensal;
+    totalComissoes += aPagar; totalRecebido += item.recebido;
+    const pg = item.prof.pagamento || {};
+    const descPagamento = [
+      (pg.percentual!==undefined && pg.percentual!=='') ? pg.percentual+'% com.' : null,
+      parseFloat(pg.diaria)>0 ? 'R$ '+formatMoney(parseFloat(pg.diaria))+'/dia' : null,
+      parseFloat(pg.fixo)>0 ? 'R$ '+formatMoney(parseFloat(pg.fixo))+'/mês fixo' : null,
+    ].filter(Boolean).join(' + ') || '—';
+    let cx = marginX;
+    const rowFill = ri%2===1 ? BLUELIGHT : [255,255,255];
+    const valores = [item.prof.nome, descPagamento, String(item.qtdConsultasPercentual + item.qtdConsultasDiaria), 'R$ '+formatMoney(aPagar)];
+    valores.forEach((val,ci) => {
+      doc.setFillColor(...rowFill); doc.setDrawColor(...LINECOL);
+      doc.rect(cx, y, widths[ci], rowH, 'FD');
+      doc.setFont('helvetica', ci===3?'bold':'normal'); doc.setFontSize(9);
+      doc.setTextColor(ci===3?GREEN[0]:INK[0], ci===3?GREEN[1]:INK[1], ci===3?GREEN[2]:INK[2]);
+      const clipped = doc.splitTextToSize(String(val), widths[ci]-6)[0]||'';
+      doc.text(clipped, cx+5, y+rowH-7);
+      cx += widths[ci];
+    });
+    y += rowH;
+  });
+  y += 10;
+  ensureSpace(30);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+  doc.text('Total recebido (todos os profissionais): R$ '+formatMoney(totalRecebido), marginX, y);
+  y += 16;
+  doc.setTextColor(...GREEN);
+  doc.text('Total de comissões a pagar: R$ '+formatMoney(totalComissoes), marginX, y);
+  y += 20;
+
+  if(porRateioFixo && porRateioFixo.length){
+    ensureSpace(rowH*2 + 30);
+    y += 10;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...BLUE);
+    doc.text('Rateios fixos', marginX, y);
+    y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+    doc.text('Incidem sobre todo o valor recebido: R$ '+formatMoney(totalRecebidoGeralBruto), marginX, y);
+    y += 16;
+
+    const headers2 = ['Rateio','%','Valor'];
+    const widths2 = [contentW*0.5, contentW*0.2, contentW*0.3];
+    function drawHeader2(){
+      let cx = marginX;
+      headers2.forEach((h,i) => {
+        doc.setFillColor(...BLUEHEAD); doc.setDrawColor(...LINECOL);
+        doc.rect(cx, y, widths2[i], rowH, 'FD');
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+        doc.text(h, cx+5, y+rowH-7);
+        cx += widths2[i];
+      });
+      y += rowH;
+    }
+    drawHeader2();
+    let totalRateiosFixos = 0;
+    porRateioFixo.forEach((item, ri) => {
+      if(y+rowH>pageH-50){ doc.addPage(); y=50; drawHeader2(); }
+      totalRateiosFixos += item.valor;
+      let cx = marginX;
+      const rowFill = ri%2===1 ? BLUELIGHT : [255,255,255];
+      const valores2 = [item.rateio.nome, (item.pct||0)+'%', 'R$ '+formatMoney(item.valor)];
+      valores2.forEach((val,ci) => {
+        doc.setFillColor(...rowFill); doc.setDrawColor(...LINECOL);
+        doc.rect(cx, y, widths2[ci], rowH, 'FD');
+        doc.setFont('helvetica', ci===2?'bold':'normal'); doc.setFontSize(9);
+        doc.setTextColor(ci===2?GREEN[0]:INK[0], ci===2?GREEN[1]:INK[1], ci===2?GREEN[2]:INK[2]);
+        const clipped2 = doc.splitTextToSize(String(val), widths2[ci]-6)[0]||'';
+        doc.text(clipped2, cx+5, y+rowH-7);
+        cx += widths2[ci];
+      });
+      y += rowH;
+    });
+    y += 10;
+    ensureSpace(20);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
+    doc.text('Total de rateios fixos: R$ '+formatMoney(totalRateiosFixos), marginX, y);
+    y += 20;
+  }
+
+  if(temSemProfissional){
+    ensureSpace(30);
+    doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+    const aviso = doc.splitTextToSize('Atenção: há R$ '+formatMoney(semProfRecebido)+' recebidos de lançamentos sem profissional atribuído, não incluídos neste cálculo de comissões.', contentW);
+    doc.text(aviso, marginX, y);
+  }
+
+  doc.save('relatorio_comissoes_'+hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0')+'.pdf');
+  toast('PDF do relatório gerado com sucesso!');
+}
+
+// ============ NAVEGAÇÃO ============
+function renderNav(){
+  const nav = document.getElementById('stepsNav');
+  nav.innerHTML = '';
+  STEPS.forEach((label, i) => {
+    const btn = el('button', { class: i===currentStep?'active':'' }, document.createTextNode(label));
+    btn.onclick = () => { currentStep = i; renderPanel(i); };
+    nav.appendChild(btn);
+  });
+}
+function renderPanel(stepIndex, opts={}){
+  currentStep = stepIndex;
+  renderNav();
+  const main = document.getElementById('main');
+  const scrollY = window.scrollY;
+  main.innerHTML = '';
+  const renderers = [renderProfissionais, renderLancamentos, renderParcelasRecebimentos, renderComissoes];
+  renderers[stepIndex](main);
+  if(opts.keepScroll){ window.scrollTo(0, scrollY); } else { window.scrollTo(0,0); }
+}
+function refreshPanel(){ renderPanel(currentStep, { keepScroll:true }); }
+
+// ============ INICIALIZAÇÃO ============
+(async function iniciarFinanceiro(){
+  window._clinicaPerfil = await aplicarIdentidadeClinica();
+  await carregarAgendamentoConsultasCache();
+  await clinicaInitPacientes();
+  await loadProgress();
+  await carregarProfissionaisCompartilhados();
+  renderPanel(currentStep);
+})();
+</script>
+</body>
+</html>

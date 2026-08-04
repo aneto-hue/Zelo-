@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dados do Paciente — Zelo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+  document.head.appendChild(s);
+"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{
+    background:#fff; border-bottom:3px solid var(--blue-dark); padding:14px 16px;
+    display:flex; align-items:center; gap:14px; position:sticky; top:0; z-index:20;
+  }
+  header.topbar h1{font-size:17px; margin:0; color:var(--blue-dark); font-weight:700;}
+  header.topbar p{margin:2px 0 0; font-size:12px; color:var(--muted); font-style:italic;}
+  main{max-width:640px; margin:0 auto; padding:18px 14px 60px;}
+  .section-title{
+    background:var(--blue-dark); color:#fff; font-weight:700; font-size:14px; letter-spacing:.5px;
+    padding:10px 14px; border-radius:6px; margin:18px 0 12px; text-transform:uppercase;
+  }
+  .section-title:first-child{margin-top:0;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; font-weight:700; margin-bottom:5px; color:var(--ink);}
+  .field input[type=text], .field input[type=date]{
+    width:100%; padding:12px 10px; font-size:16px; border:1.5px solid var(--line); border-radius:8px;
+    background:#fff; font-family:inherit;
+  }
+  .field input:focus{outline:none; border-color:var(--blue-dark); box-shadow:0 0 0 3px var(--blue-head);}
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:140px;}
+
+  .q-card{background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:14px; margin-bottom:12px;}
+  .q-text{font-size:15px; font-weight:600; margin-bottom:10px; display:block;}
+  .yn-group{display:flex; gap:10px; margin-bottom:8px;}
+  .yn-btn{
+    flex:1; max-width:120px; padding:11px 0; text-align:center; border:1.5px solid var(--line);
+    border-radius:8px; background:#fff; font-size:14px; font-weight:700; color:var(--muted); cursor:pointer; user-select:none;
+  }
+  .yn-btn.sim.selected{background:var(--green); border-color:var(--green); color:#fff;}
+  .yn-btn.nao.selected{background:#888; border-color:#888; color:#fff;}
+  .sub-field{margin-top:8px;}
+  .sub-field input[type=text]{width:100%; padding:9px 8px; font-size:14px; border:1px solid var(--line-light); border-radius:6px; font-family:inherit;}
+  .sub-field label{font-size:12px; color:var(--muted); font-style:italic; display:block; margin-bottom:4px;}
+
+  .disease-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-bottom:14px;}
+  @media(min-width:600px){.disease-grid{grid-template-columns:repeat(3, 1fr);}}
+  .disease-chip{
+    display:flex; align-items:center; gap:8px; background:var(--blue-light); border:1.5px solid var(--line-light);
+    border-radius:8px; padding:11px 10px; font-size:13px; cursor:pointer; user-select:none;
+  }
+  .disease-chip .box{
+    width:20px; height:20px; border:2px solid var(--line); border-radius:4px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; background:#fff; font-size:14px; color:#fff; font-weight:900;
+  }
+  .disease-chip.checked{background:var(--blue-dark); color:#fff; border-color:var(--blue-dark);}
+  .disease-chip.checked .box{background:#fff; color:var(--blue-dark);}
+
+  .photo-field{margin-bottom:16px;}
+  .photo-box{
+    position:relative; width:140px; height:140px; border-radius:12px; border:2px dashed var(--line);
+    background:var(--blue-light); display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden;
+  }
+  .photo-placeholder{display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--blue-dark); font-size:12px; font-weight:600; text-align:center; padding:8px;}
+  .photo-icon{font-size:28px;}
+  .photo-preview{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-input{position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;}
+  .photo-remove{position:absolute; bottom:0; left:0; right:0; background:rgba(192,57,43,0.9); color:#fff; text-align:center; font-size:11px; font-weight:700; padding:5px 0; cursor:pointer; z-index:2;}
+
+  .add-row-btn{margin-top:10px; padding:14px; border:none; border-radius:8px; font-weight:700; font-size:15px; cursor:pointer; text-align:center;}
+  .hint{font-size:12.5px; color:var(--muted); line-height:1.5; margin-bottom:16px;}
+  .success-box{
+    display:none; background:#E4F3EA; border:1.5px solid var(--green); border-radius:10px; padding:16px; margin-top:16px;
+    font-size:13.5px; color:var(--ink); line-height:1.5;
+  }
+  .success-box.show{display:block;}
+  .toast{
+    position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; transition:all .25s; z-index:50; pointer-events:none; text-align:center; max-width:90%;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+<link rel="stylesheet" href="theme.css">
+<script src="nav-home.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>Dados do Paciente e Saúde</h1>
+    <p>Ficha de pré-preenchimento</p>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ ESTADO (mesma estrutura de chaves da Ficha de Anamnese) ============
+const state = {
+  patient: { nome:'', nasc:'', sexo:'', idade:'', rg:'', cpf:'', telefone:'', email:'', endereco:'', obs:'', responsavel:'', respCpf:'', foto:'' },
+  general: {},
+  diseases: {},
+  oral: {}
+};
+
+const GENERAL_QUESTIONS = [
+  { key:'tratamento', text:'Está ou esteve recentemente em tratamento médico?', sub:[{key:'motivo', label:'Por qual motivo?'}] },
+  { key:'remedio', text:'Está tomando algum remédio?', sub:[{key:'quais', label:'Quais?'}] },
+  { key:'gravida', text:'Está grávida?', sub:[{key:'mes', label:'Qual mês?'}] },
+  { key:'alergiamed', text:'Já teve reação alérgica a algum medicamento?', sub:[{key:'qualalergia', label:'Qual(is)?'}] },
+  { key:'alergiaanest', text:'Já teve reação alérgica à anestesia?' },
+  { key:'sangrar', text:'Quando se machuca costuma sangrar muito?' },
+  { key:'cicatrizar', text:'Demora a cicatrizar?' },
+  { key:'tontura', text:'Costuma sentir tonturas ou desmaios?' },
+];
+const GENERAL_QUESTIONS_2 = [
+  { key:'marcapasso', text:'Usa marca-passo ou válvula cardíaca?' },
+  { key:'trombose', text:'Já teve trombose?' },
+  { key:'fuma', text:'Fuma?' },
+  { key:'alcool', text:'Toma bebida alcoólica frequentemente?' },
+];
+const DISEASES = ['Pressão alta','Problemas cardíacos','Diabetes','Problema nos rins','Tuberculose','Artrite','Asma / Bronquite','Hepatite','Anemia','Problemas nervosos','Depressão','Epilepsia','Problemas respiratórios','Febre reumática','Convulsão','Reumatismo','Sífilis','HIV'];
+const ORAL_QUESTIONS = [
+  { key:'gengiva', text:'Suas gengivas sangram facilmente?', sub:[{key:'escova', label:'Usa escova? / Usa fio dental?'}] },
+  { key:'sensiveis', text:'Tem dentes sensíveis?', sub:[{key:'sensmotivo', label:'Devido ao frio / Ao quente'}] },
+  { key:'range', text:'Range os dentes?', sub:[{key:'mordelabio', label:'Morde os lábios?'}] },
+  { key:'dificuldade', text:'Ao abrir a boca sente dificuldade, dor ou ruído?' },
+  { key:'respira', text:'Respira bem pelo nariz?', sub:[{key:'dorouvido', label:'Dor no ouvido ou na face?'}] },
+  { key:'outroproblema', text:'Existe algum outro problema de saúde geral ou bucal que não foi perguntado e você deseja relatar?', sub:[{key:'qualoutro', label:'Qual?'}] },
+];
+
+// ============ PERSISTÊNCIA LOCAL ============
+const STORAGE_KEY = 'ficha_dados_paciente_saude_v1';
+function saveProgress(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
+let _saveTimer=null;
+function saveProgressDebounced(){ clearTimeout(_saveTimer); _saveTimer=setTimeout(saveProgress,400); }
+function loadProgress(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const saved = JSON.parse(raw);
+    Object.keys(state).forEach(k => { if(saved[k]!==undefined) state[k]=saved[k]; });
+  }catch(e){}
+}
+
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+}
+
+// ============ HELPERS DE RENDER ============
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function maskCPF(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
+function maskTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 5) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length > 0) v = v.replace(/(\d{0,2})/,'($1');
+  return v.trim();
+}
+function maskRG(v){
+  let letraFinal = '';
+  if(/[Xx]$/.test(v.replace(/[^\dXx]/g,''))){
+    const limpoComX = v.replace(/[^\dXx]/g,'').slice(0,9);
+    if(/[Xx]$/.test(limpoComX)){ letraFinal = 'X'; v = limpoComX.slice(0,-1); }
+  }
+  v = v.replace(/\D/g,'').slice(0,9);
+  v = v.replace(/(\d{2})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  if(letraFinal) v = (v.endsWith('-') ? v : v + '-') + letraFinal;
+  return v;
+}
+function mascaraParaCampo(key){
+  const k = key.toLowerCase();
+  if(k==='cpf') return maskCPF;
+  if(k==='rg') return maskRG;
+  if(k.includes('telefone') || k==='whatsapp' || k==='celular') return maskTelefone;
+  return null;
+}
+
+function textField(label, store, key, opts={}){
+  const f=el('div',{class:'field'});
+  f.appendChild(el('label',{},document.createTextNode(label)));
+  const mascara = opts.mask===false ? null : mascaraParaCampo(key);
+  const input=el('input',{type:opts.type||'text', value:store[key]||''});
+  input.oninput=(e)=>{ if(mascara){ e.target.value = mascara(e.target.value); } store[key]=e.target.value; saveProgressDebounced(); };
+  f.appendChild(input);
+  return f;
+}
+function yesNoBlock(store, q){
+  const card=el('div',{class:'q-card'});
+  card.appendChild(el('span',{class:'q-text'},document.createTextNode(q.text)));
+  const grp=el('div',{class:'yn-group'});
+  const simBtn=el('div',{class:'yn-btn sim'+(store[q.key]==='sim'?' selected':'')},document.createTextNode('Sim'));
+  const naoBtn=el('div',{class:'yn-btn nao'+(store[q.key]==='nao'?' selected':'')},document.createTextNode('Não'));
+  simBtn.onclick=()=>{ store[q.key]=store[q.key]==='sim'?'':'sim'; saveProgress(); render(); };
+  naoBtn.onclick=()=>{ store[q.key]=store[q.key]==='nao'?'':'nao'; saveProgress(); render(); };
+  grp.appendChild(simBtn); grp.appendChild(naoBtn);
+  card.appendChild(grp);
+  if(q.sub){
+    q.sub.forEach(s=>{
+      const wrap=el('div',{class:'sub-field'});
+      wrap.appendChild(el('label',{},document.createTextNode(s.label)));
+      const input=el('input',{type:'text', value:store[s.key]||''});
+      input.oninput=(e)=>{ store[s.key]=e.target.value; saveProgressDebounced(); };
+      wrap.appendChild(input);
+      card.appendChild(wrap);
+    });
+  } else if(store[q.key]==='sim'){
+    const noteKey=q.key+'_obs';
+    const wrap=el('div',{class:'sub-field'});
+    wrap.appendChild(el('label',{},document.createTextNode('Observações')));
+    const input=el('input',{type:'text', value:store[noteKey]||''});
+    input.oninput=(e)=>{ store[noteKey]=e.target.value; saveProgressDebounced(); };
+    wrap.appendChild(input);
+    card.appendChild(wrap);
+  }
+  return card;
+}
+
+function loadFixedImageDataURL(file, callback){
+  const maxDim = 1400;
+  function fromBitmap(bitmap){
+    const canvas=document.createElement('canvas');
+    let w=bitmap.width, h=bitmap.height;
+    if(w>maxDim || h>maxDim){ const scale=maxDim/Math.max(w,h); w=Math.round(w*scale); h=Math.round(h*scale); }
+    canvas.width=w; canvas.height=h;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(bitmap,0,0,w,h);
+    callback(canvas.toDataURL('image/jpeg',0.9));
+  }
+  if(window.createImageBitmap){
+    createImageBitmap(file,{imageOrientation:'from-image'}).then(fromBitmap).catch(()=>fallbackViaImageEl());
+  } else { fallbackViaImageEl(); }
+  function fallbackViaImageEl(){
+    const reader=new FileReader();
+    reader.onload=()=>{ const img=new Image(); img.onload=()=>fromBitmap(img); img.src=reader.result; };
+    reader.readAsDataURL(file);
+  }
+}
+
+function photoField(){
+  const wrap=el('div',{class:'field photo-field'});
+  wrap.appendChild(el('label',{},document.createTextNode('Foto do paciente (opcional)')));
+  const box=el('div',{class:'photo-box'});
+  if(state.patient.foto){
+    box.appendChild(el('img',{src:state.patient.foto, class:'photo-preview'}));
+    const removeBtn=el('div',{class:'photo-remove'},document.createTextNode('✕ Remover foto'));
+    removeBtn.onclick=(e)=>{ e.stopPropagation(); state.patient.foto=''; saveProgressDebounced(); render(); };
+    box.appendChild(removeBtn);
+  } else {
+    box.appendChild(el('div',{class:'photo-placeholder'},[
+      el('div',{class:'photo-icon'},document.createTextNode('📷')),
+      el('div',{},document.createTextNode('Tocar para tirar foto'))
+    ]));
+  }
+  const input=el('input',{type:'file', accept:'image/*', capture:'user', class:'photo-input'});
+  input.onchange=(e)=>{
+    const file=e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file,(dataUrl)=>{ state.patient.foto=dataUrl; saveProgressDebounced(); render(); });
+  };
+  box.appendChild(input);
+  wrap.appendChild(box);
+  return wrap;
+}
+
+// ============ GERAÇÃO DO PDF COM DADOS EMBUTIDOS ============
+const PDF_DATA_TAG = 'FICHA_ANAMNESE_DATA:';
+function encodePdfData(obj){
+  try{
+    const json=JSON.stringify(obj);
+    return btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }catch(e){ return null; }
+}
+
+function generatePDF(){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+  if(!(state.patient.nome||'').trim()){
+    alert('Preencha ao menos o nome do paciente antes de gerar o PDF.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW=595.28, pageH=841.89, marginX=50, contentW=pageW-marginX*2;
+  const BLUE=[31,92,139], INK=[26,26,26], MUTED=[91,107,122];
+  let y=60;
+
+  function ensureSpace(needed){ if(y+needed > pageH-50){ doc.addPage(); y=50; } }
+  function titulo(texto){
+    ensureSpace(26);
+    doc.setFont('helvetica','bold'); doc.setFontSize(12.5); doc.setTextColor(...BLUE);
+    doc.text(texto, marginX, y);
+    y += 18;
+  }
+  function linhaLabelValor(label, val){
+    ensureSpace(20);
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(...BLUE);
+    doc.text(label+':', marginX, y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(...INK);
+    const lines = doc.splitTextToSize(val||'—', contentW-140);
+    doc.text(lines, marginX+140, y);
+    y += 14*Math.max(1,lines.length) + 5;
+  }
+  function respostaSimNao(q, store){
+    const resposta = store[q.key]==='sim' ? 'Sim' : store[q.key]==='nao' ? 'Não' : '—';
+    ensureSpace(16);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...INK);
+    doc.text('• '+q.text, marginX, y);
+    doc.setFont('helvetica','bold'); doc.setTextColor(...(resposta==='Sim'?[46,139,87]:resposta==='Não'?[91,107,122]:[91,107,122]));
+    doc.text(resposta, pageW-marginX-30, y, { align:'left' });
+    y += 14;
+    if(q.sub){
+      q.sub.forEach(s=>{
+        if((store[s.key]||'').trim()){
+          doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+          const l = doc.splitTextToSize(s.label+': '+store[s.key], contentW-14);
+          ensureSpace(12*l.length);
+          doc.text(l, marginX+10, y);
+          y += 12*l.length + 2;
+        }
+      });
+    } else if(store[q.key]==='sim' && (store[q.key+'_obs']||'').trim()){
+      doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+      const l = doc.splitTextToSize('Observações: '+store[q.key+'_obs'], contentW-14);
+      ensureSpace(12*l.length);
+      doc.text(l, marginX+10, y);
+      y += 12*l.length + 2;
+    }
+    y += 3;
+  }
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...BLUE);
+  doc.text('Dados do Paciente e Saúde', marginX, y);
+  y += 22;
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.2);
+  doc.line(marginX, y, pageW-marginX, y);
+  y += 24;
+
+  titulo('DADOS PESSOAIS');
+  linhaLabelValor('Nome completo', state.patient.nome);
+  linhaLabelValor('Data de nascimento', state.patient.nasc);
+  linhaLabelValor('Sexo', state.patient.sexo);
+  linhaLabelValor('Idade', state.patient.idade);
+  linhaLabelValor('RG', state.patient.rg);
+  linhaLabelValor('CPF', state.patient.cpf);
+  linhaLabelValor('Telefone', state.patient.telefone);
+  linhaLabelValor('E-mail', state.patient.email);
+  linhaLabelValor('Endereço', state.patient.endereco);
+  linhaLabelValor('Observações', state.patient.obs);
+  linhaLabelValor('Responsável legal', state.patient.responsavel);
+  linhaLabelValor('CPF do responsável legal', state.patient.respCpf);
+  y += 8;
+
+  titulo('QUESTIONÁRIO DE SAÚDE GERAL');
+  GENERAL_QUESTIONS.forEach(q => respostaSimNao(q, state.general));
+  ensureSpace(20);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...BLUE);
+  doc.text('Outras doenças? Quais?', marginX, y);
+  doc.setFont('helvetica','normal'); doc.setTextColor(...INK);
+  const outrasLines = doc.splitTextToSize(state.general.outrasdoencas||'—', contentW-160);
+  doc.text(outrasLines, marginX+160, y);
+  y += 14*Math.max(1,outrasLines.length) + 8;
+  GENERAL_QUESTIONS_2.forEach(q => respostaSimNao(q, state.general));
+  y += 8;
+
+  titulo('SOFRE ALGUMA DESTAS DOENÇAS?');
+  const doencasMarcadas = DISEASES.filter(d => !!state.diseases[d]);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...INK);
+  const doencasTxt = doencasMarcadas.length ? doencasMarcadas.join(', ') : 'Nenhuma assinalada';
+  const doencasLines = doc.splitTextToSize(doencasTxt, contentW);
+  ensureSpace(14*doencasLines.length);
+  doc.text(doencasLines, marginX, y);
+  y += 14*doencasLines.length + 10;
+
+  titulo('QUESTIONÁRIO DE SAÚDE BUCAL');
+  ORAL_QUESTIONS.forEach(q => respostaSimNao(q, state.oral));
+
+  y += 14;
+  ensureSpace(30);
+  doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  const rodape = doc.splitTextToSize('Este PDF contém os dados desta ficha para importação automática na Ficha de Anamnese Odontológica. Envie-o de volta à clínica (ex: por WhatsApp ou e-mail) sem editar o arquivo.', contentW);
+  doc.text(rodape, marginX, y);
+
+  const payload = { patient: state.patient, general: state.general, oral: state.oral, diseases: state.diseases };
+  const code = encodePdfData(payload);
+  if(code) doc.setProperties({ keywords: PDF_DATA_TAG + code });
+
+  const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  doc.save('dados_paciente_' + safeName + '.pdf');
+  document.getElementById('successBox').classList.add('show');
+  toast('PDF gerado com sucesso!');
+}
+
+// ============ RENDER ============
+function render(){
+  const main=document.getElementById('main');
+  main.innerHTML='';
+
+  main.appendChild(el('div',{class:'section-title'},document.createTextNode('Seus dados')));
+  main.appendChild(el('p',{class:'hint'},document.createTextNode(
+    'Preencha este formulário com calma e gere o PDF ao final. Depois, envie o arquivo para a clínica (ex: por WhatsApp) — ' +
+    'ela vai importar seus dados diretamente na ficha de anamnese, sem precisar digitar nada de novo.'
+  )));
+
+  main.appendChild(photoField());
+  main.appendChild(textField('Nome completo', state.patient, 'nome'));
+  const row1=el('div',{class:'row'});
+  row1.appendChild(textField('Data de nascimento', state.patient, 'nasc', {type:'date'}));
+  row1.appendChild(textField('Sexo', state.patient, 'sexo'));
+  row1.appendChild(textField('Idade', state.patient, 'idade'));
+  main.appendChild(row1);
+  const row2=el('div',{class:'row'});
+  row2.appendChild(textField('RG', state.patient, 'rg'));
+  row2.appendChild(textField('CPF', state.patient, 'cpf'));
+  row2.appendChild(textField('Telefone', state.patient, 'telefone'));
+  main.appendChild(row2);
+  main.appendChild(textField('E-mail', state.patient, 'email'));
+  main.appendChild(textField('Endereço', state.patient, 'endereco'));
+  main.appendChild(textField('Observações', state.patient, 'obs'));
+  const row3=el('div',{class:'row'});
+  row3.appendChild(textField('Responsável legal (se menor de idade)', state.patient, 'responsavel'));
+  row3.appendChild(textField('CPF do responsável legal', state.patient, 'respCpf'));
+  main.appendChild(row3);
+
+  main.appendChild(el('div',{class:'section-title', style:'margin-top:24px;'},document.createTextNode('Questionário de saúde geral')));
+  GENERAL_QUESTIONS.forEach(q => main.appendChild(yesNoBlock(state.general, q)));
+
+  main.appendChild(el('div',{class:'section-title'},document.createTextNode('Sofre alguma destas doenças?')));
+  const grid=el('div',{class:'disease-grid'});
+  DISEASES.forEach(d=>{
+    const checked=!!state.diseases[d];
+    const chip=el('div',{class:'disease-chip'+(checked?' checked':'')});
+    chip.appendChild(el('div',{class:'box'},document.createTextNode(checked?'✓':'')));
+    chip.appendChild(document.createTextNode(d));
+    chip.onclick=()=>{ state.diseases[d]=!state.diseases[d]; saveProgress(); render(); };
+    grid.appendChild(chip);
+  });
+  main.appendChild(grid);
+
+  const otherCard=el('div',{class:'q-card'});
+  otherCard.appendChild(el('span',{class:'q-text'},document.createTextNode('Outras doenças? Quais?')));
+  const otherInput=el('input',{type:'text', value: state.general.outrasdoencas||''});
+  otherInput.style.width='100%'; otherInput.style.padding='9px 8px'; otherInput.style.fontSize='14px';
+  otherInput.style.border='1px solid var(--line-light)'; otherInput.style.borderRadius='6px'; otherInput.style.fontFamily='inherit';
+  otherInput.oninput=(e)=>{ state.general.outrasdoencas=e.target.value; saveProgressDebounced(); };
+  otherCard.appendChild(otherInput);
+  main.appendChild(otherCard);
+
+  GENERAL_QUESTIONS_2.forEach(q => main.appendChild(yesNoBlock(state.general, q)));
+
+  main.appendChild(el('div',{class:'section-title', style:'margin-top:24px;'},document.createTextNode('Questionário de saúde bucal')));
+  ORAL_QUESTIONS.forEach(q => main.appendChild(yesNoBlock(state.oral, q)));
+
+  const pdfBtn=el('div',{class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;margin-top:20px;'},
+    document.createTextNode('📄 Gerar PDF para enviar à clínica'));
+  pdfBtn.onclick=generatePDF;
+  main.appendChild(pdfBtn);
+
+  const successBox=el('div',{id:'successBox', class:'success-box'},
+    document.createTextNode('✓ PDF gerado! Agora envie o arquivo baixado para a clínica (WhatsApp, e-mail etc). Ela vai usar o botão "Importar PDF — Dados do Paciente e Saúde" na Ficha de Anamnese para preencher tudo automaticamente.'));
+  main.appendChild(successBox);
+}
+
+loadProgress();
+render();
+</script>
+</body>
+</html>

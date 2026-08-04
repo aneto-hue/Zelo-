@@ -1,0 +1,3317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ficha de Anamnese — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="voice-dictation.js"></script>
+<script src="wake-lock.js"></script>
+<script src="shared-data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+  document.head.appendChild(s);
+"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B;
+    --blue-med:#2E75B6;
+    --blue-head:#D6E7F3;
+    --blue-light:#EFF6FB;
+    --line:#9BBBD4;
+    --line-light:#C9DCEC;
+    --ink:#1A1A1A;
+    --muted:#5B6B7A;
+    --green:#2E8B57;
+    --red:#C0392B;
+    --amber:#C98A1F;
+    --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-tap-highlight-color: transparent;
+  }
+  header.topbar{
+    background:#fff;
+    border-bottom:3px solid var(--blue-dark);
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .logo-box{
+    width:56px;height:56px;border:1.5px dashed var(--line);
+    border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:9px;color:#9BAAB8;text-align:center;line-height:1.1;flex-shrink:0;
+  }
+  header.topbar h1{font-size:18px;margin:0;color:var(--blue-dark);font-weight:700;}
+  header.topbar p{margin:2px 0 0;font-size:12px;color:var(--muted);font-style:italic;}
+
+  nav.steps{
+    display:flex;
+    overflow-x:auto;
+    background:#fff;
+    border-bottom:1px solid var(--line-light);
+    position:sticky;
+    top:86px;
+    z-index:19;
+    -webkit-overflow-scrolling:touch;
+  }
+  nav.steps button{
+    flex:0 0 auto;
+    padding:12px 16px;
+    font-size:13px;
+    font-weight:700;
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    border-bottom:3px solid transparent;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  nav.steps button.active{
+    color:var(--blue-dark);
+    border-bottom-color:var(--blue-dark);
+  }
+
+  main{
+    max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto;
+    padding:18px 14px 100px;
+  }
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .section-title{
+    background:var(--blue-dark);
+    color:#fff;
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:0.5px;
+    padding:10px 14px;
+    border-radius:6px;
+    margin:18px 0 12px;
+    text-transform:uppercase;
+  }
+  .section-title:first-child{margin-top:0;}
+
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:13px;
+    font-weight:700;
+    margin-bottom:5px;
+    color:var(--ink);
+  }
+  .field input[type=text], .field input[type=date], .field textarea{
+    width:100%;
+    padding:12px 10px;
+    font-size:16px;
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    font-family:inherit;
+  }
+  .field input:focus, .field textarea:focus{
+    outline:none;
+    border-color:var(--blue-dark);
+    box-shadow:0 0 0 3px var(--blue-head);
+  }
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:140px;}
+
+  .q-card{
+    background:#fff;
+    border:1.5px solid var(--line-light);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:12px;
+  }
+  .q-text{font-size:15px; font-weight:600; margin-bottom:10px; display:block;}
+  .q-text .hint{font-weight:400; font-style:italic; color:var(--muted); font-size:13px;}
+
+  .yn-group{display:flex; gap:10px; margin-bottom:8px;}
+  .yn-btn{
+    flex:1;
+    max-width:120px;
+    padding:11px 0;
+    text-align:center;
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    font-size:14px;
+    font-weight:700;
+    color:var(--muted);
+    cursor:pointer;
+    user-select:none;
+  }
+  .yn-btn.sim.selected{background:var(--green); border-color:var(--green); color:#fff;}
+  .yn-btn.nao.selected{background:#888; border-color:#888; color:#fff;}
+
+  .sub-field{margin-top:8px;}
+  .sub-field input[type=text]{
+    width:100%;
+    padding:9px 8px;
+    font-size:14px;
+    border:1px solid var(--line-light);
+    border-radius:6px;
+    font-family:inherit;
+  }
+  .sub-field label{font-size:12px; color:var(--muted); font-style:italic; display:block; margin-bottom:4px;}
+
+  .disease-grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:8px;
+    margin-bottom:14px;
+  }
+  @media(min-width:600px){.disease-grid{grid-template-columns:repeat(3, 1fr);}}
+  .disease-chip{
+    display:flex; align-items:center; gap:8px;
+    background:var(--blue-light);
+    border:1.5px solid var(--line-light);
+    border-radius:8px;
+    padding:11px 10px;
+    font-size:13px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .disease-chip .box{
+    width:20px;height:20px;border:2px solid var(--line);border-radius:4px;
+    flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    background:#fff; font-size:14px; color:#fff; font-weight:900;
+  }
+  .disease-chip.checked{background:var(--blue-dark); color:#fff; border-color:var(--blue-dark);}
+  .disease-chip.checked .box{background:#fff; color:var(--blue-dark);}
+
+  .signature-row{display:flex; gap:12px; margin-top:18px; flex-wrap:wrap;}
+  .signature-row .field{flex:1; min-width:160px;}
+
+  .odonto-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; padding:6px 0 10px;}
+  .odonto-wrap svg{display:block; margin:0 auto;}
+  .tooth{cursor:pointer;}
+  .legend{display:flex; gap:14px; font-size:12px; color:var(--muted); justify-content:center; flex-wrap:wrap; margin-top:6px;}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .legend i{width:13px; height:13px; border-radius:3px; display:inline-block; border:1px solid var(--line);}
+
+  table.tx-table{width:100%; border-collapse:collapse; margin-top:14px; font-size:13px;}
+  table.tx-table th{
+    background:var(--blue-head); color:var(--blue-dark); font-weight:700;
+    padding:8px 6px; border:1px solid var(--line-light); text-align:left;
+  }
+  table.tx-table td{border:1px solid var(--line-light); padding:0;}
+  table.tx-table input{
+    width:100%; border:none; padding:8px 6px; font-size:13px; font-family:inherit; background:transparent;
+  }
+  table.tx-table input:focus{outline:2px solid var(--blue-dark); outline-offset:-2px;}
+  table.tx-table tr:nth-child(even) td{background:var(--blue-light);}
+  .add-row-btn{
+    margin-top:8px; padding:9px 14px; border:1.5px dashed var(--line);
+    background:#fff; border-radius:8px; color:var(--blue-dark); font-weight:700; font-size:13px; cursor:pointer;
+  }
+
+  .pay-info-table{width:100%; border-collapse:collapse; margin-bottom:14px; font-size:13px;}
+  .pay-info-table td{border:1px solid var(--line-light); padding:0;}
+  .pay-info-table td.label{background:var(--blue-head); color:var(--blue-dark); font-weight:700; padding:10px; width:42%;}
+  .pay-info-table input{width:100%; border:none; padding:10px; font-size:14px; font-family:inherit; background:transparent;}
+
+  .photo-field{margin-bottom:16px;}
+  .photo-box{
+    position:relative;
+    width:140px; height:140px;
+    border-radius:12px;
+    border:2px dashed var(--line);
+    background:var(--blue-light);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    overflow:hidden;
+  }
+  .photo-placeholder{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    color:var(--blue-dark); font-size:12px; font-weight:600; text-align:center; padding:8px;
+  }
+  .photo-icon{font-size:28px;}
+  .photo-preview{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-input{
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    opacity:0; cursor:pointer;
+  }
+  .photo-remove{
+    position:absolute; bottom:0; left:0; right:0;
+    background:rgba(192,57,43,0.9); color:#fff; text-align:center;
+    font-size:11px; font-weight:700; padding:5px 0; cursor:pointer; z-index:2;
+  }
+
+  .gallery-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:10px;
+    margin-bottom:10px;
+  }
+  @media(min-width:600px){.gallery-grid{grid-template-columns:repeat(4, 1fr);}}
+  .gallery-thumb{
+    position:relative;
+    width:100%;
+    aspect-ratio:1/1;
+    border-radius:10px;
+    overflow:hidden;
+    border:1.5px solid var(--line-light);
+    background:var(--blue-light);
+  }
+  .gallery-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .gallery-thumb .remove-x{
+    position:absolute; top:4px; right:4px;
+    width:22px; height:22px; border-radius:50%;
+    background:rgba(192,57,43,0.92); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:900; cursor:pointer; z-index:2;
+  }
+  .gallery-item{display:flex; flex-direction:column; gap:4px;}
+  .gallery-caption{
+    width:100%;
+    font-size:11px;
+    padding:6px 6px;
+    border:1px solid var(--line-light);
+    border-radius:6px;
+    font-family:inherit;
+    background:#fff;
+  }
+  .gallery-caption:focus{outline:none; border-color:var(--blue-dark);}
+  .gallery-add{
+    width:100%;
+    aspect-ratio:1/1;
+    border-radius:10px;
+    border:1.5px dashed var(--line);
+    background:var(--blue-light);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:4px;
+    color:var(--blue-dark); font-size:11px; font-weight:600; text-align:center;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+  }
+  .gallery-add .add-icon{font-size:24px;}
+  .gallery-add input{
+    position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;
+  }
+
+  footer.bottombar{
+    position:fixed; bottom:0; left:0; right:0;
+    background:#fff; border-top:1.5px solid var(--line-light);
+    padding:10px 14px; display:flex; gap:10px; justify-content:space-between;
+    z-index:20;
+  }
+  footer.bottombar button{
+    flex:1; padding:13px 0; border-radius:8px; font-size:14px; font-weight:700; border:none; cursor:pointer;
+  }
+  .btn-prev{background:#fff; border:1.5px solid var(--line); color:var(--muted);}
+  .btn-next{background:var(--blue-dark); color:#fff;}
+  .btn-pdf{background:var(--green); color:#fff;}
+
+  .tooth-modal-overlay{
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.45);
+    z-index:100;
+    display:flex;align-items:center;justify-content:center;
+    padding:16px;
+    animation:fadeIn .15s ease;
+  }
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .tooth-modal{
+    background:#fff;
+    border-radius:16px;
+    padding:20px;
+    width:100%;
+    max-width:420px;
+    max-height:90vh;
+    overflow-y:auto;
+    box-shadow:0 8px 40px rgba(0,0,0,0.22);
+    animation:slideUp .18s ease;
+    position:relative;
+  }
+  @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .tooth-modal .modal-hdr{
+    display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;
+  }
+  .tooth-modal .modal-title{
+    font-size:16px;font-weight:700;color:var(--blue-dark);
+  }
+  .tooth-modal .modal-close{
+    font-size:22px;cursor:pointer;color:var(--muted);line-height:1;padding:0 4px;
+  }
+  .tooth-modal .status-btns{
+    display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;
+  }
+  .tooth-modal .status-btn{
+    flex:1;min-width:70px;padding:8px 4px;border-radius:8px;
+    text-align:center;font-size:12px;font-weight:700;cursor:pointer;
+    border:2px solid;transition:all .15s;
+  }
+  .tooth-modal .prob-fields{
+    border-top:1px solid var(--line-light);padding-top:12px;margin-top:2px;
+  }
+  .tooth-modal .prob-fields .field{margin-bottom:10px;}
+  .tooth-modal .modal-save{
+    margin-top:14px;width:100%;padding:13px;border-radius:8px;
+    background:var(--blue-dark);color:#fff;font-size:14px;font-weight:700;
+    text-align:center;cursor:pointer;border:none;
+  }
+
+  .toast{
+    position:fixed; top:96px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; transition:all .25s; z-index:50; pointer-events:none;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+<link rel="stylesheet" href="theme.css">
+<script src="nav-home.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo-box">LOGO</div>
+  <div>
+    <h1>Ficha de Anamnese Odontológica</h1>
+    <p id="clinicSubtitle">Nome da Clínica / Cirurgião-Dentista</p>
+  </div>
+</header>
+
+<nav class="steps" id="stepsNav"></nav>
+<div style="max-width:760px;margin:10px auto 0;padding:0 14px;">
+  <span id="voltarListaBtn" style="display:none;font-size:13px;font-weight:700;color:var(--blue-dark);cursor:pointer;">← Voltar para pacientes</span>
+</div>
+
+<main id="main"></main>
+
+<footer class="bottombar">
+  <button class="btn-prev" id="btnPrev">Voltar</button>
+  <button class="btn-next" id="btnNext">Avançar</button>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ DATA MODEL ============
+const state = {
+  clinic: { nome:'', dentista:'', cro:'', endereco:'', cidade:'', telefone:'', email:'', cnpj:'', logo:'' },
+  patient: { nome:'', nasc:'', sexo:'', idade:'', rg:'', cpf:'', telefone:'', email:'', endereco:'', obs:'', responsavel:'', respCpf:'', foto:'' },
+  general: {}, // question key -> 'sim'|'nao', plus text subfields
+  diseases: {}, // disease name -> bool
+  oral: {},
+  dentist: { obs:'' },
+  outrosTratamentos: [], // [{descricao:'', valor:''}]
+  declare: { eu:'', cpf:'', data:'', dr:'', cro:'' },
+  teeth: {}, // kept for backward compat loading old saves
+  toothData: {}, // toothNumber -> { status:0-3, situacao:'', tratamento:'', valor:'' }
+  payInfo: { total:'', forma:'', vencimento:'', parcelas:'' },
+  payRows: [ ['', '', ''] ],
+  contract: { autorizaImagem:'', dataContrato:'', npEmissao:'', npVencimento:'', textoPersonalizado:'' },
+  images: { clinicas: [], radiografias: [] },
+  historicoOrcamentos: [], // [{id, dataGeracao, itens:[{dente,situacao,tratamento,valor}], outros:[{descricao,valor}], total}]
+  financeiroLancamentoId: '' // id do lançamento já criado automaticamente no Financeiro (evita duplicar ao gerar o PDF de novo)
+};
+
+// Chaves do state que pertencem à FICHA de um paciente específico (tudo, exceto "clinic",
+// que agora é compartilhado por todas as fichas). Usado para separar o que é salvo em
+// cada lugar, e para "zerar" a ficha ao abrir/criar uma nova.
+const FICHA_KEYS = Object.keys(state).filter(k => k !== 'clinic');
+const FICHA_TEMPLATE_VAZIA = JSON.parse(JSON.stringify(
+  FICHA_KEYS.reduce((acc,k) => { acc[k] = state[k]; return acc; }, {})
+));
+
+const GENERAL_QUESTIONS = [
+  { key:'tratamento', text:'Está ou esteve recentemente em tratamento médico?', sub:[{key:'motivo', label:'Por qual motivo?'}] },
+  { key:'remedio', text:'Está tomando algum remédio?', sub:[{key:'quais', label:'Quais?'}] },
+  { key:'gravida', text:'Está grávida?', sub:[{key:'mes', label:'Qual mês?'}] },
+  { key:'alergiamed', text:'Já teve reação alérgica a algum medicamento?', sub:[{key:'qualalergia', label:'Qual(is)?'}] },
+  { key:'alergiaanest', text:'Já teve reação alérgica à anestesia?' },
+  { key:'sangrar', text:'Quando se machuca costuma sangrar muito?' },
+  { key:'cicatrizar', text:'Demora a cicatrizar?' },
+  { key:'tontura', text:'Costuma sentir tonturas ou desmaios?' },
+];
+const GENERAL_QUESTIONS_2 = [
+  { key:'marcapasso', text:'Usa marca-passo ou válvula cardíaca?' },
+  { key:'trombose', text:'Já teve trombose?' },
+  { key:'fuma', text:'Fuma?' },
+  { key:'alcool', text:'Toma bebida alcoólica frequentemente?' },
+];
+const DISEASES = ['Pressão alta','Problemas cardíacos','Diabetes','Problema nos rins','Tuberculose','Artrite','Asma / Bronquite','Hepatite','Anemia','Problemas nervosos','Depressão','Epilepsia','Problemas respiratórios','Febre reumática','Convulsão','Reumatismo','Sífilis','HIV'];
+
+const ORAL_QUESTIONS = [
+  { key:'gengiva', text:'Suas gengivas sangram facilmente?', sub:[{key:'escova', label:'Usa escova? / Usa fio dental?'}] },
+  { key:'sensiveis', text:'Tem dentes sensíveis?', sub:[{key:'sensmotivo', label:'Devido ao frio / Ao quente'}] },
+  { key:'range', text:'Range os dentes?', sub:[{key:'mordelabio', label:'Morde os lábios?'}] },
+  { key:'dificuldade', text:'Ao abrir a boca sente dificuldade, dor ou ruído?' },
+  { key:'respira', text:'Respira bem pelo nariz?', alertOn:'nao', sub:[{key:'dorouvido', label:'Dor no ouvido ou na face?'}] },
+  { key:'outroproblema', text:'Existe algum outro problema de saúde geral ou bucal que não foi perguntado e você deseja relatar?', sub:[{key:'qualoutro', label:'Qual?'}] },
+];
+
+let currentStep = 0;
+let modoAtual = 'lista'; // 'lista' = lista de pacientes | 'ficha' = editando a ficha de um paciente
+let fichaAtivaPacienteId = null;
+const STEPS = ['Questionário de Saúde','Imagens','Odontograma','Contrato e Pagamento'];
+
+// ============ IMAGE HELPERS ============
+// Fixes EXIF rotation issues from phone cameras (photos that look correct in
+// the browser preview but appear sideways when drawn raw into the PDF), and
+// normalizes the output to a reasonable size/format for storage + PDF embedding.
+function loadFixedImageDataURL(file, callback){
+  const maxDim = 1400; // cap resolution to keep state/localStorage small
+
+  function fromBitmap(bitmap){
+    const canvas = document.createElement('canvas');
+    let w = bitmap.width, h = bitmap.height;
+    if(w > maxDim || h > maxDim){
+      const scale = maxDim / Math.max(w, h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    callback(canvas.toDataURL('image/jpeg', 0.9));
+  }
+
+  if(window.createImageBitmap){
+    createImageBitmap(file, { imageOrientation: 'from-image' })
+      .then(fromBitmap)
+      .catch(() => fallbackViaImageEl());
+  } else {
+    fallbackViaImageEl();
+  }
+
+  function fallbackViaImageEl(){
+    // Older browsers: createImageBitmap unsupported. EXIF orientation may not
+    // be auto-corrected here, but this keeps the app working everywhere.
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if(w > maxDim || h > maxDim){
+          const scale = maxDim / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// ============ RENDER HELPERS ============
+function el(tag, attrs={}, children=[]){
+  const e = document.createElement(tag);
+  for(const k in attrs){
+    if(k === 'class') e.className = attrs[k];
+    else if(k === 'html') e.innerHTML = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c => { if(c) e.appendChild(c); });
+  return e;
+}
+
+function yesNoBlock(store, q){
+  const card = el('div', { class:'q-card' });
+  card.appendChild(el('span', { class:'q-text' }, document.createTextNode(q.text)));
+  const grp = el('div', { class:'yn-group' });
+  const simBtn = el('div', { class:'yn-btn sim' + (store[q.key]==='sim'?' selected':'') }, document.createTextNode('Sim'));
+  const naoBtn = el('div', { class:'yn-btn nao' + (store[q.key]==='nao'?' selected':'') }, document.createTextNode('Não'));
+  simBtn.onclick = () => { store[q.key] = store[q.key]==='sim'?'':'sim'; refreshPanel(); };
+  naoBtn.onclick = () => { store[q.key] = store[q.key]==='nao'?'':'nao'; refreshPanel(); };
+  grp.appendChild(simBtn); grp.appendChild(naoBtn);
+  card.appendChild(grp);
+  if(q.sub){
+    q.sub.forEach(s => {
+      const wrap = el('div', { class:'sub-field' });
+      wrap.appendChild(el('label', {}, document.createTextNode(s.label)));
+      const input = el('input', { type:'text', value: store[s.key]||'' });
+      input.oninput = (e) => { store[s.key] = e.target.value; saveProgressDebounced(); };
+      wrap.appendChild(comDitado(input));
+      card.appendChild(wrap);
+    });
+  } else if(store[q.key] === 'sim'){
+    const noteKey = q.key + '_obs';
+    const wrap = el('div', { class:'sub-field' });
+    wrap.appendChild(el('label', {}, document.createTextNode('Observações')));
+    const input = el('input', { type:'text', value: store[noteKey]||'' });
+    input.oninput = (e) => { store[noteKey] = e.target.value; saveProgressDebounced(); };
+    wrap.appendChild(comDitado(input));
+    card.appendChild(wrap);
+  }
+  return card;
+}
+
+function maskCPF(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
+function maskTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 5) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length > 0) v = v.replace(/(\d{0,2})/,'($1');
+  return v.trim();
+}
+function maskRG(v){
+  let letraFinal = '';
+  if(/[Xx]$/.test(v.replace(/[^\dXx]/g,''))){
+    const limpoComX = v.replace(/[^\dXx]/g,'').slice(0,9);
+    if(/[Xx]$/.test(limpoComX)){ letraFinal = 'X'; v = limpoComX.slice(0,-1); }
+  }
+  v = v.replace(/\D/g,'').slice(0,9);
+  v = v.replace(/(\d{2})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  if(letraFinal) v = (v.endsWith('-') ? v : v + '-') + letraFinal;
+  return v;
+}
+// Detecta automaticamente qual máscara aplicar, pelo nome do campo (cpf/rg/telefone)
+function mascaraParaCampo(key){
+  const k = key.toLowerCase();
+  if(k==='cpf') return maskCPF;
+  if(k==='rg') return maskRG;
+  if(k.includes('telefone') || k==='whatsapp' || k==='celular') return maskTelefone;
+  return null;
+}
+
+function textField(label, store, key, opts={}){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode(label)));
+  const mascara = opts.mask===false ? null : mascaraParaCampo(key);
+  const attrsInput = { type: opts.type||'text', value: store[key]||'' };
+  if(mascara) attrsInput.inputmode = 'numeric';
+  const input = el('input', attrsInput);
+  input.oninput = (e) => {
+    if(mascara){ e.target.value = mascara(e.target.value); }
+    store[key] = e.target.value;
+    saveProgressDebounced();
+  };
+  f.appendChild((opts.type && opts.type !== 'text') ? input : comDitado(input));
+  return f;
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+// ============ IMPORTAR DADOS A PARTIR DE PDF (gerado pela ficha de preenchimento externa) ============
+const PDF_DATA_TAG = 'FICHA_ANAMNESE_DATA:';
+function encodePdfData(obj){
+  try{
+    const json = JSON.stringify(obj);
+    return btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }catch(e){ return null; }
+}
+function decodePdfData(code){
+  try{
+    let b64 = String(code).trim().replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length % 4) b64 += '=';
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  }catch(e){ return null; }
+}
+function extractDataFromPDFBytes(bytes){
+  // jsPDF grava metadados (Keywords) como texto simples no PDF (sem compressão),
+  // então dá para extrair direto dos bytes, sem precisar de nenhuma biblioteca extra.
+  let raw = '';
+  const chunk = 0x8000;
+  for(let i=0;i<bytes.length;i+=chunk){
+    raw += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  const m = raw.match(/\/Keywords\s*\(([^)]*)\)/);
+  if(!m) return null;
+  const kwIdx = m[1].indexOf(PDF_DATA_TAG);
+  if(kwIdx === -1) return null;
+  const codeMatch = m[1].slice(kwIdx + PDF_DATA_TAG.length).match(/[A-Za-z0-9_-]+/);
+  if(!codeMatch) return null;
+  return decodePdfData(codeMatch[0]);
+}
+function importDataFromPDFFile(kind, file, targetLabel){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const bytes = new Uint8Array(reader.result);
+      const incoming = extractDataFromPDFBytes(bytes);
+      if(!incoming || typeof incoming !== 'object'){
+        alert('Não foi possível encontrar dados neste PDF. Confirme se ele foi gerado pela ficha de preenchimento de "' + targetLabel + '".');
+        return;
+      }
+      const target = state[kind];
+      Object.keys(target).forEach(k => {
+        if(incoming[k] !== undefined && incoming[k] !== ''){ target[k] = incoming[k]; }
+      });
+      refreshPanel();
+      toast('Dados de "' + targetLabel + '" importados com sucesso!');
+    }catch(err){
+      alert('Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function importDataFromPDFFileMulti(kinds, file, targetLabel){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const bytes = new Uint8Array(reader.result);
+      const incoming = extractDataFromPDFBytes(bytes);
+      if(!incoming || typeof incoming !== 'object'){
+        alert('Não foi possível encontrar dados neste PDF. Confirme se ele foi gerado pela ficha de preenchimento de "' + targetLabel + '".');
+        return;
+      }
+      kinds.forEach(kind => {
+        const part = incoming[kind];
+        if(!part || typeof part !== 'object') return;
+        const target = state[kind];
+        Object.keys(part).forEach(k => {
+          if(part[k] !== undefined && part[k] !== ''){ target[k] = part[k]; }
+        });
+      });
+      refreshPanel();
+      toast('Dados de "' + targetLabel + '" importados com sucesso!');
+    }catch(err){
+      alert('Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function importPdfButtonMulti(kinds, targetLabel, hint){
+  const wrap = el('div', { style:'margin-bottom:16px;' });
+  wrap.appendChild(el('div', { style:'font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.4;' },
+    document.createTextNode(hint)));
+  const btn = el('div', {
+    class:'add-row-btn',
+    style:'background:var(--blue-light);border-color:var(--blue-dark);color:var(--blue-dark);text-align:center;position:relative;overflow:hidden;'
+  }, document.createTextNode('📥 Importar PDF — ' + targetLabel));
+  const input = el('input', {
+    type:'file', accept:'.pdf,application/pdf',
+    style:'position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;'
+  });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    importDataFromPDFFileMulti(kinds, file, targetLabel);
+  };
+  btn.appendChild(input);
+  wrap.appendChild(btn);
+  return wrap;
+}
+function importPdfButton(kind, targetLabel, hint){
+  const wrap = el('div', { style:'margin-bottom:16px;' });
+  wrap.appendChild(el('div', { style:'font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.4;' },
+    document.createTextNode(hint)));
+  const btn = el('div', {
+    class:'add-row-btn',
+    style:'background:var(--blue-light);border-color:var(--blue-dark);color:var(--blue-dark);text-align:center;position:relative;overflow:hidden;'
+  }, document.createTextNode('📥 Importar PDF — ' + targetLabel));
+  const input = el('input', {
+    type:'file', accept:'.pdf,application/pdf',
+    style:'position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;'
+  });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    importDataFromPDFFile(kind, file, targetLabel);
+  };
+  btn.appendChild(input);
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+// ============ COMPARTILHAMENTO RÁPIDO (link / código) ============
+let _saveTimer = null;
+function saveProgressDebounced(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveProgress, 400);
+}
+
+// ============ PANEL RENDERERS ============
+function photoField(){
+  const wrap = el('div', { class:'field photo-field' });
+  wrap.appendChild(el('label', {}, document.createTextNode('Foto do paciente')));
+
+  const box = el('div', { class:'photo-box' });
+  if(state.patient.foto){
+    const img = el('img', { src: state.patient.foto, class:'photo-preview' });
+    box.appendChild(img);
+    const removeBtn = el('div', { class:'photo-remove' }, document.createTextNode('✕ Remover foto'));
+    removeBtn.onclick = (e) => { e.stopPropagation(); state.patient.foto=''; refreshPanel(); };
+    box.appendChild(removeBtn);
+  } else {
+    box.appendChild(el('div', { class:'photo-placeholder' }, [
+      el('div', { class:'photo-icon' }, document.createTextNode('📷')),
+      el('div', {}, document.createTextNode('Tocar para tirar foto'))
+    ]));
+  }
+
+  const input = el('input', { type:'file', accept:'image/*', capture:'user', class:'photo-input' });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file, (fixedDataUrl) => {
+      state.patient.foto = fixedDataUrl;
+      refreshPanel();
+    });
+  };
+  box.appendChild(input);
+  if(!state.patient.foto){
+    box.onclick = () => input.click();
+  }
+  wrap.appendChild(box);
+  return wrap;
+}
+
+function logoField(){
+  const wrap = el('div', { class:'field photo-field' });
+  wrap.appendChild(el('label', {}, document.createTextNode('Logo da clínica')));
+
+  const box = el('div', { class:'photo-box' });
+  if(state.clinic.logo){
+    const img = el('img', { src: state.clinic.logo, class:'photo-preview' });
+    box.appendChild(img);
+    const removeBtn = el('div', { class:'photo-remove' }, document.createTextNode('✕ Remover logo'));
+    removeBtn.onclick = (e) => { e.stopPropagation(); state.clinic.logo=''; refreshPanel(); };
+    box.appendChild(removeBtn);
+  } else {
+    box.appendChild(el('div', { class:'photo-placeholder' }, [
+      el('div', { class:'photo-icon' }, document.createTextNode('🖼️')),
+      el('div', {}, document.createTextNode('Tocar para enviar logo'))
+    ]));
+  }
+
+  const input = el('input', { type:'file', accept:'image/*', class:'photo-input' });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file, (fixedDataUrl) => {
+      state.clinic.logo = fixedDataUrl;
+      refreshPanel();
+    });
+  };
+  box.appendChild(input);
+  if(!state.clinic.logo){
+    box.onclick = () => input.click();
+  }
+  wrap.appendChild(box);
+  return wrap;
+}
+
+function renderClinic(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Dados da clínica / dentista')));
+  container.appendChild(importPdfButton('clinic', 'Dados da clínica',
+    'Envie a ficha separada "Dados da Clínica" para a recepcionista preencher. Quando ela gerar o PDF e te devolver, importe-o aqui.'));
+  container.appendChild(logoField());
+  container.appendChild(textField('Nome da clínica', state.clinic, 'nome'));
+  const row1 = el('div', { class:'row' });
+  row1.appendChild(textField('Nome do dentista responsável', state.clinic, 'dentista'));
+  row1.appendChild(textField('CRO', state.clinic, 'cro'));
+  container.appendChild(row1);
+  container.appendChild(textField('Endereço da clínica', state.clinic, 'endereco'));
+  const rowCidade = el('div', { class:'row' });
+  rowCidade.appendChild(textField('Cidade', state.clinic, 'cidade'));
+  rowCidade.appendChild(textField('CNPJ', state.clinic, 'cnpj'));
+  container.appendChild(rowCidade);
+  const row2 = el('div', { class:'row' });
+  row2.appendChild(textField('Telefone / WhatsApp', state.clinic, 'telefone'));
+  row2.appendChild(textField('E-mail', state.clinic, 'email'));
+  container.appendChild(row2);
+}
+
+function galleryField(label, arr, onChange){
+  const wrap = el('div', { class:'field' });
+  wrap.appendChild(el('label', {}, document.createTextNode(label)));
+
+  const grid = el('div', { class:'gallery-grid' });
+
+  arr.forEach((item, idx) => {
+    const gItem = el('div', { class:'gallery-item' });
+    const thumb = el('div', { class:'gallery-thumb' });
+    thumb.appendChild(el('img', { src: item.url }));
+    const removeX = el('div', { class:'remove-x' }, document.createTextNode('✕'));
+    removeX.onclick = (e) => { e.stopPropagation(); arr.splice(idx,1); onChange(); };
+    thumb.appendChild(removeX);
+    gItem.appendChild(thumb);
+
+    const caption = el('input', { type:'text', class:'gallery-caption', placeholder:'Título / descrição', value: item.titulo||'' });
+    caption.oninput = (e) => { item.titulo = e.target.value; saveProgressDebounced(); };
+    gItem.appendChild(caption);
+
+    grid.appendChild(gItem);
+  });
+
+  const addTile = el('div', { class:'gallery-add' }, [
+    el('div', { class:'add-icon' }, document.createTextNode('📷')),
+    el('div', {}, document.createTextNode('Tirar foto'))
+  ]);
+  const input = el('input', { type:'file', accept:'image/*', capture:'environment' });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file, (fixedDataUrl) => {
+      arr.push({ url:fixedDataUrl, titulo:'' });
+      onChange();
+    });
+  };
+  addTile.appendChild(input);
+  grid.appendChild(addTile);
+
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+function renderImages(container){
+  migrateImages();
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Imagens clínicas')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:10px;' },
+    document.createTextNode('Toque em "Tirar foto" para acionar a câmera do dispositivo e adicionar quantas imagens forem necessárias. Você pode dar um título/descrição a cada imagem.')));
+  container.appendChild(galleryField('Fotos clínicas', state.images.clinicas, refreshPanel));
+
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Radiografias')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:10px;' },
+    document.createTextNode('Toque em "Tirar foto" para fotografar a radiografia (ex: revelada, em negatoscópio, ou exibida na tela). Você pode dar um título/descrição a cada imagem.')));
+  container.appendChild(galleryField('Radiografias', state.images.radiografias, refreshPanel));
+}
+
+
+function renderPatient(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Questionário de Saúde')));
+
+  // ---- Resumo do paciente (somente leitura — os dados são cadastrados no módulo Pacientes) ----
+  const resumo = el('div', { class:'card', style:'margin-bottom:16px;' });
+  const resumoTop = el('div', { style:'display:flex;gap:12px;align-items:center;' });
+  if(state.patient.foto) resumoTop.appendChild(el('img', { src: state.patient.foto, style:'width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;' }));
+  const resumoInfo = el('div', {});
+  resumoInfo.appendChild(el('div', { style:'font-weight:700;font-size:16px;' }, document.createTextNode(state.patient.nome || '(sem nome cadastrado)')));
+  const linha2 = [
+    state.patient.nasc ? formatDateBR(state.patient.nasc) : '',
+    state.patient.sexo || '',
+    state.patient.telefone || ''
+  ].filter(Boolean).join(' • ');
+  resumoInfo.appendChild(el('div', { style:'font-size:12.5px;color:var(--muted);margin-top:2px;' }, document.createTextNode(linha2 || 'Sem dados adicionais')));
+  const linha3 = [
+    state.patient.cpf ? ('CPF: '+state.patient.cpf) : '',
+    state.patient.rg ? ('RG: '+state.patient.rg) : ''
+  ].filter(Boolean).join(' • ');
+  if(linha3) resumoInfo.appendChild(el('div', { style:'font-size:12.5px;color:var(--muted);margin-top:2px;' }, document.createTextNode(linha3)));
+  resumoTop.appendChild(resumoInfo);
+  resumo.appendChild(resumoTop);
+  resumo.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin:10px 0 0;' }, [
+    document.createTextNode('Esses dados vêm do cadastro do paciente. Para corrigir algo, use o módulo '),
+    el('a', { href:'paciente.html?id='+encodeURIComponent(fichaAtivaPacienteId||''), style:'color:var(--blue-dark);font-weight:700;' }, document.createTextNode('Pacientes')),
+    document.createTextNode('.')
+  ]));
+  container.appendChild(resumo);
+
+  container.appendChild(importPdfButtonMulti(['patient','general','oral','diseases'], 'Dados do Paciente e Saúde',
+    'Envie a ficha separada "Dados do Paciente e Saúde" para o paciente preencher pelo celular (dados pessoais + saúde geral + saúde bucal). Quando ele gerar o PDF e te devolver (ex: pelo WhatsApp), importe-o aqui.'));
+
+  container.appendChild(el('div', { class:'section-title', style:'margin-top:20px;' }, document.createTextNode('Questionário de saúde geral')));
+  GENERAL_QUESTIONS.forEach(q => container.appendChild(yesNoBlock(state.general, q)));
+
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Sofre alguma destas doenças?')));
+  const grid = el('div', { class:'disease-grid' });
+  DISEASES.forEach(d => {
+    const checked = !!state.diseases[d];
+    const chip = el('div', { class:'disease-chip' + (checked?' checked':'') });
+    chip.appendChild(el('div', { class:'box' }, document.createTextNode(checked?'✓':'')));
+    chip.appendChild(document.createTextNode(d));
+    chip.onclick = () => { state.diseases[d] = !state.diseases[d]; refreshPanel(); };
+    grid.appendChild(chip);
+  });
+  container.appendChild(grid);
+
+  const otherCard = el('div', { class:'q-card' });
+  otherCard.appendChild(el('span', { class:'q-text' }, document.createTextNode('Outras doenças? Quais?')));
+  const otherInput = el('input', { type:'text', value: state.general.outrasdoencas||'' });
+  otherInput.style.width='100%'; otherInput.style.padding='9px 8px'; otherInput.style.fontSize='14px';
+  otherInput.style.border='1px solid var(--line-light)'; otherInput.style.borderRadius='6px'; otherInput.style.fontFamily='inherit';
+  otherInput.oninput = (e) => { state.general.outrasdoencas = e.target.value; saveProgressDebounced(); };
+  otherCard.appendChild(otherInput);
+  container.appendChild(otherCard);
+
+  GENERAL_QUESTIONS_2.forEach(q => container.appendChild(yesNoBlock(state.general, q)));
+
+  container.appendChild(el('div', { class:'section-title', style:'margin-top:24px;' }, document.createTextNode('Questionário de saúde bucal')));
+  ORAL_QUESTIONS.forEach(q => container.appendChild(yesNoBlock(state.oral, q)));
+
+  // ── Observações do cirurgião-dentista ──
+  container.appendChild(el('div',{class:'section-title',style:'margin-top:20px;'},document.createTextNode('Observações do cirurgião-dentista')));
+  const obsField=el('div',{class:'field'});
+  const obsTa=el('textarea',{rows:5});
+  obsTa.value=state.dentist.obs||'';
+  obsTa.oninput=(e)=>{state.dentist.obs=e.target.value;saveProgressDebounced();};
+  obsField.appendChild(comDitado(obsTa));
+  container.appendChild(obsField);
+}
+
+// ============ ODONTOGRAMA ============
+const UPPER_RIGHT = [18,17,16,15,14,13,12,11];
+const UPPER_LEFT  = [21,22,23,24,25,26,27,28];
+const LOWER_RIGHT = [48,47,46,45,44,43,42,41];
+const LOWER_LEFT  = [31,32,33,34,35,36,37,38];
+const DEC_UPPER_RIGHT = [55,54,53,52,51];
+const DEC_UPPER_LEFT  = [61,62,63,64,65];
+const DEC_LOWER_RIGHT = [85,84,83,82,81];
+const DEC_LOWER_LEFT  = [71,72,73,74,75];
+const ALL_TEETH = [...UPPER_RIGHT,...UPPER_LEFT,...LOWER_RIGHT,...LOWER_LEFT,
+                   ...DEC_UPPER_RIGHT,...DEC_UPPER_LEFT,...DEC_LOWER_RIGHT,...DEC_LOWER_LEFT];
+const TOOTH_LABELS = ['','Problema','Tratado','Ausente'];
+const TOOTH_COLORS = ['#ffffff','#FADADD','#B9D6EC','#CCCCCC'];
+const TOOTH_STROKES= ['#9BBBD4','#C0392B','#1F5C8B','#888888'];
+
+function novoTratamentoId(){ return 'tt'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+function td(n){
+  let entry = state.toothData[n];
+  if(!entry){
+    entry = state.toothData[n] = { status:0, tratamentos:[] };
+    return entry;
+  }
+  // Migra fichas antigas (um único tratamento gravado direto no objeto do dente)
+  // para o novo formato de lista, sem perder nada que já estava preenchido.
+  if(!Array.isArray(entry.tratamentos)){
+    const tinhaConteudo = entry.situacao || entry.tratamento || entry.valor;
+    const antigo = {
+      id: novoTratamentoId(),
+      situacao: entry.situacao||'', tratamento: entry.tratamento||'', valor: entry.valor||'',
+      procedimentoId: entry.procedimentoId||'', estoqueBaixado: entry.estoqueBaixado||''
+    };
+    entry.tratamentos = tinhaConteudo ? [antigo] : [];
+    delete entry.situacao; delete entry.tratamento; delete entry.valor;
+    delete entry.procedimentoId; delete entry.estoqueBaixado;
+  }
+  return entry;
+}
+
+function migrateTeeth(){
+  if(state.teeth && Object.keys(state.teeth).length){
+    Object.entries(state.teeth).forEach(([k,v])=>{
+      if(!state.toothData[k]) state.toothData[k] = { status:0, situacao:'', tratamento:'', valor:'' };
+      state.toothData[k].status = v || 0;
+    });
+  }
+}
+
+// Converte imagens salvas no formato antigo (string dataUrl) para o novo formato {url, titulo}
+function migrateImages(){
+  ['clinicas','radiografias'].forEach(key=>{
+    if(!state.images[key]) { state.images[key] = []; return; }
+    state.images[key] = state.images[key].map(item=>{
+      if(typeof item === 'string') return { url:item, titulo:'' };
+      return { url:item.url||'', titulo:item.titulo||'' };
+    });
+  });
+}
+
+let selectedTooth = null;
+let refreshOdontoTable = null;
+let estoqueCache = { produtos: [], procedimentos: [] };
+
+async function carregarEstoqueCache(){
+  const dados = await ClinicaStorage.load('controle_estoque_progresso_v1');
+  estoqueCache.produtos = (dados && dados.produtos) || [];
+  estoqueCache.procedimentos = (dados && dados.procedimentos) || [];
+}
+
+// Dá baixa no estoque dos materiais de um procedimento (grava movimentações de saída direto
+// nos dados do módulo Estoque, na mesma clínica). Não bloqueia mesmo se o estoque ficar negativo
+// (mesmo comportamento do módulo Estoque, que só avisa, não impede).
+async function baixarEstoqueProcedimento(proc, contexto){
+  if(!proc || !proc.materiais || !proc.materiais.length) return;
+  const dados = await ClinicaStorage.load('controle_estoque_progresso_v1') || { produtos:[], movimentacoes:[], procedimentos:[] };
+  if(!Array.isArray(dados.movimentacoes)) dados.movimentacoes = [];
+  const hoje = new Date();
+  const hojeStr = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+  proc.materiais.forEach(m => {
+    dados.movimentacoes.unshift({
+      id: 'idmov'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+      produtoId: m.produtoId,
+      tipo: 'saida',
+      quantidade: parseFloat(m.quantidade)||0,
+      data: hojeStr,
+      motivo: 'Uso em procedimento: ' + proc.nome + (contexto ? (' — ' + contexto) : '')
+    });
+  });
+  ClinicaStorage.save('controle_estoque_progresso_v1', dados);
+}
+let refreshPaymentDisplay = null;
+
+function buildOdontoSVG(){
+  const cell=36, gap=2, gapMid=12;
+  const decCell=28, decGap=2, decGapMid=8;
+  const totalW = 16*(cell+gap)+gapMid+20;
+
+  // Layout vertical:
+  // y=14: arcada superior permanente (h=cell=36), label abaixo: 14+36+11=61
+  // y=68: arcada inferior permanente (h=36), label acima: 68-4=64
+  // y=126: linha separadora + label DECÍDUOS (y=138)
+  // y=146: arcada superior decídua (h=28), label abaixo: 146+28+11=185
+  // y=188: arcada inferior decídua (h=28), label acima: 188-4=184
+  // totalH: 188+28+14 = 230
+  const totalH = 232;
+  let svg=`<svg viewBox="0 0 ${totalW} ${totalH}" width="100%" style="max-width:720px;display:block;margin:0 auto;">`;
+
+  svg+=`<text x="${totalW/2}" y="10" text-anchor="middle" font-size="9" fill="#9BAAB8" font-family="Arial" font-weight="700">SUPERIOR</text>`;
+  svg+=`<text x="${totalW/2}" y="116" text-anchor="middle" font-size="9" fill="#9BAAB8" font-family="Arial" font-weight="700">INFERIOR</text>`;
+
+  const midX = 10 + 8*(cell+gap) + gapMid/2;
+  svg+=`<line x1="${midX}" y1="12" x2="${midX}" y2="118" stroke="#DDD" stroke-width="1" stroke-dasharray="4,3"/>`;
+
+  svg+=`<line x1="10" y1="123" x2="${totalW-10}" y2="123" stroke="#DDD" stroke-width="1" stroke-dasharray="5,3"/>`;
+  svg+=`<text x="${totalW/2}" y="134" text-anchor="middle" font-size="9" fill="#B8860B" font-family="Arial" font-weight="700">DECÍDUOS</text>`;
+
+  const decMidX = totalW/2;
+  svg+=`<line x1="${decMidX}" y1="136" x2="${decMidX}" y2="${totalH-4}" stroke="#E8D5A0" stroke-width="1" stroke-dasharray="4,3"/>`;
+
+  const allUpper=[...UPPER_RIGHT,...UPPER_LEFT];
+  const allLower=[...LOWER_RIGHT,...LOWER_LEFT];
+  const decUpper=[...DEC_UPPER_RIGHT,...DEC_UPPER_LEFT];
+  const decLower=[...DEC_LOWER_RIGHT,...DEC_LOWER_LEFT];
+
+  function drawRow(numbers, rowY, isUpper, isDeciduous){
+    const c = isDeciduous ? decCell : cell;
+    const g2 = isDeciduous ? decGap : gap;
+    const gm = isDeciduous ? decGapMid : gapMid;
+    const perSide = numbers.length / 2;
+    const rowW = perSide*(c+g2)*2 + gm;
+    const startX = isDeciduous ? Math.round((totalW - rowW)/2) : 10;
+
+    numbers.forEach((n,i)=>{
+      const x = startX + i*(c+g2) + (i>=perSide?gm:0);
+      const tData = td(n);
+      const fill = TOOTH_COLORS[tData.status||0];
+      const fillActual = tData.status===0 && isDeciduous ? '#FFFDE7' : fill;
+      const strokeActual = tData.status>0 ? TOOTH_STROKES[tData.status] : (isDeciduous?'#B8860B':'#9BBBD4');
+      const isSel = selectedTooth==n;
+      const hasNote = tData.status!==3 && !!(tData.tratamentos && tData.tratamentos.some(t=>t.situacao||t.tratamento||t.valor));
+      const absent = tData.status===3;
+
+      svg+=`<g class="tooth-g" data-tooth="${n}" style="cursor:pointer">`;
+      if(absent){
+        svg+=`<rect x="${x}" y="${rowY}" width="${c}" height="${c}" rx="4" fill="#EEE" stroke="#AAA" stroke-width="1.2" stroke-dasharray="4,2"/>`;
+        svg+=`<line x1="${x+4}" y1="${rowY+4}" x2="${x+c-4}" y2="${rowY+c-4}" stroke="#AAA" stroke-width="1.5"/>`;
+        svg+=`<line x1="${x+c-4}" y1="${rowY+4}" x2="${x+4}" y2="${rowY+c-4}" stroke="#AAA" stroke-width="1.5"/>`;
+      } else {
+        svg+=`<rect x="${x}" y="${rowY}" width="${c}" height="${c}" rx="4" fill="${fillActual}" stroke="${strokeActual}" stroke-width="${isSel?2.5:1.5}"/>`;
+        const fs = isDeciduous ? 9 : 10;
+        svg+=`<text x="${x+c/2}" y="${rowY+c/2+Math.round(fs/3)+1}" font-size="${fs}" text-anchor="middle" font-family="Arial" fill="${strokeActual}" font-weight="700">${n}</text>`;
+      }
+      if(isSel) svg+=`<rect x="${x-2}" y="${rowY-2}" width="${c+4}" height="${c+4}" rx="6" fill="none" stroke="#F39C12" stroke-width="2.5"/>`;
+      if(hasNote) svg+=`<circle cx="${x+c-3}" cy="${rowY+3}" r="3.5" fill="#F39C12"/>`;
+      svg+=`</g>`;
+    });
+  }
+
+  drawRow(allUpper, 14, true, false);
+  drawRow(allLower, 68, false, false);
+  drawRow(decUpper, 140, true, true);
+  drawRow(decLower, 188, false, true);
+
+  svg+=`</svg>`;
+  return svg;
+}
+
+function formatCurrencyMask(value){
+  // Mantém apenas os dígitos digitados
+  let digits = String(value).replace(/\D/g,'');
+  if(!digits) return '';
+  // Remove zeros à esquerda excedentes, mas garante ao menos 3 dígitos (centavos + 1 inteiro)
+  digits = digits.replace(/^0+(?=\d)/,'');
+  while(digits.length < 3) digits = '0' + digits;
+  const cents = digits.slice(-2);
+  let intPart = digits.slice(0, -2).replace(/^0+(?=\d)/,'');
+  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return 'R$ ' + intPart + ',' + cents;
+}
+
+function openToothModal(container, n){
+  // Remove qualquer modal existente
+  const existing = document.getElementById('tooth-modal-overlay');
+  if(existing) existing.remove();
+
+  const tData = td(n);
+  const statusNames = ['Sem alteração','Problema','Tratado','Ausente'];
+  const colors = [
+    ['#F4F8FB','#1F5C8B'],
+    ['#FADADD','#C0392B'],
+    ['#B9D6EC','#1F5C8B'],
+    ['#E8E8E8','#888888']
+  ];
+
+  function rebuild(){
+    const existing2 = document.getElementById('tooth-modal-overlay');
+    if(existing2) existing2.remove();
+    openToothModal(container, n);
+  }
+
+  function fecharModalDente(){
+    (tData.tratamentos||[]).forEach(t => {
+      if(t.procedimentoId && t.estoqueBaixado !== t.procedimentoId){
+        const proc = estoqueCache.procedimentos.find(p => p.id === t.procedimentoId);
+        if(proc){
+          baixarEstoqueProcedimento(proc, 'Dente '+n+(state.patient.nome?(' — '+state.patient.nome):''));
+          t.estoqueBaixado = t.procedimentoId;
+          toast('Estoque baixado para "'+proc.nome+'"!');
+        }
+      }
+    });
+    overlay.remove(); selectedTooth=null; renderSVGOnly(container); syncTotalToPayInfo(); saveProgressDebounced();
+    if(refreshOdontoTable) refreshOdontoTable();
+    if(refreshPaymentDisplay) refreshPaymentDisplay();
+  }
+
+  const overlay = el('div', { class:'tooth-modal-overlay' });
+  overlay.id = 'tooth-modal-overlay';
+  overlay.onclick = (e) => { if(e.target===overlay){ fecharModalDente(); } };
+
+  const modal = el('div', { class:'tooth-modal' });
+
+  // Cabeçalho
+  const hdr = el('div', { class:'modal-hdr' });
+  hdr.appendChild(el('div', { class:'modal-title' }, document.createTextNode('Dente ' + n)));
+  const closeBtn = el('span', { class:'modal-close' }, document.createTextNode('✕'));
+  closeBtn.onclick = () => { fecharModalDente(); };
+  hdr.appendChild(closeBtn);
+  modal.appendChild(hdr);
+
+  // Botões de status
+  const statusRow = el('div', { class:'status-btns' });
+  [0,1,2,3].forEach(s=>{
+    const active = tData.status===s;
+    const btn = el('div', { class:'status-btn',
+      style:`border-color:${active?colors[s][1]:'var(--line-light)'};background:${active?colors[s][0]:'#fff'};color:${active?colors[s][1]:'var(--muted)'};`
+    }, document.createTextNode(statusNames[s]));
+    btn.onclick = () => { tData.status=s; saveProgressDebounced(); rebuild(); };
+    statusRow.appendChild(btn);
+  });
+  modal.appendChild(statusRow);
+
+  // Lista de procedimentos deste dente (pode ter mais de um) — exceto quando o dente está Ausente (3)
+  if(tData.status !== 3){
+    if(!tData.tratamentos.length) tData.tratamentos.push({ id: novoTratamentoId(), situacao:'', tratamento:'', valor:'', procedimentoId:'', estoqueBaixado:'' });
+
+    modal.appendChild(el('div', { style:'font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px;' },
+      document.createTextNode('Procedimento(s) para este dente')));
+
+    const listaWrap = el('div', {});
+    modal.appendChild(listaWrap);
+
+    function renderListaTratamentos(){
+      listaWrap.innerHTML = '';
+      tData.tratamentos.forEach((t, idx) => {
+        const bloco = el('div', { style:'border:1.5px solid var(--line-light);border-radius:10px;padding:12px;margin-bottom:12px;position:relative;' });
+
+        if(tData.tratamentos.length > 1){
+          const numBadge = el('div', { style:'font-size:11px;font-weight:700;color:var(--blue-dark);margin-bottom:8px;' },
+            document.createTextNode('Procedimento ' + (idx+1)));
+          bloco.appendChild(numBadge);
+        }
+
+        if(estoqueCache.procedimentos.length){
+          const procField = el('div', { class:'field' });
+          procField.appendChild(el('label', {}, document.createTextNode('Procedimento cadastrado (opcional)')));
+          const procSelect = el('select', { style:'width:100%;padding:11px 10px;font-size:15px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+          procSelect.appendChild(el('option', { value:'' }, document.createTextNode('— Preencher manualmente —')));
+          estoqueCache.procedimentos.forEach(p => {
+            const opt = el('option', { value:p.id }, document.createTextNode(p.nome + (p.valorSugerido?(' — R$ '+parseFloat(p.valorSugerido).toFixed(2).replace('.',','))+'':'')));
+            if(t.procedimentoId === p.id) opt.setAttribute('selected','selected');
+            procSelect.appendChild(opt);
+          });
+          procSelect.onchange = (e) => {
+            const proc = estoqueCache.procedimentos.find(p => p.id === e.target.value);
+            if(proc){
+              t.procedimentoId = proc.id;
+              t.tratamento = proc.nome;
+              if(proc.valorSugerido){
+                const centavos = Math.round(parseFloat(proc.valorSugerido) * 100);
+                t.valor = formatCurrencyMask(String(centavos));
+              }
+            } else {
+              t.procedimentoId = '';
+            }
+            saveProgressDebounced();
+            rebuild();
+          };
+          procField.appendChild(procSelect);
+          bloco.appendChild(procField);
+          if(t.procedimentoId){
+            const proc = estoqueCache.procedimentos.find(p => p.id === t.procedimentoId);
+            if(proc && proc.materiais && proc.materiais.length){
+              const jaBaixado = t.estoqueBaixado === t.procedimentoId;
+              bloco.appendChild(el('p', { style:'font-size:11.5px;color:'+(jaBaixado?'var(--muted)':'var(--amber)')+';margin-top:-6px;margin-bottom:10px;' },
+                document.createTextNode(jaBaixado
+                  ? '✓ Estoque já baixado para este procedimento.'
+                  : '⚠ Ao confirmar, os materiais deste procedimento serão baixados do estoque automaticamente.')));
+            }
+          }
+        }
+
+        [['situacao','Situação / Diagnóstico'],['tratamento','Tratamento proposto'],['valor','Valor (R$)']].forEach(([key,label])=>{
+          const f = el('div', { class:'field' });
+          f.appendChild(el('label', {}, document.createTextNode(label)));
+          if(key==='valor'){
+            const inp = el('input', { type:'text', inputmode:'numeric', value:t[key]?formatCurrencyMask(t[key]):'', placeholder:'R$ 0,00', style:'font-weight:700;color:var(--green);' });
+            inp.oninput = e => {
+              e.target.value = formatCurrencyMask(e.target.value);
+              t[key]=e.target.value;
+              saveProgressDebounced();
+            };
+            f.appendChild(inp);
+          } else {
+            const inp = el('input', { type:'text', value:t[key]||'', placeholder:label });
+            inp.oninput = e => { t[key]=e.target.value; saveProgressDebounced(); };
+            f.appendChild(comDitado(inp));
+          }
+          bloco.appendChild(f);
+        });
+
+        if(tData.tratamentos.length > 1){
+          const removerBtn = el('div', { style:'text-align:right;' }, [
+            el('span', { style:'color:var(--red);cursor:pointer;font-size:12px;font-weight:700;' }, document.createTextNode('✕ Remover este procedimento'))
+          ]);
+          removerBtn.onclick = () => {
+            tData.tratamentos.splice(idx,1);
+            saveProgressDebounced();
+            rebuild();
+          };
+          bloco.appendChild(removerBtn);
+        }
+
+        listaWrap.appendChild(bloco);
+      });
+    }
+    renderListaTratamentos();
+
+    const addTratamentoBtn = el('div', { class:'add-row-btn', style:'text-align:center;margin-bottom:4px;' },
+      document.createTextNode('+ Adicionar outro procedimento neste dente'));
+    addTratamentoBtn.onclick = () => {
+      tData.tratamentos.push({ id: novoTratamentoId(), situacao:'', tratamento:'', valor:'', procedimentoId:'', estoqueBaixado:'' });
+      saveProgressDebounced();
+      rebuild();
+    };
+    modal.appendChild(addTratamentoBtn);
+  }
+
+  // ---- Imagens deste dente (foto clínica, raio-x etc.) ----
+  if(!tData.imagens) tData.imagens = [];
+  modal.appendChild(el('div', { style:'font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 8px;' },
+    document.createTextNode('Imagens deste dente')));
+  modal.appendChild(galleryField('Fotos e radiografias do dente ' + n, tData.imagens, () => { saveProgressDebounced(); }));
+
+  // Botão salvar/fechar
+  const saveBtn = el('div', { class:'modal-save' }, document.createTextNode('Confirmar'));
+  saveBtn.onclick = () => { fecharModalDente(); };
+  modal.appendChild(saveBtn);
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function renderSVGOnly(container){
+  const wrap = document.getElementById('odonto-svg-wrap');
+  if(wrap) wrap.innerHTML = buildOdontoSVG();
+  bindToothClicks(container);
+}
+
+function renderToothPanel(container){
+  // Remove painel fixo antigo se existir
+  const existing = document.getElementById('tooth-panel');
+  if(existing) existing.remove();
+  // Mostra hint quando nada selecionado
+  if(!selectedTooth){
+    const hint = el('div', {
+      style:'text-align:center;padding:16px;color:var(--muted);font-size:13px;background:#fff;border:1.5px dashed var(--line-light);border-radius:10px;margin-top:12px;'
+    }, document.createTextNode('Toque num dente para selecionar o estado e anotar.'));
+    hint.id = 'tooth-panel';
+    container.appendChild(hint);
+  }
+}
+
+function renderOdontogramPanel(container){
+  renderSVGOnly(container);
+  renderToothPanel(container);
+}
+
+function bindToothClicks(container){
+  const wrap = document.getElementById('odonto-svg-wrap');
+  if(!wrap) return;
+  wrap.querySelectorAll('.tooth-g').forEach(g=>{
+    g.onclick = ()=>{
+      const n = parseInt(g.getAttribute('data-tooth'));
+      selectedTooth = n;
+      renderSVGOnly(container);
+      openToothModal(container, n);
+    };
+  });
+}
+
+function renderTeethGrid(container){
+  const wrap = el('div', { class:'odonto-wrap', html: buildOdontoSVG() });
+  wrap.id = 'odonto-svg-wrap';
+  container.appendChild(wrap);
+  bindToothClicks(container);
+  const legend = el('div', { class:'legend', style:'margin-top:8px;' });
+  legend.innerHTML = `
+    <span><i style="background:#fff;border-color:#9BBBD4"></i> Normal</span>
+    <span><i style="background:#FADADD;border-color:#C0392B"></i> Problema</span>
+    <span><i style="background:#B9D6EC;border-color:#1F5C8B"></i> Tratado</span>
+    <span><i style="background:#EEE;border-color:#AAA"></i> Ausente</span>
+    <span><i style="background:#F39C12;border-radius:50%;border-color:#F39C12"></i> Com anotação</span>
+    <span><i style="background:#FFFDE7;border-color:#B8860B"></i> Decíduo</span>`;
+  container.appendChild(legend);
+  container.appendChild(el('p',{style:'font-size:11px;color:var(--muted);text-align:center;margin:6px 0 0;'},
+    document.createTextNode('Toque num dente para selecionar e anotar.')));
+}
+
+function parseMoney(str){
+  if(!str) return 0;
+  let clean = String(str).replace(/[^\d,\.]/g,'');
+  // Formato brasileiro: ponto = milhar, vírgula = decimal
+  clean = clean.replace(/\./g,'').replace(',', '.');
+  const n = parseFloat(clean);
+  return isNaN(n)?0:n;
+}
+
+function calcTotalTratamentos(){
+  let total = 0;
+  ALL_TEETH.forEach(n=>{
+    const d=state.toothData[n];
+    if(d && Array.isArray(d.tratamentos)){
+      d.tratamentos.forEach(t => { if(t.valor) total += parseMoney(t.valor); });
+    }
+  });
+  (state.outrosTratamentos||[]).forEach(item=>{
+    if(item.valor) total += parseMoney(item.valor);
+  });
+  return total;
+}
+
+function formatMoney(n){
+  return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// Junta os tratamentos de TODOS os dentes anotados numa lista única e "achatada" —
+// um item por procedimento (um dente com 2 procedimentos gera 2 itens aqui).
+function listarTodosTratamentosDentes(){
+  const itens = [];
+  ALL_TEETH.forEach(n => {
+    const d = state.toothData[n];
+    if(!d) return;
+    const lista = (d.tratamentos && d.tratamentos.length) ? d.tratamentos : (d.status>0 ? [null] : []);
+    lista.forEach(t => {
+      if(!t && d.status===0) return;
+      itens.push({ dente:n, status:d.status, situacao: t?(t.situacao||''):'', tratamento: t?(t.tratamento||''):'', valor: t?(t.valor||''):'' });
+    });
+  });
+  return itens;
+}
+
+function syncTotalToPayInfo(){
+  const total = calcTotalTratamentos();
+  if(total>0) state.payInfo.total = formatMoney(total);
+}
+
+function renderOdontograma(container){
+  migrateTeeth();
+  if(!state.outrosTratamentos) state.outrosTratamentos=[];
+
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Odontograma')));
+  renderTeethGrid(container);
+
+  // Hint
+  const hint = el('div', {
+    style:'text-align:center;padding:12px;color:var(--muted);font-size:12px;background:#fff;border:1.5px dashed var(--line-light);border-radius:10px;margin-top:10px;'
+  }, document.createTextNode('Toque num dente para selecionar o estado e anotar.'));
+  container.appendChild(hint);
+
+  // ── Botão Outros tratamentos logo abaixo do odontograma ──
+  const addOutroBtn = el('div',{
+    class:'add-row-btn',
+    style:'text-align:center;margin-top:10px;background:var(--blue-light);border-color:var(--blue-dark);color:var(--blue-dark);font-weight:700;'
+  }, document.createTextNode('+ Outros tratamentos'));
+
+  const outrosSection = el('div', { style:'margin-top:10px;display:none;' });
+  outrosSection.id = 'outros-section';
+
+  addOutroBtn.onclick = ()=>{
+    const vis = outrosSection.style.display==='none';
+    outrosSection.style.display = vis ? 'block' : 'none';
+    addOutroBtn.textContent = vis ? '− Outros tratamentos' : '+ Outros tratamentos';
+  };
+  container.appendChild(addOutroBtn);
+
+  // Seção outros tratamentos (oculta por padrão, abre ao clicar)
+  outrosSection.appendChild(el('p',{style:'font-size:12px;color:var(--muted);margin-bottom:10px;'},
+    document.createTextNode('Tratamentos adicionais não vinculados a um dente específico.')));
+
+  function renderOutrosRows(wrapper){
+    wrapper.innerHTML='';
+    state.outrosTratamentos.forEach((item,idx)=>{
+      const row=el('div',{style:'display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;'});
+
+      const descWrap=el('div',{class:'field',style:'flex:2;margin:0;'});
+      descWrap.appendChild(el('label',{},document.createTextNode('Descrição')));
+      const descInp=el('input',{type:'text',value:item.descricao||'',placeholder:'Ex: Clareamento, Prótese...'});
+      descInp.oninput=e=>{item.descricao=e.target.value;saveProgressDebounced();renderTabelaConsolidada();};
+      descWrap.appendChild(descInp);
+      row.appendChild(descWrap);
+
+      const valWrap=el('div',{class:'field',style:'flex:1;margin:0;'});
+      valWrap.appendChild(el('label',{},document.createTextNode('Valor (R$)')));
+      const valInp=el('input',{type:'text',inputmode:'numeric',value:item.valor?formatCurrencyMask(item.valor):'',placeholder:'R$ 0,00',style:'font-weight:700;color:var(--green);'});
+      valInp.oninput=e=>{e.target.value=formatCurrencyMask(e.target.value);item.valor=e.target.value;saveProgressDebounced();syncTotalToPayInfo();renderTabelaConsolidada();if(refreshPaymentDisplay) refreshPaymentDisplay();};
+      valWrap.appendChild(valInp);
+      row.appendChild(valWrap);
+
+      const removeBtn=el('div',{style:'margin-top:22px;cursor:pointer;color:#C0392B;font-size:20px;line-height:1;padding:6px 4px;flex-shrink:0;'},
+        document.createTextNode('✕'));
+      removeBtn.onclick=()=>{state.outrosTratamentos.splice(idx,1);saveProgressDebounced();syncTotalToPayInfo();renderOutrosRows(outrosWrapper);renderTabelaConsolidada();if(refreshPaymentDisplay) refreshPaymentDisplay();};
+      row.appendChild(removeBtn);
+      wrapper.appendChild(row);
+    });
+  }
+
+  const outrosWrapper=el('div');
+  renderOutrosRows(outrosWrapper);
+  outrosSection.appendChild(outrosWrapper);
+
+  const addRowBtn=el('div',{class:'add-row-btn',style:'text-align:center;'},document.createTextNode('+ Adicionar linha'));
+  addRowBtn.onclick=()=>{
+    state.outrosTratamentos.push({descricao:'',valor:''});
+    saveProgressDebounced();
+    renderOutrosRows(outrosWrapper);
+    outrosSection.style.display='block';
+    addOutroBtn.textContent='− Outros tratamentos';
+  };
+  outrosSection.appendChild(addRowBtn);
+  container.appendChild(outrosSection);
+
+  // Se já há outros tratamentos, mostrar a seção aberta
+  if(state.outrosTratamentos.length>0){
+    outrosSection.style.display='block';
+    addOutroBtn.textContent='− Outros tratamentos';
+  }
+
+  // ── Tabela consolidada única ──
+  container.appendChild(el('div',{class:'section-title',style:'margin-top:20px;'},document.createTextNode('Plano de tratamento consolidado')));
+
+  const tabelaWrap = el('div');
+  tabelaWrap.id = 'tabela-consolidada';
+  container.appendChild(tabelaWrap);
+
+  function renderTabelaConsolidada(){
+    tabelaWrap.innerHTML='';
+    const annotated = ALL_TEETH.filter(n=>{ const d=state.toothData[n]; return d&&(d.status>0||(d.tratamentos&&d.tratamentos.length>0)); });
+    const outros = (state.outrosTratamentos||[]).filter(i=>i.descricao||i.valor);
+    const hasRows = annotated.length>0 || outros.length>0;
+
+    if(!hasRows){
+      tabelaWrap.appendChild(el('p',{style:'color:var(--muted);font-size:13px;padding:10px 0;'},
+        document.createTextNode('Nenhum tratamento registrado ainda.')));
+      return;
+    }
+
+    const tbl=el('table',{class:'tx-table'});
+    const thead=el('tr');
+    ['Dente / Descrição','Estado','Situação / Diagnóstico','Tratamento','Valor (R$)',''].forEach(h=>
+      thead.appendChild(el('th',{},document.createTextNode(h))));
+    tbl.appendChild(thead);
+
+    // Linhas dos dentes (uma linha por procedimento, ou uma linha só do status se não houver detalhe)
+    annotated.forEach(n=>{
+      const d=state.toothData[n];
+      const linhasTratamento = (d.tratamentos && d.tratamentos.length) ? d.tratamentos : [null];
+      linhasTratamento.forEach((t, idxT) => {
+        const tr=el('tr');
+        const labelDente = 'Dente '+n+(linhasTratamento.length>1 ? ' ('+(idxT+1)+'/'+linhasTratamento.length+')' : '');
+
+        const tdDente=el('td',{style:'padding:7px 6px;'});
+        tdDente.appendChild(document.createTextNode(labelDente));
+        tr.appendChild(tdDente);
+
+        // Estado — select editável
+        const tdEstado=el('td',{style:'padding:5px 4px;'});
+        const selEstado=el('select',{style:'width:100%;padding:5px 3px;font-size:12.5px;border:1px solid var(--line-light);border-radius:6px;font-family:inherit;'});
+        TOOTH_LABELS.forEach((lbl,i)=>{
+          const opt=el('option',{value:String(i)},document.createTextNode(lbl));
+          if(d.status===i) opt.setAttribute('selected','selected');
+          selEstado.appendChild(opt);
+        });
+        selEstado.onchange=(e)=>{ d.status=parseInt(e.target.value,10); saveProgressDebounced(); syncTotalToPayInfo(); renderSVGOnly(container); if(refreshPaymentDisplay) refreshPaymentDisplay(); };
+        tdEstado.appendChild(selEstado);
+        tr.appendChild(tdEstado);
+
+        // Garante que existe um objeto de tratamento pra editar (cria na hora, se preciso)
+        function garantirTratamento(){
+          if(t) return t;
+          t = { id: novoTratamentoId(), situacao:'', tratamento:'', valor:'', procedimentoId:'', estoqueBaixado:'' };
+          if(!Array.isArray(d.tratamentos)) d.tratamentos = [];
+          d.tratamentos.push(t);
+          return t;
+        }
+
+        [['situacao','Situação'],['tratamento','Tratamento'],['valor','Valor (R$)']].forEach(([campo,placeholder])=>{
+          const tdCampo=el('td',{style:'padding:5px 4px;'});
+          const inputCampo=el('input',{type:'text', value: t?(t[campo]||''):'', placeholder:placeholder,
+            style:'width:100%;padding:5px 6px;font-size:12.5px;border:1px solid var(--line-light);border-radius:6px;font-family:inherit;'+(campo==='valor'?'font-weight:700;color:var(--green);':'')});
+          inputCampo.oninput=(e)=>{
+            if(campo==='valor') e.target.value = formatCurrencyMask(e.target.value);
+            const alvo = garantirTratamento();
+            alvo[campo] = e.target.value;
+            saveProgressDebounced();
+            if(campo==='valor'){ syncTotalToPayInfo(); if(refreshPaymentDisplay) refreshPaymentDisplay(); atualizarTotalConsolidado(); }
+          };
+          tdCampo.appendChild(inputCampo);
+          tr.appendChild(tdCampo);
+        });
+
+        const tdAction=el('td',{style:'padding:7px 6px;text-align:center;'});
+        const delBtn=el('span',{style:'cursor:pointer;color:#C0392B;font-size:18px;line-height:1;padding:4px;'},document.createTextNode('✕'));
+        delBtn.onclick=()=>{
+          if(t){
+            const idxReal = d.tratamentos.indexOf(t);
+            if(idxReal>-1) d.tratamentos.splice(idxReal,1);
+          } else {
+            state.toothData[n] = { status:0, tratamentos:[] };
+          }
+          saveProgressDebounced();
+          syncTotalToPayInfo();
+          renderTabelaConsolidada();
+          renderSVGOnly(container);
+          if(refreshPaymentDisplay) refreshPaymentDisplay();
+        };
+        tdAction.appendChild(delBtn);
+        tr.appendChild(tdAction);
+        tbl.appendChild(tr);
+      });
+    });
+
+    // Linhas dos outros tratamentos
+    outros.forEach(item=>{
+      const tr=el('tr',{style:'background:var(--blue-light);'});
+      const tdDesc=el('td',{style:'padding:5px 4px;'});
+      const inputDesc=el('input',{type:'text', value:item.descricao||'', placeholder:'Descrição',
+        style:'width:100%;padding:5px 6px;font-size:12.5px;border:1px solid var(--line-light);border-radius:6px;font-family:inherit;font-weight:600;color:var(--blue-dark);'});
+      inputDesc.oninput=(e)=>{ item.descricao=e.target.value; saveProgressDebounced(); };
+      tdDesc.appendChild(inputDesc);
+      tr.appendChild(tdDesc);
+      ['—','—'].forEach(v=>{
+        const td2=el('td',{style:'padding:7px 6px;color:var(--muted);text-align:center;'});
+        td2.appendChild(document.createTextNode(v));
+        tr.appendChild(td2);
+      });
+      const tdVazio=el('td',{style:'padding:7px 6px;'});
+      tr.appendChild(tdVazio);
+      const tdValor=el('td',{style:'padding:5px 4px;'});
+      const inputValor=el('input',{type:'text', value:item.valor||'', placeholder:'Valor (R$)',
+        style:'width:100%;padding:5px 6px;font-size:12.5px;border:1px solid var(--line-light);border-radius:6px;font-family:inherit;font-weight:700;color:var(--green);'});
+      inputValor.oninput=(e)=>{ e.target.value = formatCurrencyMask(e.target.value); item.valor=e.target.value; saveProgressDebounced(); syncTotalToPayInfo(); if(refreshPaymentDisplay) refreshPaymentDisplay(); atualizarTotalConsolidado(); };
+      tdValor.appendChild(inputValor);
+      tr.appendChild(tdValor);
+      const tdAction=el('td',{style:'padding:7px 6px;text-align:center;'});
+      const delBtn=el('span',{style:'cursor:pointer;color:#C0392B;font-size:18px;line-height:1;padding:4px;'},document.createTextNode('✕'));
+      delBtn.onclick=()=>{
+        const idx = state.outrosTratamentos.indexOf(item);
+        if(idx>-1) state.outrosTratamentos.splice(idx,1);
+        saveProgressDebounced();
+        syncTotalToPayInfo();
+        renderOutrosRows(outrosWrapper);
+        renderTabelaConsolidada();
+        if(refreshPaymentDisplay) refreshPaymentDisplay();
+      };
+      tdAction.appendChild(delBtn);
+      tr.appendChild(tdAction);
+      tbl.appendChild(tr);
+    });
+
+    tbl.appendChild(el('tr')); // espaçador
+
+    // Linha de total
+    const total = calcTotalTratamentos();
+    let totalValorCell = null;
+    if(total>0){
+      const trTotal=el('tr',{style:'background:var(--blue-dark);'});
+      ['TOTAL','','','','R$ '+formatMoney(total),''].forEach((v,i)=>{
+        const isValueCell = i===4;
+        const cellColor = isValueCell ? '#3DDC84' : '#fff';
+        const td2=el('td',{style:`padding:9px 6px;font-weight:700;color:${cellColor};background:var(--blue-dark);`+(i===0?'':'text-align:'+(i===4?'left':'center')+';')});
+        td2.appendChild(document.createTextNode(v));
+        trTotal.appendChild(td2);
+        if(isValueCell) totalValorCell = td2;
+      });
+      tbl.appendChild(trTotal);
+      // Sincroniza automaticamente com Pagamento
+      syncTotalToPayInfo();
+    }
+    tabelaTotalCellRef = totalValorCell;
+
+    tabelaWrap.appendChild(tbl);
+  }
+
+  // Atualiza só o número do total (sem reconstruir a tabela inteira) — assim o campo
+  // que a pessoa está digitando não perde o foco a cada tecla.
+  let tabelaTotalCellRef = null;
+  function atualizarTotalConsolidado(){
+    const novoTotal = calcTotalTratamentos();
+    if(tabelaTotalCellRef){
+      tabelaTotalCellRef.textContent = 'R$ ' + formatMoney(novoTotal);
+    } else if(novoTotal > 0){
+      // Ainda não existia linha de total (total zerado antes) — agora precisa criar, então refaz a tabela.
+      renderTabelaConsolidada();
+    }
+  }
+
+  renderTabelaConsolidada();
+  refreshOdontoTable = renderTabelaConsolidada;
+
+  const orcamentoBtn = el('div', { class:'add-row-btn',
+    style:'margin-top:10px;background:#fff;border:1.5px dashed var(--blue-dark);color:var(--blue-dark);text-align:center;font-size:14px;padding:13px;' },
+    document.createTextNode('📄 Gerar apenas o Orçamento (PDF, sem contrato)'));
+  orcamentoBtn.onclick = () => { generateOrcamentoPDF(); renderHistoricoOrcamentos(); };
+  container.appendChild(orcamentoBtn);
+  container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:6px;margin-bottom:0;' },
+    document.createTextNode('Use isso enquanto o paciente ainda está decidindo. Quando ele fechar o tratamento, gere o PDF completo (com contrato e nota promissória) na última aba.')));
+
+  const historicoWrap = el('div', {});
+  container.appendChild(historicoWrap);
+  function renderHistoricoOrcamentos(){
+    historicoWrap.innerHTML = '';
+    if(!state.historicoOrcamentos || !state.historicoOrcamentos.length) return;
+    historicoWrap.appendChild(el('div', { style:'font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 8px;' },
+      document.createTextNode('Histórico de orçamentos gerados')));
+    state.historicoOrcamentos.forEach(orc => {
+      const dataFmt = new Date(orc.dataGeracao).toLocaleDateString('pt-BR') + ' às ' + new Date(orc.dataGeracao).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      const qtdItens = (orc.itens?.length||0) + (orc.outros?.length||0);
+      const card = el('div', { class:'card', style:'padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;' });
+      const info = el('div', {});
+      info.appendChild(el('div', { style:'font-weight:700;font-size:13.5px;' }, document.createTextNode('R$ ' + formatMoney(orc.total||0))));
+      info.appendChild(el('div', { style:'font-size:11.5px;color:var(--muted);' }, document.createTextNode(dataFmt + ' • ' + qtdItens + ' item(ns)')));
+      card.appendChild(info);
+      const delBtn = el('span', { style:'color:var(--red);cursor:pointer;font-size:12px;font-weight:700;' }, document.createTextNode('✕'));
+      delBtn.onclick = () => {
+        if(!confirm('Remover este registro do histórico de orçamentos?')) return;
+        state.historicoOrcamentos = state.historicoOrcamentos.filter(o=>o.id!==orc.id);
+        saveProgress();
+        renderHistoricoOrcamentos();
+      };
+      card.appendChild(delBtn);
+      historicoWrap.appendChild(card);
+    });
+  }
+  renderHistoricoOrcamentos();
+}
+
+
+// Calcula a data de vencimento (DD/MM/AAAA) para um dado dia do mês, avançando "monthOffset" meses a partir do mês atual.
+// Se o dia não existir no mês (ex: 31 em fevereiro), usa o último dia daquele mês.
+function computeDueDate(day, monthOffset){
+  const today = new Date();
+  let month = today.getMonth() + (monthOffset||0);
+  let year = today.getFullYear();
+  while(month > 11){ month -= 12; year++; }
+  const lastDay = new Date(year, month+1, 0).getDate();
+  const d = Math.min(parseInt(day,10)||1, lastDay);
+  const dd = String(d).padStart(2,'0');
+  const mm = String(month+1).padStart(2,'0');
+  return dd+'/'+mm+'/'+year;
+}
+
+// Gera automaticamente as linhas de parcelas (Valor dividido, Data nos meses subsequentes, Forma de pagamento)
+// a partir do número de parcelas e do dia de vencimento escolhidos.
+function regenerateParcelas(){
+  const n = parseInt(state.payInfo.parcelas, 10);
+  const day = state.payInfo.vencimento;
+  if(!n || n<1 || !day) return;
+  const totalValor = calcTotalTratamentos();
+  const centavosTotal = Math.round(totalValor*100);
+  const baseCent = Math.floor(centavosTotal/n);
+  const restoCent = centavosTotal - (baseCent*n);
+  const novasLinhas = [];
+  for(let i=0; i<n; i++){
+    const cent = baseCent + (i===n-1 ? restoCent : 0); // ajusta arredondamento na última parcela
+    const valorTxt = totalValor>0 ? ('R$ '+formatMoney(cent/100)) : '';
+    const dataTxt = computeDueDate(day, i);
+    novasLinhas.push([valorTxt, dataTxt, state.payInfo.forma||'']);
+  }
+  state.payRows = novasLinhas;
+  saveProgressDebounced();
+  refreshPanel();
+}
+
+function renderPayment(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Plano de pagamento')));
+  const infoTable = el('table', { class:'pay-info-table' });
+
+  // Guarda os inputs das colunas "Valor" (0), "Data do pagamento" (1) e "Forma do pagamento" (2) da tabela
+  // para poder atualizá-los ao vivo, sem re-renderizar o painel inteiro (o que tiraria o foco do campo).
+  const rowInputs = []; // { valorInput, dataInput, formaInput }
+  let totalInputEl = null;
+
+  [['total','Valor total do tratamento'],['forma','Forma de pagamento'],['parcelas','Número de parcelas'],['vencimento','Vencimento todo dia']].forEach(([key,label]) => {
+    const tr = el('tr');
+    tr.appendChild(el('td', { class:'label' }, document.createTextNode(label)));
+    const td = el('td');
+    if(key==='total'){
+      const totalValor = calcTotalTratamentos();
+      const totalTexto = totalValor>0 ? ('R$ '+formatMoney(totalValor)) : '';
+      state.payInfo.total = totalTexto;
+      const input = el('input', { type:'text', value: totalTexto, readonly:'readonly', style:'font-weight:700;color:var(--green);background:var(--blue-light);cursor:not-allowed;' });
+      totalInputEl = input;
+      td.appendChild(input);
+    } else if(key==='forma'){
+      const options = ['', 'Cartão de crédito', 'Cartão de Débito', 'Pix', 'Dinheiro', 'Promissória', 'Boleto'];
+      const select = el('select', { style:'width:100%;padding:9px 8px;font-size:14px;border:1px solid var(--line-light);border-radius:6px;font-family:inherit;background:#fff;' });
+      options.forEach(opt => {
+        const optEl = el('option', { value: opt }, document.createTextNode(opt || 'Selecione...'));
+        if((state.payInfo.forma||'') === opt) optEl.setAttribute('selected','selected');
+        select.appendChild(optEl);
+      });
+      select.onchange = (e) => {
+        state.payInfo.forma = e.target.value;
+        saveProgressDebounced();
+        if(state.payInfo.parcelas && state.payInfo.vencimento){
+          regenerateParcelas();
+        } else {
+          // Preenche automaticamente a "Forma do pagamento" das linhas ainda vazias, sem sobrescrever correções já feitas
+          rowInputs.forEach((r, ri) => {
+            if(!state.payRows[ri][2]){
+              r.formaInput.value = e.target.value;
+              state.payRows[ri][2] = e.target.value;
+            }
+          });
+        }
+      };
+      td.appendChild(select);
+    } else if(key==='parcelas'){
+      const select = el('select', { style:'width:100%;padding:9px 8px;font-size:14px;border:1px solid var(--line-light);border-radius:6px;font-family:inherit;background:#fff;' });
+      const blankOpt = el('option', { value:'' }, document.createTextNode('Selecione...'));
+      if(!state.payInfo.parcelas) blankOpt.setAttribute('selected','selected');
+      select.appendChild(blankOpt);
+      for(let n=1; n<=24; n++){
+        const optEl = el('option', { value:String(n) }, document.createTextNode(n===1 ? 'À vista (1x)' : n+'x'));
+        if(String(state.payInfo.parcelas||'') === String(n)) optEl.setAttribute('selected','selected');
+        select.appendChild(optEl);
+      }
+      select.onchange = (e) => {
+        state.payInfo.parcelas = e.target.value;
+        saveProgressDebounced();
+        if(state.payInfo.parcelas && state.payInfo.vencimento){
+          regenerateParcelas();
+        }
+      };
+      td.appendChild(select);
+    } else {
+      const select = el('select', { style:'width:100%;padding:9px 8px;font-size:14px;border:1px solid var(--line-light);border-radius:6px;font-family:inherit;background:#fff;' });
+      const blankOpt = el('option', { value:'' }, document.createTextNode('Selecione o dia...'));
+      if(!state.payInfo.vencimento) blankOpt.setAttribute('selected','selected');
+      select.appendChild(blankOpt);
+      for(let d=1; d<=31; d++){
+        const optEl = el('option', { value:String(d) }, document.createTextNode('Dia '+d));
+        if(String(state.payInfo.vencimento||'') === String(d)) optEl.setAttribute('selected','selected');
+        select.appendChild(optEl);
+      }
+      select.onchange = (e) => {
+        state.payInfo.vencimento = e.target.value;
+        saveProgressDebounced();
+        if(state.payInfo.parcelas){
+          // Já sabendo o número de parcelas, cria a tabela inteira automaticamente com os vencimentos dos meses subsequentes
+          regenerateParcelas();
+        } else if(e.target.value){
+          // Sem número de parcelas definido: apenas preenche a data nas linhas ainda vazias
+          rowInputs.forEach((r, ri) => {
+            if(!state.payRows[ri][1]){
+              const dataTxt = computeDueDate(e.target.value, ri);
+              r.dataInput.value = dataTxt;
+              state.payRows[ri][1] = dataTxt;
+            }
+          });
+        }
+      };
+      td.appendChild(select);
+    }
+    tr.appendChild(td);
+    infoTable.appendChild(tr);
+  });
+  container.appendChild(infoTable);
+
+  const table = el('table', { class:'tx-table' });
+  const thead = el('tr');
+  ['Valor','Data do pagamento','Forma do pagamento'].forEach(h => thead.appendChild(el('th', {}, document.createTextNode(h))));
+  table.appendChild(thead);
+  state.payRows.forEach((row, ri) => {
+    const tr = el('tr');
+    const inputsForRow = {};
+    row.forEach((val, ci) => {
+      const td = el('td');
+      const input = el('input', { type:'text', value: val });
+      input.oninput = (e) => { state.payRows[ri][ci] = e.target.value; saveProgressDebounced(); };
+      td.appendChild(input);
+      tr.appendChild(td);
+      if(ci===0) inputsForRow.valorInput = input;
+      if(ci===1) inputsForRow.dataInput = input;
+      if(ci===2) inputsForRow.formaInput = input;
+    });
+    rowInputs.push(inputsForRow);
+    table.appendChild(tr);
+  });
+  container.appendChild(table);
+  const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Adicionar linha'));
+  addBtn.onclick = () => {
+    const novaLinha = ['', '', ''];
+    if(state.payInfo.vencimento) novaLinha[1] = computeDueDate(state.payInfo.vencimento, state.payRows.length);
+    if(state.payInfo.forma) novaLinha[2] = state.payInfo.forma;
+    if(state.payInfo.total) novaLinha[0] = state.payInfo.total;
+    state.payRows.push(novaLinha);
+    refreshPanel();
+  };
+  container.appendChild(addBtn);
+
+  // Sincroniza ao vivo o valor total (e a coluna "Valor" das linhas ainda vazias) com o total do plano de tratamento,
+  // sem precisar re-renderizar o painel inteiro (o que tiraria o foco de campos em edição).
+  refreshPaymentDisplay = () => {
+    const totalValor = calcTotalTratamentos();
+    const totalTexto = totalValor>0 ? ('R$ '+formatMoney(totalValor)) : '';
+    state.payInfo.total = totalTexto;
+    if(totalInputEl) totalInputEl.value = totalTexto;
+    rowInputs.forEach((r, ri) => {
+      if(!state.payRows[ri][0]){
+        if(r.valorInput) r.valorInput.value = totalTexto;
+        state.payRows[ri][0] = totalTexto;
+      }
+    });
+  };
+}
+
+// ---- Contrato ----
+function buildContractClauses(){
+  const v = (val) => (val && String(val).trim()) ? String(val) : '________________________';
+  const tratamentosLista = listarTodosTratamentosDentes()
+    .map(item => (item.tratamento||'').trim() ? ('Dente '+item.dente+': '+item.tratamento.trim()) : '')
+    .filter(Boolean)
+    .concat(
+      (state.outrosTratamentos||[])
+        .filter(item => (item.descricao||'').trim())
+        .map(item => item.descricao.trim())
+    )
+    .join('; ');
+  const imgAutoriza = state.contract.autorizaImagem === 'sim';
+  const imgNaoAutoriza = state.contract.autorizaImagem === 'nao';
+
+  return [
+    { title:'CLÁUSULA 1ª – DO OBJETO', paragraphs:[
+      'O presente contrato tem por objeto a prestação de serviços odontológicos consistentes em tratar os seguintes casos: ' + v(tratamentosLista)
+    ]},
+    { title:'CLÁUSULA 2ª – DO PLANO DE TRATAMENTO', paragraphs:[
+      'O plano de tratamento inicialmente proposto compreende os seguintes procedimentos: ' + v(tratamentosLista),
+      'Parágrafo Primeiro – O CONTRATANTE declara estar ciente de que o planejamento poderá sofrer alterações em razão de necessidades clínicas supervenientes que serão previamente informadas a ele.'
+    ]},
+    { title:'CLÁUSULA 3ª – DO CONSENTIMENTO INFORMADO', paragraphs:[
+      'O CONTRATANTE declara que recebeu informações claras e suficientes acerca: I – do diagnóstico apresentado; II – dos procedimentos indicados; III – dos riscos inerentes ao tratamento; IV – das possíveis complicações e limitações; V – das alternativas terapêuticas disponíveis; VI – dos cuidados necessários durante e após o tratamento.'
+    ]},
+    { title:'CLÁUSULA 4ª – DAS OBRIGAÇÕES DO CONTRATADO', paragraphs:[
+      'São obrigações do CONTRATADO: I – prestar os serviços odontológicos com zelo, diligência e observância das normas técnicas e éticas aplicáveis; II – utilizar materiais e técnicas adequadas ao procedimento; III – manter sigilo profissional; IV – manter prontuário clínico atualizado.',
+      'Parágrafo Único – O CONTRATANTE declara ciência de que os serviços odontológicos constituem obrigação de meio, não havendo garantia absoluta de resultado tendo em vista fatores biológicos individuais de cada paciente.'
+    ]},
+    { title:'CLÁUSULA 5ª – DAS OBRIGAÇÕES DO CONTRATANTE', paragraphs:[
+      'I – fornecer informações verdadeiras sobre seu estado de saúde; II – seguir corretamente as orientações profissionais; III – comparecer às consultas agendadas; IV – realizar os pagamentos nos prazos estipulados.'
+    ]},
+    { title:'CLÁUSULA 6ª – DOS HONORÁRIOS E FORMA DE PAGAMENTO', paragraphs:[
+      'Pelos serviços prestados, o CONTRATANTE pagará ao CONTRATADO o valor total de R$ ' + v(state.payInfo.total) + ', conforme a forma de pagamento ' + v(state.payInfo.forma) + ', com vencimento no dia ' + v(state.payInfo.vencimento) + ' de cada mês, conforme parcelas discriminadas em tabela própria deste contrato.'
+    ]},
+    { title:'CLÁUSULA 7ª – DAS FALTAS E REAGENDAMENTOS', paragraphs:[
+      'As consultas deverão ser canceladas ou remarcadas com antecedência mínima de 01 (um) dia.'
+    ]},
+    { title:'CLÁUSULA 8ª – DO USO DE IMAGEM E DADOS PESSOAIS', paragraphs:[
+      (imgAutoriza ? '[X] ' : '[ ] ') + 'Autorizo o uso de imagens clínicas, fotografias e exames.',
+      (imgNaoAutoriza ? '[X] ' : '[ ] ') + 'NÃO autorizo o uso de imagens clínicas, fotografias e exames.',
+      'O CONTRATADO compromete-se a preservar o sigilo e confidencialidade das informações do CONTRATANTE.'
+    ]},
+    { title:'CLÁUSULA 9ª – DO FORO', paragraphs:[
+      'Fica eleito o foro da comarca de ' + v(state.clinic.cidade) + ', para dirimir eventuais controvérsias decorrentes deste contrato.'
+    ]}
+  ];
+}
+
+function buildContractClausesPlainText(){
+  return buildContractClauses().map(c => c.title + '\n' + c.paragraphs.join('\n')).join('\n\n');
+}
+
+function renderContract(container){
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-bottom:-6px;' },
+    document.createTextNode('O plano de pagamento pode ser preenchido e fechado por outro profissional, diferente de quem preencheu o odontograma.')));
+  renderPayment(container);
+
+  container.appendChild(el('div', { class:'section-title', style:'margin-top:24px;' }, document.createTextNode('Contrato de prestação de serviços')));
+
+  const note = el('p', { style:'font-size:13px;color:var(--muted);margin-bottom:14px;' },
+    document.createTextNode('Os dados abaixo foram preenchidos automaticamente a partir das outras abas. Revise antes de gerar o PDF.'));
+  container.appendChild(note);
+
+  const imgCard = el('div', { class:'q-card' });
+  imgCard.appendChild(el('span', { class:'q-text' }, document.createTextNode('O paciente autoriza o uso de imagens clínicas, fotografias e exames?')));
+  const grp = el('div', { class:'yn-group' });
+  const simBtn = el('div', { class:'yn-btn sim' + (state.contract.autorizaImagem==='sim'?' selected':'') }, document.createTextNode('Autorizo'));
+  const naoBtn = el('div', { class:'yn-btn nao' + (state.contract.autorizaImagem==='nao'?' selected':'') }, document.createTextNode('Não autorizo'));
+  simBtn.onclick = () => { state.contract.autorizaImagem = state.contract.autorizaImagem==='sim'?'':'sim'; refreshPanel(); };
+  naoBtn.onclick = () => { state.contract.autorizaImagem = state.contract.autorizaImagem==='nao'?'':'nao'; refreshPanel(); };
+  grp.appendChild(simBtn); grp.appendChild(naoBtn);
+  imgCard.appendChild(grp);
+  container.appendChild(imgCard);
+
+  container.appendChild(textField('Data do contrato', state.contract, 'dataContrato', {type:'date'}));
+
+  // ── Texto do contrato: botão para visualizar/editar ──
+  const editWrap = el('div', { style:'margin-top:14px;' });
+  const editBtn = el('div', {
+    class:'add-row-btn',
+    style:'text-align:center;background:var(--blue-light);border-color:var(--blue-dark);color:var(--blue-dark);font-weight:700;'
+  }, document.createTextNode('✎ Ver / Editar texto do contrato'));
+
+  const editorSection = el('div', { style:'margin-top:10px;display:none;' });
+  editorSection.id = 'contract-text-editor';
+
+  editorSection.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-bottom:8px;' },
+    document.createTextNode('O texto abaixo foi pré-preenchido automaticamente com os dados das outras abas. Você pode alterá-lo livremente — as alterações serão usadas no PDF final no lugar do texto padrão.')));
+
+  const ta = el('textarea', {
+    rows:18,
+    style:'width:100%;font-family:inherit;font-size:13px;padding:10px;border:1.5px solid var(--line);border-radius:8px;line-height:1.5;'
+  });
+  ta.value = (state.contract.textoPersonalizado||'').trim() ? state.contract.textoPersonalizado : buildContractClausesPlainText();
+  ta.oninput = (e) => { state.contract.textoPersonalizado = e.target.value; saveProgressDebounced(); };
+  editorSection.appendChild(comDitado(ta));
+
+  const restoreBtn = el('div', {
+    style:'margin-top:8px;text-align:center;font-size:12px;color:#C0392B;cursor:pointer;text-decoration:underline;'
+  }, document.createTextNode('Restaurar texto padrão (desfazer alterações)'));
+  restoreBtn.onclick = () => {
+    if(confirm('Isso vai apagar suas alterações no texto e voltar ao texto gerado automaticamente. Deseja continuar?')){
+      state.contract.textoPersonalizado = '';
+      saveProgressDebounced();
+      refreshPanel();
+    }
+  };
+  editorSection.appendChild(restoreBtn);
+
+  editBtn.onclick = () => {
+    const vis = editorSection.style.display === 'none';
+    editorSection.style.display = vis ? 'block' : 'none';
+    editBtn.textContent = vis ? '✕ Fechar edição do texto do contrato' : '✎ Ver / Editar texto do contrato';
+  };
+  editWrap.appendChild(editBtn);
+  editWrap.appendChild(editorSection);
+  container.appendChild(editWrap);
+
+  if((state.contract.textoPersonalizado||'').trim()){
+    container.appendChild(el('p', { style:'font-size:12px;color:var(--amber);margin-top:6px;font-style:italic;' },
+      document.createTextNode('⚠ O texto do contrato foi personalizado e será usado no PDF no lugar do texto padrão.')));
+  }
+
+  // Separador nota promissória — só aparece se a forma de pagamento escolhida for "Promissória"
+  if(state.payInfo.forma === 'Promissória'){
+    container.appendChild(el('div', { class:'section-title', style:'margin-top:24px;' },
+      document.createTextNode('Nota promissória')));
+    container.appendChild(el('p', { style:'font-size:13px;color:var(--muted);margin-bottom:10px;' },
+      document.createTextNode('Preencha as datas para emitir a nota promissória. O valor será o total do tratamento já informado.')));
+
+    const dateRow = el('div', { class:'row' });
+    dateRow.appendChild(textField('Data de emissão', state.contract, 'npEmissao', {type:'date'}));
+    dateRow.appendChild(textField('Data de vencimento', state.contract, 'npVencimento', {type:'date'}));
+    container.appendChild(dateRow);
+  }
+
+  // Separador botões finais
+  const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:20px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
+    document.createTextNode('Gerar PDF da ficha completa'));
+  pdfBtn.onclick = generatePDF;
+  container.appendChild(pdfBtn);
+
+  const newBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:transparent;border:1.5px solid #C0392B;color:#C0392B;text-align:center;font-size:13px;padding:11px;' },
+    document.createTextNode('Iniciar nova ficha (limpar dados deste paciente)'));
+  newBtn.onclick = () => {
+    if(confirm('Isso vai apagar todos os dados preenchidos desta ficha e começar do zero. Deseja continuar?')){
+      const pacienteId = fichaAtivaPacienteId;
+      clearProgress();
+      abrirFicha(pacienteId);
+    }
+  };
+  container.appendChild(newBtn);
+}
+
+// ============ NAVIGATION ============
+function renderNav(){
+  const nav = document.getElementById('stepsNav');
+  nav.innerHTML = '';
+  STEPS.forEach((label, i) => {
+    const btn = el('button', { class: i===currentStep?'active':'' }, document.createTextNode((i+1)+'. '+label));
+    btn.onclick = () => { currentStep = i; renderPanel(i); };
+    nav.appendChild(btn);
+  });
+}
+
+function renderPanel(stepIndex, opts={}){
+  currentStep = stepIndex;
+  renderNav();
+  const main = document.getElementById('main');
+  const scrollY = window.scrollY;
+  main.innerHTML = '';
+  const renderers = [renderPatient, renderImages, renderOdontograma, renderContract];
+  renderers[stepIndex](main);
+  const subtitleParts = [state.clinic.nome, state.clinic.dentista].filter(Boolean);
+  document.getElementById('clinicSubtitle').textContent = subtitleParts.length ? subtitleParts.join(' — ') : 'Nome da Clínica / Cirurgião-Dentista';
+  document.getElementById('btnPrev').style.visibility = stepIndex===0 ? 'hidden' : 'visible';
+  document.getElementById('btnNext').textContent = stepIndex===STEPS.length-1 ? 'Concluir' : 'Avançar';
+  if(opts.keepScroll){
+    window.scrollTo(0, scrollY);
+  } else {
+    window.scrollTo(0,0);
+  }
+}
+
+// Re-renders the current panel to reflect a state change, without jumping scroll position
+function refreshPanel(){
+  saveProgress();
+  renderPanel(currentStep, { keepScroll:true });
+}
+
+document.getElementById('voltarListaBtn').onclick = () => mostrarListaFichas();
+document.getElementById('btnPrev').onclick = () => { if(currentStep>0) renderPanel(currentStep-1); };
+document.getElementById('btnNext').onclick = () => {
+  if(currentStep < STEPS.length-1) renderPanel(currentStep+1);
+  else generatePDF();
+};
+
+// ============ PDF GENERATION ============
+function formatDateBR(dateStr){
+  if(!dateStr) return '___/___/______';
+  const [y,m,d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function valueByExtension(val){
+  // Converte número para extenso (simplificado para reais brasileiros)
+  // Formato brasileiro: ponto = separador de milhar, vírgula = separador decimal
+  let clean = (val||'').replace(/[^\d,\.]/g,'');
+  clean = clean.replace(/\./g,'').replace(',', '.');
+  const num = parseFloat(clean);
+  if(isNaN(num)||num<=0) return '';
+  const inteiros = Math.floor(num);
+  const centavos = Math.round((num - inteiros)*100);
+
+  const unidades = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove',
+    'dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+  const dezenas = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  const centenas = ['','cem','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+
+  function toWords(n){
+    if(n===0) return '';
+    if(n===100) return 'cem';
+    if(n<20) return unidades[n];
+    if(n<100){
+      const d=Math.floor(n/10), u=n%10;
+      return dezenas[d]+(u?' e '+unidades[u]:'');
+    }
+    const c=Math.floor(n/100), resto=n%100;
+    return centenas[c]+(resto?' e '+toWords(resto):'');
+  }
+
+  function toWordsMil(n){
+    if(n===0) return 'zero';
+    if(n<1000) return toWords(n);
+    const mil=Math.floor(n/1000), resto=n%1000;
+    const milStr = mil===1?'mil':(toWords(mil)+' mil');
+    return milStr+(resto?' e '+toWords(resto):'');
+  }
+
+  let ext = toWordsMil(inteiros);
+  ext += inteiros===1?' real':' reais';
+  if(centavos>0){
+    ext += ' e '+toWords(centavos);
+    ext += centavos===1?' centavo':' centavos';
+  }
+  return ext.charAt(0).toUpperCase()+ext.slice(1);
+}
+
+function drawPromissoryPage(doc, pageW, pageH){
+  const mX=40, mY=40, cW=pageW-mX*2;
+  const BLUE=window._clinicaCorPrimariaRGB||[31,92,139], INK=[20,20,20], MUTED=[90,100,110], LINE=[180,196,210];
+  const v = (val) => (val&&String(val).trim())?String(val):'_______________________';
+  const p = state.patient, cl = state.clinic, pay = state.payInfo, con = state.contract;
+  const valor = v((pay.total||'').replace(/^R\$\s*/,''));
+  const extenso = valueByExtension(pay.total);
+  const emissao = formatDateBR(con.npEmissao);
+  const vencimento = formatDateBR(con.npVencimento);
+  const cidade = v(cl.cidade);
+  let y = mY;
+
+  // Borda dupla
+  doc.setDrawColor(...LINE); doc.setLineWidth(1.5);
+  doc.rect(mX-10, mY-10, cW+20, pageH-mY*2+20);
+  doc.setLineWidth(0.5);
+  doc.rect(mX-6, mY-6, cW+12, pageH-mY*2+12);
+
+  // Título
+  y += 20;
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...BLUE);
+  doc.text('NOTA PROMISSÓRIA', pageW/2, y, { align:'center' });
+  y += 18;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  doc.text('Nº ____________', mX, y);
+  doc.text(`Vencimento: ${vencimento}`, pageW-mX, y, { align:'right' });
+  y += 20;
+
+  // Separador
+  doc.setDrawColor(...LINE); doc.setLineWidth(0.8);
+  doc.line(mX, y, mX+cW, y);
+  y += 18;
+
+  // Valor em destaque — sem sobreposição
+  doc.setFillColor(214,231,243);
+  doc.rect(mX, y, cW, 44, 'F');
+  // Label "VALOR:" em fonte menor
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+  doc.text('VALOR:', mX+10, y+14);
+  // Valor em fonte maior, deslocado para não sobrepor
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(...BLUE);
+  doc.text('R$ ' + valor, mX+55, y+14);
+  // Por extenso em linha separada
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...INK);
+  const extensoLines = doc.splitTextToSize('Por extenso: '+(extenso||'_'.repeat(80)), cW-20);
+  extensoLines.slice(0,2).forEach((l,i) => doc.text(l, mX+10, y+30+i*11));
+  y += 52;
+
+  // Texto jurídico
+  y += 12;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...INK);
+  const textoNota = `No dia ${vencimento}, pagarei por esta NOTA PROMISSÓRIA a ${v(cl.nome||cl.dentista)}, ` +
+    `CNPJ/CPF: ${v(cl.cnpj)}, ou à sua ordem, a quantia de R$ ${valor} ` +
+    `(${extenso||'_______________________________________'}), ` +
+    `referente a serviços odontológicos prestados conforme contrato firmado em ${formatDateBR(con.dataContrato)}.`;
+  const textoLines = doc.splitTextToSize(textoNota, cW);
+  textoLines.forEach(l => { doc.text(l, mX, y); y+=14; });
+  y += 10;
+
+  // Emitente
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+  doc.text('EMITENTE (DEVEDOR)', mX, y); y += 12;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...INK);
+  function iL(label, val2){ doc.text(`${label}: ${v(val2)}`, mX, y); y+=13; }
+  iL('Nome', p.nome); iL('CPF', p.cpf); iL('RG', p.rg);
+  iL('Endereço', p.endereco); iL('Telefone', p.telefone);
+  if((p.responsavel||'').trim()){
+    y+=4;
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+    doc.text('RESPONSÁVEL LEGAL', mX, y); y+=12;
+    doc.setFont('helvetica','normal'); doc.setTextColor(...INK);
+    iL('Nome', p.responsavel); iL('CPF', p.respCpf);
+  }
+
+  y += 8;
+  doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
+  doc.line(mX, y, mX+cW, y); y += 14;
+
+  // Beneficiário
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+  doc.text('BENEFICIÁRIO (CREDOR)', mX, y); y += 12;
+  doc.setFont('helvetica','normal'); doc.setTextColor(...INK);
+  iL('Nome/Clínica', cl.nome||(cl.dentista?'Dr.(a) '+cl.dentista:''));
+  iL('CNPJ/CPF', cl.cnpj); iL('CRO', cl.cro); iL('Endereço', cl.endereco);
+
+  y += 14;
+  doc.line(mX, y, mX+cW, y); y += 20;
+
+  // Local e data
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...INK);
+  doc.text(`Local de emissão: ${cidade}     Data de emissão: ${emissao}`, mX, y);
+  y += 38;
+
+  // Assinaturas
+  const sigW = (cW-30)/2;
+  doc.setDrawColor(...LINE); doc.setLineWidth(0.7);
+  doc.line(mX, y, mX+sigW, y);
+  doc.line(mX+sigW+30, y, mX+cW, y);
+  doc.setFontSize(8); doc.setTextColor(...MUTED);
+  doc.text(v(p.nome), mX+sigW/2, y+11, { align:'center' });
+  doc.text('Emitente', mX+sigW/2, y+20, { align:'center' });
+  doc.text(v(cl.nome||cl.dentista), mX+sigW+30+sigW/2, y+11, { align:'center' });
+  doc.text('Beneficiário', mX+sigW+30+sigW/2, y+20, { align:'center' });
+  y += 38;
+
+  // Testemunhas
+  y += 8;
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...MUTED);
+  doc.text('TESTEMUNHAS:', mX, y); y += 13;
+  doc.setFont('helvetica','normal');
+  const tW = (cW-20)/2;
+  doc.line(mX, y, mX+tW, y);
+  doc.line(mX+tW+20, y, mX+cW, y); y += 10;
+  doc.text('Nome: ____________________________   CPF: _______________', mX, y);
+  doc.text('Nome: ____________________________   CPF: _______________', mX+tW+20, y);
+  y += 18;
+  doc.line(mX, y, mX+tW, y);
+  doc.line(mX+tW+20, y, mX+cW, y);
+
+  // Rodapé legal
+  doc.setFontSize(7); doc.setTextColor(...MUTED);
+  doc.text('Este título é regido pela Lei nº 7.357/85 e Lei Uniforme de Genebra (Decreto nº 57.663/66).',
+    pageW/2, pageH-mY-8, { align:'center' });
+}
+
+// Gera um PDF simples de ORÇAMENTO: plano de tratamento + valores propostos, SEM contrato
+// e SEM nota promissória — para quando o paciente ainda está decidindo se vai fechar.
+function generateOrcamentoPDF(){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+  const pdfAnnotated = listarTodosTratamentosDentes();
+  const pdfOutros = (state.outrosTratamentos||[]).filter(i=>i.descricao||i.valor);
+  if(!pdfAnnotated.length && !pdfOutros.length){
+    alert('Nenhum tratamento foi lançado ainda no odontograma. Preencha o plano de tratamento antes de gerar o orçamento.');
+    return;
+  }
+
+  // Guarda um "retrato" deste orçamento no histórico do paciente, com data — mesmo que o
+  // plano de tratamento seja alterado depois, este registro específico não se perde.
+  const totalNoMomento = calcTotalTratamentos();
+  state.historicoOrcamentos.unshift({
+    id: 'orc' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+    dataGeracao: Date.now(),
+    itens: pdfAnnotated.map(item => ({ dente:item.dente, situacao:item.situacao, tratamento:item.tratamento, valor:item.valor })),
+    outros: pdfOutros.map(i => ({ descricao:i.descricao||'', valor:i.valor||'' })),
+    total: totalNoMomento
+  });
+  saveProgress();
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = 595.28, pageH = 841.89;
+  const marginX = 40;
+  const contentW = pageW - marginX*2;
+  const BLUE = window._clinicaCorPrimariaRGB||[31,92,139];
+  const BLUEHEAD = window.clarearCor(BLUE,0.85);
+  const BLUELIGHT = window.clarearCor(BLUE,0.93);
+  const LINECOL = [155,187,212];
+  const INK = [26,26,26];
+  const MUTED = [91,107,122];
+  let y = 40;
+
+  desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+
+  function newPage(){ doc.addPage(); y = 40; desenharMarcaDagua(doc, pageW, pageH, state.clinic); }
+  function ensureSpace(needed){ if(y + needed > pageH - 50) newPage(); }
+
+  // ---------- Cabeçalho da clínica ----------
+  const clinicLogo = state.clinic.logo;
+  const logoSize = 52;
+  let titleX = marginX;
+  if(clinicLogo){
+    try{
+      doc.setDrawColor(...LINECOL);
+      doc.rect(marginX, y-8, logoSize, logoSize, 'D');
+      const fmt = clinicLogo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(clinicLogo, fmt, marginX, y-8, logoSize, logoSize);
+      titleX = marginX + logoSize + 14;
+    }catch(e){}
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...BLUE);
+  doc.text((state.clinic.nome || 'Orçamento Odontológico').toUpperCase(), titleX, y+8);
+  doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  const subParts = [state.clinic.dentista, state.clinic.cro?('CRO '+state.clinic.cro):''].filter(Boolean);
+  doc.text(subParts.join(' — ') || ' ', titleX, y+22);
+  y = Math.max(y+logoSize+2, y+34);
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
+  doc.line(marginX, y, marginX+contentW, y);
+  y += 26;
+
+  // ---------- Título do documento ----------
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(...BLUE);
+  doc.text('ORÇAMENTO ODONTOLÓGICO', marginX, y);
+  y += 24;
+
+  // ---------- Paciente e data ----------
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...INK);
+  doc.text('Paciente: ', marginX, y);
+  doc.setFont('helvetica','normal');
+  doc.text(state.patient.nome || '_______________________', marginX+58, y);
+  const hoje = new Date();
+  const dataTxt = String(hoje.getDate()).padStart(2,'0')+'/'+String(hoje.getMonth()+1).padStart(2,'0')+'/'+hoje.getFullYear();
+  doc.setFont('helvetica','bold');
+  doc.text('Data: ', marginX+contentW-110, y);
+  doc.setFont('helvetica','normal');
+  doc.text(dataTxt, marginX+contentW-80, y);
+  y += 26;
+
+  // ---------- Tabela do plano de tratamento ----------
+  const statusNames = ['Normal','Problema','Tratado','Ausente'];
+  const txRows = pdfAnnotated.map(item => [String(item.dente), item.situacao||'', item.tratamento||'', item.valor||'']);
+  const outrosRows = pdfOutros.map(item=>[item.descricao||'', '—', '—', item.valor||'']);
+  const total = calcTotalTratamentos();
+  const colWidths = [55, contentW*0.30, contentW*0.38, contentW - 55 - contentW*0.30 - contentW*0.38];
+  const headers = ['Dente','Situação','Tratamento proposto','Valor (R$)'];
+  const rowH = 18;
+
+  function drawHeaderTabela(){
+    let cx = marginX;
+    headers.forEach((h,i) => {
+      doc.setFillColor(...BLUEHEAD); doc.setDrawColor(...LINECOL);
+      doc.rect(cx, y, colWidths[i], rowH, 'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...BLUE);
+      doc.text(h, cx+5, y+rowH-6);
+      cx += colWidths[i];
+    });
+    y += rowH;
+  }
+  ensureSpace(rowH*2);
+  drawHeaderTabela();
+  [...txRows, ...outrosRows].forEach((row, ri) => {
+    if(y + rowH > pageH - 90){ newPage(); drawHeaderTabela(); }
+    let cx = marginX;
+    const rowFill = ri % 2 === 1 ? BLUELIGHT : [255,255,255];
+    row.forEach((val, ci) => {
+      doc.setFillColor(...rowFill); doc.setDrawColor(...LINECOL);
+      doc.rect(cx, y, colWidths[ci], rowH, 'FD');
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...INK);
+      const clipped = doc.splitTextToSize(String(val||''), colWidths[ci]-8)[0] || '';
+      doc.text(clipped, cx+5, y+rowH-6);
+      cx += colWidths[ci];
+    });
+    y += rowH;
+  });
+
+  // ---------- Total ----------
+  ensureSpace(30);
+  y += 6;
+  doc.setFillColor(...BLUE);
+  doc.rect(marginX, y, contentW, 26, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(255,255,255);
+  doc.text('VALOR TOTAL DO ORÇAMENTO', marginX+10, y+17);
+  doc.text('R$ ' + formatMoney(total), marginX+contentW-10, y+17, { align:'right' });
+  y += 40;
+
+  // ---------- Observações ----------
+  ensureSpace(70);
+  doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  const observacoes = [
+    'Este documento é um orçamento e não representa um contrato ou compromisso de pagamento.',
+    'Os valores e o plano de tratamento propostos estão sujeitos a reavaliação clínica.',
+    'Orçamento válido por 30 dias a partir da data de emissão acima.'
+  ];
+  observacoes.forEach(txt => {
+    const linhas = doc.splitTextToSize('• ' + txt, contentW);
+    linhas.forEach(l => { ensureSpace(14); doc.text(l, marginX, y); y += 13; });
+  });
+
+  const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  doc.save('orcamento_' + safeName + '.pdf');
+  toast('Orçamento gerado com sucesso!');
+}
+
+function generatePDF(){
+  migrateImages();
+  if(typeof clinicaUpsertPaciente === 'function' && (state.patient.nome||'').trim()){
+    clinicaUpsertPaciente({
+      nome: state.patient.nome, nasc: state.patient.nasc, telefone: state.patient.telefone,
+      cpf: state.patient.cpf, rg: state.patient.rg, endereco: state.patient.endereco, email: state.patient.email
+    });
+  }
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente. Se o problema persistir, abra este arquivo em outro navegador (Chrome ou Safari).');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = 595.28, pageH = 841.89;
+  const marginX = 40;
+  const contentW = pageW - marginX*2;
+  const BLUE = window._clinicaCorPrimariaRGB||[31,92,139];
+  const BLUEHEAD = window.clarearCor(BLUE,0.85);
+  const BLUELIGHT = window.clarearCor(BLUE,0.93);
+  const LINECOL = [155,187,212];
+  const INK = [26,26,26];
+  const MUTED = [91,107,122];
+  const RED = [176,40,40];
+  let y = 0;
+
+  desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+
+  function newPage(){
+    doc.addPage();
+    y = 40;
+    desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+  }
+  function ensureSpace(needed){
+    if(y + needed > pageH - 50) newPage();
+  }
+  function sectionTitle(text){
+    ensureSpace(34);
+    doc.setFillColor(...BLUE);
+    doc.rect(marginX, y, contentW, 22, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(11);
+    doc.text(text.toUpperCase(), marginX+10, y+15);
+    y += 22 + 12;
+  }
+  function fieldLine(label, value, x, w){
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(...INK);
+    doc.text(label, x, y);
+    const labelW = doc.getTextWidth(label) + 6;
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(40,40,40);
+    doc.text(String(value||''), x+labelW, y);
+    doc.setDrawColor(...BLUE);
+    doc.setLineWidth(0.7);
+    doc.line(x, y+3, x+w, y+3);
+  }
+  function fieldRow(fields){
+    fieldRowW(contentW, fields);
+  }
+  function fieldRowW(totalW, fields){
+    ensureSpace(26);
+    const gap = 14;
+    const totalWeight = fields.reduce((s,f)=>s+(f.weight||1),0);
+    let x = marginX;
+    fields.forEach(f => {
+      const w = (totalW - gap*(fields.length-1)) * (f.weight||1) / totalWeight;
+      fieldLine(f.label, f.value, x, w);
+      x += w + gap;
+    });
+    y += 22;
+  }
+  function questionBox(rows){
+    ensureSpace(14);
+    let boxTop = y;
+    y += 2; // pequeno respiro para o texto não tocar a borda superior da caixa
+    let boxPage = doc.internal.getNumberOfPages();
+    function closeBox(endY){
+      const curPage = doc.internal.getNumberOfPages();
+      doc.setPage(boxPage);
+      doc.setDrawColor(...LINECOL);
+      doc.setLineWidth(0.75);
+      doc.rect(marginX, boxTop-4, contentW, endY-boxTop-2, 'D');
+      doc.setPage(curPage);
+    }
+    rows.forEach((r) => {
+      doc.setFontSize(9.3);
+      if(r.alert){ doc.setFont('helvetica','bold'); doc.setTextColor(...RED); }
+      else if(r.bold){ doc.setFont('helvetica','bold'); doc.setTextColor(...INK); }
+      else if(r.italic){ doc.setFont('helvetica','italic'); doc.setTextColor(...MUTED); }
+      else { doc.setFont('helvetica','normal'); doc.setTextColor(...INK); }
+      const split = doc.splitTextToSize(r.text, contentW-12);
+      split.forEach(s => {
+        // Verifica espaço antes de CADA linha (não só antes da pergunta), evitando texto cortado no rodapé
+        if(y + 18 > pageH - 50){
+          closeBox(y);
+          newPage();
+          boxTop = y;
+          boxPage = doc.internal.getNumberOfPages();
+        }
+        doc.text(s, marginX+6, y+2);
+        doc.setDrawColor(...LINECOL);
+        doc.setLineWidth(0.5);
+        doc.line(marginX, y+8, marginX+contentW, y+8);
+        y += 16;
+      });
+    });
+    closeBox(y);
+    y += 8;
+  }
+  function ynRowText(q, store){
+    const v = store[q.key];
+    const respostaAlerta = q.alertOn || 'sim';
+    let extra = '';
+    if(q.sub){
+      extra = q.sub.map(s => s.label + ' ' + (store[s.key]||'____')).join('   ');
+    } else if(v === 'sim' && store[q.key+'_obs']){
+      extra = 'Obs.: ' + store[q.key+'_obs'];
+    }
+    return {
+      text: q.text + '   [' + (v==='sim'?'X':' ') + '] Sim  [' + (v==='nao'?'X':' ') + '] Não' + (extra?'    '+extra:''),
+      alert: v === respostaAlerta
+    };
+  }
+
+  function drawTable(headers, rows, colWidths, rowH, fontSize){
+    rowH = rowH || 16;
+    fontSize = fontSize || 8.5;
+    ensureSpace(30);
+    function drawHeader(){
+      let cx = marginX;
+      headers.forEach((h,i) => {
+        doc.setFillColor(...BLUEHEAD);
+        doc.setDrawColor(...LINECOL);
+        doc.rect(cx, y, colWidths[i], rowH, 'FD');
+        doc.setFont('helvetica','bold'); doc.setFontSize(fontSize); doc.setTextColor(...BLUE);
+        doc.text(h, cx+4, y+rowH-5);
+        cx += colWidths[i];
+      });
+      y += rowH;
+    }
+    drawHeader();
+    rows.forEach((row, ri) => {
+      if(y + rowH > pageH - 50){ newPage(); drawHeader(); }
+      let cx = marginX;
+      const rowFill = ri % 2 === 1 ? BLUELIGHT : [255,255,255];
+      row.forEach((val, ci) => {
+        doc.setFillColor(...rowFill);
+        doc.setDrawColor(...LINECOL);
+        doc.rect(cx, y, colWidths[ci], rowH, 'FD');
+        doc.setFont('helvetica','normal'); doc.setFontSize(fontSize); doc.setTextColor(...INK);
+        const txt = String(val||'');
+        const clipped = doc.splitTextToSize(txt, colWidths[ci]-6)[0] || '';
+        doc.text(clipped, cx+4, y+rowH-5);
+        cx += colWidths[ci];
+      });
+      y += rowH;
+    });
+    y += 14;
+  }
+
+  function drawToothGridPDF(){
+    const statusColors = [[255,255,255],[232,180,180],[185,214,236],[220,220,220]];
+    const statusStrokes = [LINECOL,[192,57,43],[31,92,139],[136,136,136]];
+
+    function drawPDFRow(nums, label, cellW, cellH, isDeciduous){
+      ensureSpace(cellH+8);
+      let cx = isDeciduous ? marginX + (contentW - nums.length*cellW)/2 : marginX;
+      nums.forEach(n=>{
+        const tData = state.toothData[n] || { status:0 };
+        const s = tData.status||0;
+        const absent = s===3;
+        doc.setFillColor(...statusColors[s]);
+        doc.setDrawColor(...statusStrokes[s]);
+        doc.rect(cx, y, cellW-1, cellH, 'FD');
+        if(absent){
+          doc.setDrawColor(...statusStrokes[s]);
+          doc.line(cx+2, y+2, cx+cellW-3, y+cellH-2);
+          doc.line(cx+cellW-3, y+2, cx+2, y+cellH-2);
+        } else {
+          doc.setFont('helvetica','bold'); doc.setFontSize(isDeciduous?6.5:7); doc.setTextColor(...statusStrokes[s]);
+          doc.text(String(n), cx+cellW/2-0.5, y+cellH/2+2.5, { align:'center' });
+        }
+        cx += cellW;
+      });
+      y += cellH + 4;
+    }
+
+    const permCellW = contentW/16;
+    const decCellW = contentW/12;
+    drawPDFRow([...UPPER_RIGHT,...UPPER_LEFT], 'SUPERIOR', permCellW, 22, false);
+    drawPDFRow([...LOWER_RIGHT,...LOWER_LEFT], 'INFERIOR', permCellW, 22, false);
+    y += 4;
+    drawPDFRow([...DEC_UPPER_RIGHT,...DEC_UPPER_LEFT,...DEC_LOWER_RIGHT,...DEC_LOWER_LEFT].slice(0,10), 'DECÍDUOS — SUPERIOR', decCellW, 20, true);
+    drawPDFRow([...DEC_UPPER_RIGHT,...DEC_UPPER_LEFT,...DEC_LOWER_RIGHT,...DEC_LOWER_LEFT].slice(10), 'DECÍDUOS — INFERIOR', decCellW, 20, true);
+
+    y += 4;
+    doc.setFontSize(7); doc.setTextColor(...MUTED);
+    doc.text('Branco: sem alteração   |   Vermelho: problema   |   Azul: tratado   |   Cinza: ausente', marginX, y);
+    y += 14;
+  }
+
+  // ---------- PAGE 1 ----------
+  y = 40;
+  const clinicLogo = state.clinic.logo;
+  const logoSize = 50;
+  const titleX = clinicLogo ? marginX + logoSize + 12 : marginX;
+  if(clinicLogo){
+    try{
+      doc.setDrawColor(...LINECOL);
+      doc.rect(marginX, y-30, logoSize, logoSize, 'D');
+      const fmt = clinicLogo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(clinicLogo, fmt, marginX, y-30, logoSize, logoSize);
+    }catch(e){ /* if image fails to embed, silently skip it */ }
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...BLUE);
+  const clinicMainTitle = (state.clinic.nome || state.clinic.dentista || 'Ficha de Anamnese Odontológica').toUpperCase();
+  doc.text(clinicMainTitle, titleX, y);
+  y += 14;
+  doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  const clinicSubtitleParts = [state.clinic.dentista, state.clinic.cro ? ('CRO '+state.clinic.cro) : ''].filter(Boolean);
+  doc.text(clinicSubtitleParts.length ? clinicSubtitleParts.join(' — ') : 'Ficha de Anamnese Odontológica', titleX, y);
+  y += 6;
+  if(clinicLogo && y < (40-30+logoSize)){ y = 40-30+logoSize+6; }
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
+  doc.line(marginX, y+6, marginX+contentW, y+6);
+  y += 24;
+
+  sectionTitle('Dados da clínica / dentista');
+  fieldRow([{label:'Clínica:', value:state.clinic.nome},{label:'Dentista:', value:state.clinic.dentista}]);
+  fieldRow([{label:'CRO:', value:state.clinic.cro},{label:'CNPJ:', value:state.clinic.cnpj}]);
+  fieldRow([{label:'Endereço:', value:state.clinic.endereco, weight:3}]);
+  fieldRow([{label:'Telefone:', value:state.clinic.telefone},{label:'E-mail:', value:state.clinic.email}]);
+  y += 6;
+
+  sectionTitle('Dados do paciente');
+  const hasPhoto = !!state.patient.foto;
+  const photoSize = 86;
+  const textW = hasPhoto ? contentW - photoSize - 14 : contentW;
+  const photoTop = y - 12;
+  const photoBottom = photoTop + photoSize;
+  if(hasPhoto){
+    try{
+      doc.setDrawColor(...LINECOL);
+      doc.rect(marginX+textW+14, photoTop, photoSize, photoSize, 'D');
+      const fmt = state.patient.foto.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.patient.foto, fmt, marginX+textW+14, photoTop, photoSize, photoSize);
+    }catch(e){ /* if image fails to embed, silently skip it */ }
+  }
+  // Enquanto a linha ainda estiver na altura da foto, usa a largura estreita
+  // (mantendo as colunas alinhadas); assim que passar da foto, volta à largura total.
+  function patientFieldRow(fields){
+    const rowW = (hasPhoto && y < photoBottom) ? textW : contentW;
+    fieldRowW(rowW, fields);
+  }
+  patientFieldRow([{label:'Nome:', value:state.patient.nome, weight:3}]);
+  patientFieldRow([{label:'Nascimento:', value:formatDateBR(state.patient.nasc)},{label:'Sexo:', value:state.patient.sexo}]);
+  patientFieldRow([{label:'RG:', value:state.patient.rg},{label:'Idade:', value:state.patient.idade}]);
+  patientFieldRow([{label:'CPF:', value:state.patient.cpf},{label:'Telefone:', value:state.patient.telefone}]);
+  if(hasPhoto && y < photoBottom){ y = photoBottom + 8; }
+  fieldRow([{label:'Endereço:', value:state.patient.endereco, weight:3}]);
+  fieldRow([{label:'Obs.:', value:state.patient.obs, weight:3}]);
+  fieldRow([{label:'Responsável legal:', value:state.patient.responsavel, weight:3}]);
+  y += 6;
+
+  sectionTitle('Questionário de saúde geral');
+  const genRows = GENERAL_QUESTIONS.map(q => ynRowText(q, state.general));
+  questionBox(genRows);
+
+  ensureSpace(16);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...BLUE);
+  doc.text('Sofre alguma destas doenças?', marginX, y); y += 12;
+  const dCols = 3, dColW = contentW/dCols, dRowH = 15;
+  for(let i=0;i<DISEASES.length;i+=dCols){
+    ensureSpace(dRowH+2);
+    const rowItems = DISEASES.slice(i, i+dCols);
+    let cx = marginX;
+    rowItems.forEach(name => {
+      const checked = !!state.diseases[name];
+      doc.setFillColor(...BLUELIGHT);
+      doc.setDrawColor(...LINECOL);
+      doc.rect(cx, y, dColW, dRowH, 'FD');
+      if(checked){ doc.setFont('helvetica','bold'); doc.setTextColor(...RED); }
+      else { doc.setFont('helvetica','normal'); doc.setTextColor(...INK); }
+      doc.setFontSize(8.3);
+      const mark = checked ? '[X] ' : '[ ] ';
+      doc.text(mark+name, cx+4, y+dRowH-5);
+      cx += dColW;
+    });
+    y += dRowH;
+  }
+  y += 10;
+
+  const gen2Rows = [{text:'Outras doenças? Quais? ' + (state.general.outrasdoencas||'________________________'), bold:true}]
+    .concat(GENERAL_QUESTIONS_2.map(q => ynRowText(q, state.general)));
+  questionBox(gen2Rows);
+
+  sectionTitle('Questionário de saúde bucal');
+  const oralRows = ORAL_QUESTIONS.map(q => ynRowText(q, state.oral));
+  questionBox(oralRows);
+
+  sectionTitle('Espaço reservado para o cirurgião-dentista');
+  ensureSpace(60);
+  doc.setDrawColor(...LINECOL);
+  doc.setLineWidth(0.75);
+  doc.rect(marginX, y, contentW, 50, 'D');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BLUE);
+  doc.text('Observações:', marginX+8, y+14);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...INK);
+  const obsLines = doc.splitTextToSize(state.dentist.obs||'', contentW-16);
+  obsLines.slice(0,3).forEach((l,i)=> doc.text(l, marginX+8, y+28+i*11));
+  y += 60;
+
+  ensureSpace(30);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...INK);
+  doc.text('Data: ' + (state.contract.dataContrato ? formatDateBR(state.contract.dataContrato) : '_______________'), pageW/2, y, { align:'center' });
+  y += 36;
+
+  ensureSpace(60);
+  const sigGap = 24;
+  const sigW = (contentW - sigGap) / 2;
+  doc.setDrawColor(...LINECOL); doc.setLineWidth(0.7);
+  doc.line(marginX, y, marginX+sigW, y);
+  doc.line(marginX+sigW+sigGap, y, marginX+contentW, y);
+  doc.setFontSize(8.5); doc.setTextColor(...MUTED);
+  const patientSigLabel = 'Assinatura do paciente' + (state.patient.nome ? (' — '+state.patient.nome) : '') + (state.patient.cpf ? (' — CPF: '+state.patient.cpf) : '');
+  const dentistSigLabel = 'Assinatura do(a) dentista' + (state.clinic.dentista ? (' — Dr.(a) '+state.clinic.dentista) : '');
+  function drawWrappedCentered(text, cx, startY, maxW, lineH){
+    const lines = doc.splitTextToSize(text, maxW);
+    lines.forEach((l,i)=> doc.text(l, cx, startY+i*lineH, { align:'center' }));
+    return lines.length;
+  }
+  const patLines = drawWrappedCentered(patientSigLabel, marginX+sigW/2, y+11, sigW-6, 10);
+  const denLines = drawWrappedCentered(dentistSigLabel, marginX+sigW+sigGap+sigW/2, y+11, sigW-6, 10);
+  let sigExtraLines = denLines;
+  if(state.clinic.cro){
+    doc.text('CRO: '+state.clinic.cro, marginX+sigW+sigGap+sigW/2, y+11+denLines*10, { align:'center' });
+    sigExtraLines += 1;
+  }
+  sigExtraLines = Math.max(sigExtraLines, patLines);
+  y += 20 + (sigExtraLines-1)*10;
+
+  // ---------- Imagens / Radiografias ----------
+  function drawImageGallery(label, arr, placeholderText){
+    sectionTitle(label);
+    if(!arr || arr.length === 0){
+      ensureSpace(160);
+      doc.setFillColor(...BLUELIGHT);
+      doc.setDrawColor(...LINECOL);
+      doc.setLineDashPattern([3,2], 0);
+      doc.rect(marginX, y, contentW, 150, 'FD');
+      doc.setLineDashPattern([], 0);
+      doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+      doc.text(placeholderText, pageW/2, y+78, { align:'center' });
+      y += 170;
+      return;
+    }
+    const cols = 2;
+    const gap = 10;
+    const cellW = (contentW - gap*(cols-1)) / cols;
+    const cellH = 130; // fixed slot height; the image is scaled to fit inside without distortion
+    const captionH = 16; // espaço reservado para o título/descrição abaixo de cada imagem
+    let cx = marginX, colCount = 0;
+    arr.forEach((item) => {
+      const dataUrl = item.url || item; // compatível com formato antigo (string), por segurança
+      const titulo = item.titulo || '';
+      ensureSpace(cellH + captionH + 10);
+      try{
+        const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG';
+        // Slot border (always the fixed size, for visual alignment)
+        doc.setDrawColor(...LINECOL);
+        doc.rect(cx, y, cellW, cellH, 'D');
+        // Compute real image dimensions to preserve aspect ratio (contain, not stretch)
+        const props = doc.getImageProperties(dataUrl);
+        const ratio = props.width / props.height;
+        let drawW = cellW, drawH = cellW / ratio;
+        if(drawH > cellH){
+          drawH = cellH;
+          drawW = cellH * ratio;
+        }
+        const offsetX = cx + (cellW - drawW) / 2;
+        const offsetY = y + (cellH - drawH) / 2;
+        doc.addImage(dataUrl, fmt, offsetX, offsetY, drawW, drawH);
+      }catch(e){ /* skip image if it fails to embed */ }
+      // Título / descrição abaixo da imagem
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...BLUE);
+      const captionTxt = titulo.trim() ? doc.splitTextToSize(titulo, cellW-4)[0] : '';
+      if(captionTxt) doc.text(captionTxt, cx+2, y+cellH+11);
+      colCount++;
+      if(colCount >= cols){
+        cx = marginX;
+        colCount = 0;
+        y += cellH + captionH + gap;
+      } else {
+        cx += cellW + gap;
+      }
+    });
+    if(colCount !== 0){ y += cellH + captionH + gap; }
+    y += 4;
+  }
+
+  newPage();
+  drawImageGallery('Imagens', state.images.clinicas, 'Espaço para inserir imagens clínicas');
+  drawImageGallery('Radiografias', state.images.radiografias, 'Espaço para inserir radiografias');
+
+  // ---------- Plano de tratamento ----------
+  newPage();
+  sectionTitle('Odontograma e plano de tratamento');
+  drawToothGridPDF();
+
+  // Build treatment table from toothData
+  const pdfAnnotated = listarTodosTratamentosDentes();
+  const pdfOutros = (state.outrosTratamentos||[]).filter(i=>i.descricao||i.valor);
+  const statusNames2 = ['Normal','Problema','Tratado','Ausente'];
+
+  if(pdfAnnotated.length || pdfOutros.length){
+    // Linhas dos dentes
+    const txRows2 = pdfAnnotated.map(item => [String(item.dente), statusNames2[item.status]||'', item.situacao||'', item.tratamento||'', item.valor||'']);
+    // Linhas dos outros tratamentos
+    const outrosRows2 = pdfOutros.map(item=>[item.descricao||'', '—', '—', '—', item.valor||'']);
+    // Total
+    const total = calcTotalTratamentos();
+    const totalRow = ['TOTAL','','','','R$ '+formatMoney(total)];
+    const allRows = [...txRows2, ...outrosRows2, totalRow];
+    drawTable(['Dente / Descrição','Estado','Situação','Tratamento','Valor (R$)'], allRows, [60,55,contentW-60-55-130-70,130,70]);
+  }
+
+  // ---------- Pagamento ----------
+  syncTotalToPayInfo();
+  sectionTitle('Plano de pagamento');
+  ensureSpace(60);
+  [['Valor total do tratamento', state.payInfo.total],['Forma de pagamento', state.payInfo.forma],['Vencimento todo dia', state.payInfo.vencimento]].forEach(([label,val]) => {
+    ensureSpace(18);
+    doc.setFillColor(...BLUEHEAD);
+    doc.setDrawColor(...LINECOL);
+    doc.rect(marginX, y, contentW*0.42, 16, 'FD');
+    doc.setFillColor(255,255,255);
+    doc.setDrawColor(...LINECOL);
+    doc.rect(marginX+contentW*0.42, y, contentW*0.58, 16, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...BLUE);
+    doc.text(label, marginX+4, y+11);
+    doc.setFont('helvetica','normal'); doc.setTextColor(...INK);
+    doc.text(String(val||''), marginX+contentW*0.42+4, y+11);
+    y += 16;
+  });
+  y += 10;
+  drawTable(['Valor','Data do pagamento','Forma do pagamento'], state.payRows, [contentW/3, contentW/3, contentW/3]);
+
+  // ---------- Contrato ----------
+  newPage();
+  const v = (val) => (val && String(val).trim()) ? String(val) : '________________________';
+
+  let contractScale = 1;
+  function contractTitle(text){
+    const fs = 10*contractScale;
+    ensureSpace(20*contractScale);
+    doc.setFont('helvetica','bold'); doc.setFontSize(fs); doc.setTextColor(...BLUE);
+    doc.text(text, marginX, y);
+    y += 14*contractScale;
+  }
+  function contractPara(text, opts={}){
+    doc.setFont('helvetica', opts.bold ? 'bold' : 'normal');
+    doc.setFontSize(9*contractScale); doc.setTextColor(...INK);
+    const lines = doc.splitTextToSize(text, contentW);
+    lines.forEach(l => {
+      ensureSpace(13*contractScale);
+      doc.text(l, marginX, y);
+      y += 12*contractScale;
+    });
+    y += 4*contractScale;
+  }
+
+  // Monta os textos usados no contrato uma única vez, para que a estimativa de altura e o desenho real usem exatamente o mesmo conteúdo
+  const contratanteParas = [
+    'Nome: ' + v(state.patient.nome) + '   CPF: ' + v(state.patient.cpf) + '   RG: ' + v(state.patient.rg),
+    'Endereço: ' + v(state.patient.endereco),
+    'Telefone: ' + v(state.patient.telefone) + '   E-mail: ' + v(state.patient.email)
+  ];
+  if((state.patient.responsavel||'').trim()){
+    contratanteParas.push('Responsável legal (quando aplicável): ' + v(state.patient.responsavel) + '   CPF: ' + v(state.patient.respCpf));
+  }
+  const contratadoParas = [
+    'Nome do profissional ou clínica: ' + v(state.clinic.nome) + (state.clinic.dentista ? (' — Dr.(a) '+state.clinic.dentista) : ''),
+    'CNPJ/CPF: ' + v(state.clinic.cnpj) + '   CRO: ' + v(state.clinic.cro),
+    'Endereço profissional: ' + v(state.clinic.endereco),
+    'Telefone: ' + v(state.clinic.telefone) + '   E-mail: ' + v(state.clinic.email)
+  ];
+  const usaTextoPersonalizado = (state.contract.textoPersonalizado||'').trim();
+  const clausulasParaImprimir = usaTextoPersonalizado ? null : buildContractClauses();
+  const contractPayRows = (state.payRows||[]).filter(r => (r[0]||'').trim() || (r[1]||'').trim() || (r[2]||'').trim());
+
+  // Estima a altura total do contrato para uma dada escala de fonte, para descobrir o maior tamanho que cabe em uma página
+  function estimateContractHeight(scale){
+    let h = 22*scale; // título principal
+    const measurePara = (text) => {
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(9*scale);
+      const lines = doc.splitTextToSize(text, contentW);
+      return lines.length * (12*scale) + 4*scale;
+    };
+    h += 14*scale;
+    contratanteParas.forEach(p => h += measurePara(p));
+    h += 14*scale;
+    contratadoParas.forEach(p => h += measurePara(p));
+    if(usaTextoPersonalizado){
+      h += 14*scale;
+      h += measurePara(state.contract.textoPersonalizado);
+    } else {
+      clausulasParaImprimir.forEach(c=>{
+        h += 14*scale;
+        c.paragraphs.forEach(p => h += measurePara(p));
+      });
+    }
+    if(contractPayRows.length){
+      h += 14*scale; // título da tabela
+      h += (16*scale) * (contractPayRows.length + 1) + 14*scale; // cabeçalho + linhas + respiro final
+    }
+    h += 8 + 20 + 36; // linha de cidade/data (mantida em tamanho fixo, é pequena)
+    h += 70 + 46 + 40 + 30; // blocos de assinatura (mantidos em tamanho fixo, por serem curtos e precisarem ficar legíveis)
+    return h;
+  }
+
+  // Testa escalas decrescentes até encontrar a maior que caiba em uma única página
+  const availableHeight = (pageH - 50) - y;
+  const scalesToTry = [1, 0.93, 0.86, 0.79, 0.72, 0.66, 0.6];
+  for(let i=0; i<scalesToTry.length; i++){
+    const s = scalesToTry[i];
+    if(estimateContractHeight(s) <= availableHeight || i === scalesToTry.length-1){
+      contractScale = s;
+      break;
+    }
+  }
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(14*contractScale); doc.setTextColor(...BLUE);
+  doc.text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS ODONTOLÓGICOS', pageW/2, y, { align:'center' });
+  y += 22*contractScale;
+
+  contractTitle('CONTRATANTE (PACIENTE)');
+  contratanteParas.forEach(p => contractPara(p));
+
+  contractTitle('CONTRATADO (PROFISSIONAL / CLÍNICA)');
+  contratadoParas.forEach(p => contractPara(p));
+
+  if(usaTextoPersonalizado){
+    contractTitle('CLÁUSULAS CONTRATUAIS (texto revisado pelo profissional)');
+    contractPara(state.contract.textoPersonalizado);
+  } else {
+    clausulasParaImprimir.forEach(c=>{
+      contractTitle(c.title);
+      c.paragraphs.forEach(p=>contractPara(p));
+    });
+  }
+
+  if(contractPayRows.length){
+    contractTitle('TABELA DE PARCELAS (Cláusula 6ª)');
+    drawTable(['Valor','Data do pagamento','Forma do pagamento'], contractPayRows, [contentW/3, contentW/3, contentW/3], 16*contractScale, 8.5*contractScale);
+  }
+
+  y += 8;
+  ensureSpace(20);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...INK);
+  doc.text('Cidade: ' + v(state.clinic.cidade) + '     Data: ' + (state.contract.dataContrato ? formatDateBR(state.contract.dataContrato) : v(state.contract.dataContrato)), marginX, y);
+  y += 36;
+
+  ensureSpace(70);
+  doc.setDrawColor(...LINECOL); doc.setLineWidth(0.7);
+  doc.line(marginX, y, marginX+220, y);
+  doc.setFontSize(8.5); doc.setTextColor(...MUTED);
+  doc.text(v(state.patient.nome), marginX, y+11);
+  doc.text('CONTRATANTE', marginX, y+22);
+
+  if((state.patient.responsavel||'').trim()){
+    doc.line(marginX+260, y, marginX+contentW, y);
+    doc.text(v(state.patient.responsavel), marginX+260, y+11);
+    doc.text('RESPONSÁVEL LEGAL', marginX+260, y+22);
+  }
+  y += 46;
+
+  ensureSpace(40);
+  doc.line(marginX, y, marginX+contentW, y);
+  doc.text(v(state.clinic.nome) + (state.clinic.dentista ? (' — Dr.(a) '+state.clinic.dentista) : ''), marginX, y+11);
+  doc.text('CONTRATADO(A)', marginX, y+22);
+  y += 30;
+
+  const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  const fileName = 'ficha_anamnese_' + safeName + '.pdf';
+  // ---------- Nota Promissória (só quando a forma de pagamento escolhida for "Promissória") ----------
+  if(state.payInfo.forma === 'Promissória'){
+    doc.addPage();
+    desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+    drawPromissoryPage(doc, pageW, pageH);
+  }
+
+  // ---------- Dados financeiros embutidos (para importação no Controle de Pagamentos e Comissões) ----------
+  const tratamentosParaFinanceiro = [];
+  listarTodosTratamentosDentes().forEach(item=>{
+    if((item.tratamento||'').trim() || (item.valor||'').trim()){
+      tratamentosParaFinanceiro.push({ descricao: 'Dente '+item.dente+(item.tratamento?(': '+item.tratamento.trim()):''), valor: parseMoney(item.valor) });
+    }
+  });
+  (state.outrosTratamentos||[]).forEach(item=>{
+    if((item.descricao||'').trim() || (item.valor||'').trim()){
+      tratamentosParaFinanceiro.push({ descricao: item.descricao||'', valor: parseMoney(item.valor) });
+    }
+  });
+  const parcelasParaFinanceiro = (state.payRows||[])
+    .filter(r => (r[0]||'').trim() || (r[1]||'').trim() || (r[2]||'').trim())
+    .map(r => ({ valor: parseMoney(r[0]), data: r[1]||'', forma: r[2]||'' }));
+  const financeiroPayload = {
+    paciente: state.patient.nome||'',
+    profissionalNome: state.clinic.dentista || state.clinic.nome || '',
+    clinicaNome: state.clinic.nome||'',
+    dataContrato: state.contract.dataContrato||'',
+    valorTotal: calcTotalTratamentos(),
+    tratamentos: tratamentosParaFinanceiro,
+    parcelas: parcelasParaFinanceiro
+  };
+  const FINANCEIRO_TAG = 'FICHA_FINANCEIRO_DATA:';
+  const financeiroCode = encodePdfData(financeiroPayload);
+  if(financeiroCode){
+    doc.setProperties({ keywords: FINANCEIRO_TAG + financeiroCode });
+  }
+
+  // ---------- Lança automaticamente no Financeiro (sem precisar importar o PDF manualmente) ----------
+  lancarAutomaticamenteNoFinanceiro(financeiroPayload);
+
+  sharePDF(doc, fileName);
+}
+
+// Escreve (ou atualiza, se já existir) o lançamento financeiro correspondente a esta ficha,
+// direto no módulo Financeiro — sem precisar do passo manual de "Importar PDF".
+// Parcelas pagas com cartão já entram marcadas como recebidas; as demais formas (dinheiro,
+// Pix, promissória, boleto) ficam pendentes até serem confirmadas manualmente no Financeiro.
+async function lancarAutomaticamenteNoFinanceiro(payload){
+  try{
+    const dados = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { profissionais:[], rateiosFixos:[], lancamentos:[] };
+    if(!Array.isArray(dados.lancamentos)) dados.lancamentos = [];
+
+    const nomeAlvo = (payload.profissionalNome||'').trim().toLowerCase();
+    const profEncontrado = nomeAlvo ? (dados.profissionais||[]).find(p => (p.nome||'').trim().toLowerCase() === nomeAlvo) : null;
+
+    const parcelasMontadas = (payload.parcelas||[]).map(p => {
+      const ehCartao = /cart[ãa]o/i.test(p.forma||'');
+      return {
+        id: uidFinLocal(),
+        valor: parseFloat(p.valor)||0,
+        data: p.data||'',
+        forma: p.forma||'',
+        pago: ehCartao,
+        dataRecebimento: ehCartao ? hojeISOFinLocal() : '',
+        horaRecebimento: ''
+      };
+    });
+
+    const lancamento = {
+      id: state.financeiroLancamentoId || uidFinLocal(),
+      paciente: payload.paciente || '(sem nome)',
+      pacienteId: fichaAtivaPacienteId || '',
+      profissionalId: profEncontrado ? profEncontrado.id : '',
+      profissionalNomeOriginal: payload.profissionalNome || '',
+      clinicaNome: payload.clinicaNome || '',
+      dataContrato: payload.dataContrato || '',
+      valorTotal: parseFloat(payload.valorTotal)||0,
+      tratamentos: Array.isArray(payload.tratamentos) ? payload.tratamentos : [],
+      parcelas: parcelasMontadas,
+      origem: 'automatico'
+    };
+
+    const idxExistente = dados.lancamentos.findIndex(l => l.id === lancamento.id);
+    if(idxExistente > -1) dados.lancamentos[idxExistente] = lancamento;
+    else dados.lancamentos.unshift(lancamento);
+
+    if(!state.financeiroLancamentoId){
+      state.financeiroLancamentoId = lancamento.id;
+      saveProgressDebounced();
+    }
+
+    await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dados);
+    toast('Lançado automaticamente no Financeiro!');
+  }catch(e){
+    console.error('Não foi possível lançar automaticamente no Financeiro:', e);
+  }
+}
+function uidFinLocal(){ return 'lanc'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function hojeISOFinLocal(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+async function sharePDF(doc, fileName){
+  doc.save(fileName);
+  toast('PDF baixado com sucesso!');
+}
+
+// ============ PERSISTÊNCIA (servidor, múltiplas fichas por paciente) ============
+const CLINICA_PERFIL_KEY = 'clinica_perfil_v1';
+const INDICE_STORAGE_KEY = 'ficha_anamnese_indice_v1';
+function chaveFicha(pacienteId){ return 'ficha_anamnese_paciente_' + pacienteId; }
+
+async function carregarClinica(){
+  const saved = await ClinicaStorage.load(CLINICA_PERFIL_KEY);
+  if(saved) Object.assign(state.clinic, saved);
+}
+
+async function carregarIndiceFichas(){
+  const saved = await ClinicaStorage.load(INDICE_STORAGE_KEY);
+  return Array.isArray(saved) ? saved : [];
+}
+function salvarIndiceFichas(lista){
+  ClinicaStorage.save(INDICE_STORAGE_KEY, lista);
+}
+async function registrarFichaNoIndice(pacienteId){
+  const lista = await carregarIndiceFichas();
+  const existente = lista.find(f => f.pacienteId === pacienteId);
+  if(existente){
+    existente.atualizadoEm = Date.now();
+  } else {
+    lista.push({ pacienteId, criadoEm: Date.now(), atualizadoEm: Date.now() });
+  }
+  salvarIndiceFichas(lista);
+}
+
+function extrairDadosFicha(){
+  const dados = {};
+  FICHA_KEYS.forEach(k => { dados[k] = state[k]; });
+  return dados;
+}
+
+function saveProgress(){
+  // Os dados da clínica agora são só leitura aqui (editados no Perfil da Clínica), não salvamos de volta.
+  if(modoAtual === 'ficha' && fichaAtivaPacienteId){
+    ClinicaStorage.save(chaveFicha(fichaAtivaPacienteId), extrairDadosFicha());
+  }
+}
+
+function clearProgress(){
+  // Limpa apenas a ficha ativa (não mexe no cadastro nem nas outras fichas)
+  if(fichaAtivaPacienteId){
+    ClinicaStorage.save(chaveFicha(fichaAtivaPacienteId), null);
+  }
+}
+
+// Abre (ou cria) a ficha de um paciente específico e mostra as abas normais
+async function abrirFicha(pacienteId){
+  fichaAtivaPacienteId = pacienteId;
+  await carregarEstoqueCache();
+  const salvo = await ClinicaStorage.load(chaveFicha(pacienteId));
+  const dadosFicha = salvo || JSON.parse(JSON.stringify(FICHA_TEMPLATE_VAZIA));
+  FICHA_KEYS.forEach(k => { state[k] = dadosFicha[k] !== undefined ? dadosFicha[k] : FICHA_TEMPLATE_VAZIA[k]; });
+  Object.keys(state.toothData).forEach(n => td(n)); // migra dentes já preenchidos para o novo formato (lista de tratamentos)
+
+  // Os dados pessoais do paciente (nome, nascimento, CPF etc.) vêm sempre do cadastro
+  // compartilhado (módulo Pacientes) — assim, se algo for atualizado lá, reflete aqui também.
+  const pac = clinicaFindPacienteById(pacienteId);
+  if(pac){
+    state.patient.nome = pac.nome || '';
+    state.patient.nasc = pac.nasc || '';
+    state.patient.sexo = pac.sexo || state.patient.sexo || '';
+    state.patient.telefone = pac.telefone || '';
+    state.patient.cpf = pac.cpf || '';
+    state.patient.rg = pac.rg || '';
+    state.patient.endereco = pac.endereco || '';
+    state.patient.email = pac.email || '';
+    if(pac.foto) state.patient.foto = pac.foto;
+  }
+  if(!salvo){
+    await registrarFichaNoIndice(pacienteId);
+  }
+
+  modoAtual = 'ficha';
+  currentStep = 0;
+  document.getElementById('stepsNav').style.display = '';
+  document.querySelector('footer.bottombar').style.display = '';
+  document.getElementById('voltarListaBtn').style.display = '';
+  renderPanel(0);
+  iniciarTelaSempreAtivaAutomaticamente();
+}
+
+// Volta para a lista de pacientes/fichas
+function mostrarListaFichas(){
+  modoAtual = 'lista';
+  fichaAtivaPacienteId = null;
+  document.getElementById('stepsNav').style.display = 'none';
+  document.querySelector('footer.bottombar').style.display = 'none';
+  document.getElementById('voltarListaBtn').style.display = 'none';
+  renderListaFichas();
+  pararTelaSempreAtiva();
+}
+
+let filtroListaFichas = '';
+async function renderListaFichas(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  document.getElementById('clinicSubtitle').textContent = [state.clinic.nome, state.clinic.dentista].filter(Boolean).join(' — ') || 'Nome da Clínica / Cirurgião-Dentista';
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Pacientes')));
+  main.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
+    document.createTextNode('Escolha um paciente para abrir a ficha dele, ou crie uma nova. Para cadastrar um paciente novo, use a tela inicial do sistema.')));
+
+  const searchInput = el('input', { type:'text', placeholder:'Buscar paciente...', value: filtroListaFichas,
+    style:'width:100%;padding:12px 10px;font-size:15px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;margin-bottom:14px;' });
+  searchInput.oninput = (e) => { filtroListaFichas = e.target.value; renderListaInterna(); };
+  main.appendChild(searchInput);
+
+  const listWrap = el('div', {});
+  main.appendChild(listWrap);
+
+  async function renderListaInterna(){
+    listWrap.innerHTML = '';
+    const pacientes = clinicaGetPacientes();
+    const indice = await carregarIndiceFichas();
+    const termo = filtroListaFichas.trim().toLowerCase();
+    const filtrados = pacientes.filter(p => !termo || (p.nome||'').toLowerCase().includes(termo));
+
+    if(!filtrados.length){
+      listWrap.appendChild(el('div', { class:'empty-hint', style:'text-align:center;padding:20px;border-radius:10px;' }, document.createTextNode(
+        pacientes.length ? 'Nenhum paciente encontrado.' : 'Nenhum paciente cadastrado ainda. Cadastre na tela inicial do sistema.'
+      )));
+      return;
+    }
+
+    filtrados.forEach(p => {
+      const registro = indice.find(f => f.pacienteId === p.id);
+      const card = el('div', { class:'card', style:'margin-bottom:12px;' });
+      const top = el('div', { class:'card-top' });
+      const info = el('div', {});
+      info.appendChild(el('div', { class:'card-title' }, document.createTextNode(p.nome)));
+      info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(
+        registro ? ('Ficha atualizada em ' + new Date(registro.atualizadoEm).toLocaleDateString('pt-BR')) : 'Ainda sem ficha de anamnese'
+      )));
+      top.appendChild(info);
+      card.appendChild(top);
+      const btn = el('div', { class:'add-row-btn', style:'margin-top:10px;text-align:center;' },
+        document.createTextNode(registro ? 'Abrir ficha' : '+ Criar ficha'));
+      btn.onclick = () => abrirFicha(p.id);
+      card.appendChild(btn);
+      listWrap.appendChild(card);
+    });
+  }
+  await renderListaInterna();
+}
+
+// Auto-save acontece dentro de refreshPanel() (ver acima)
+
+function showFatalError(err){
+  try{
+    document.body.innerHTML =
+      '<div style="max-width:600px;margin:40px auto;padding:20px;font-family:Arial,sans-serif;color:#1A1A1A;">' +
+      '<h2 style="color:#C0392B;">Não foi possível carregar a ficha</h2>' +
+      '<p>Ocorreu um erro técnico ao iniciar o formulário. Copie a mensagem abaixo e envie para o suporte:</p>' +
+      '<pre style="background:#F4F8FB;border:1px solid #C9DCEC;border-radius:8px;padding:12px;white-space:pre-wrap;font-size:12px;color:#C0392B;">' +
+      (err && err.stack ? err.stack : String(err)) +
+      '</pre>' +
+      '<p style="font-size:13px;color:#5B6B7A;">Dica: tente também abrir este mesmo arquivo diretamente no Chrome ou no Safari normal (não dentro de outro app), com internet ativada.</p>' +
+      '</div>';
+  }catch(e2){ /* if even this fails, nothing more we can do */ }
+}
+
+(async function iniciarAnamnese(){
+  try{
+    await aplicarIdentidadeClinica();
+    await clinicaInitPacientes();
+    await carregarClinica();
+    document.getElementById('stepsNav').style.display = 'none';
+    document.querySelector('footer.bottombar').style.display = 'none';
+
+    const params = new URLSearchParams(window.location.search);
+    const pacienteDaUrl = params.get('paciente');
+    if(pacienteDaUrl && clinicaFindPacienteById(pacienteDaUrl)){
+      await abrirFicha(pacienteDaUrl);
+    } else {
+      mostrarListaFichas();
+    }
+  }catch(err){
+    showFatalError(err);
+  }
+})();
+
+window.addEventListener('error', (e) => {
+  // Catches errors that happen after init too (e.g. during a button click)
+  if(document.body && document.body.children.length === 0){
+    showFatalError(e.error || e.message);
+  }
+});
+
+</script>
+</body>
+</html>

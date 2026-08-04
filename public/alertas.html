@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Central de Pendências — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="shared-data.js"></script>
+<script src="nav-home.js"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{background:#fff; border-bottom:3px solid var(--blue-dark); padding:22px 16px 18px; text-align:center; position:relative;}
+  header.topbar h1{font-size:22px; margin:0; color:var(--blue-dark); font-weight:800;}
+  header.topbar p{margin:4px 0 0; font-size:13px; color:var(--muted);}
+  main{max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto; padding:20px 14px 50px;}
+  .section-title{font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:22px 0 10px; display:flex; align-items:center; justify-content:space-between;}
+  .section-title:first-child{margin-top:0;}
+  .summary-row{display:flex; gap:10px; margin-bottom:6px; flex-wrap:wrap;}
+  .summary-card{flex:1; min-width:100px; background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:12px; text-align:center;}
+  .summary-num{font-size:22px; font-weight:800; color:var(--blue-dark);}
+  .summary-num.amber{color:var(--amber);} .summary-num.alert{color:var(--red);}
+  .summary-label{font-size:10px; color:var(--muted); font-weight:700; text-transform:uppercase; margin-top:2px;}
+  .alerta-card{background:#fff; border:1.5px solid var(--line-light); border-left:5px solid var(--amber); border-radius:10px; padding:14px; margin-bottom:10px;}
+  .alerta-card.vencido{border-left-color:var(--red);}
+  .alerta-titulo{font-weight:700; font-size:14.5px; color:var(--ink);}
+  .alerta-sub{font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.4;}
+  .alerta-actions{display:flex; gap:8px; margin-top:10px;}
+  .btn-resolver{flex:1; padding:9px; border:none; border-radius:8px; background:var(--green); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; text-align:center;}
+  .btn-abrir{flex:1; padding:9px; border:1.5px solid var(--blue-dark); border-radius:8px; background:#fff; color:var(--blue-dark); font-weight:700; font-size:12.5px; cursor:pointer; text-align:center; text-decoration:none; display:flex; align-items:center; justify-content:center;}
+  .empty-hint{text-align:center; padding:24px; color:var(--muted); font-size:13px; background:#fff; border:1.5px dashed var(--line-light); border-radius:10px;}
+  .tudo-ok{text-align:center; padding:30px 20px; color:var(--green); font-size:15px; font-weight:700; background:#fff; border:1.5px solid var(--line-light); border-radius:10px;}
+  .toggle-resolvidos{font-size:12px; font-weight:700; color:var(--blue-dark); cursor:pointer;}
+  .resolvido-item{font-size:12px; color:var(--muted); padding:8px 0; border-bottom:1px solid var(--line-light); display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .btn-desfazer{color:var(--blue-dark); cursor:pointer; font-weight:700; font-size:11.5px; flex-shrink:0;}
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1><img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Bell/3D/bell_3d.png" alt="" style="width:26px;height:26px;vertical-align:-8px;margin-right:6px;object-fit:contain;">Central de Pendências</h1>
+  <p>Tudo que precisa da sua atenção, num só lugar</p>
+</header>
+
+<main id="main"><div class="empty-hint">Carregando...</div></main>
+
+<div class="toast" id="toast" style="position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);background:#1A1A1A;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:all .25s;z-index:50;pointer-events:none;text-align:center;max-width:90%;"></div>
+
+<script>
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)';
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(-20px)'; },1800);
+}
+function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function formatDateBRISO(str){ if(!str) return ''; const [y,m,d]=String(str).split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
+function hojeISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function diasEntre(dataISO, hojeStr){
+  const [y1,m1,d1] = dataISO.split('-').map(Number);
+  const [y2,m2,d2] = hojeStr.split('-').map(Number);
+  const a = new Date(y1,m1-1,d1), b = new Date(y2,m2-1,d2);
+  return Math.round((b-a)/(1000*60*60*24));
+}
+
+const RESOLVIDOS_KEY = 'alertas_resolvidos_v1';
+let resolvidos = [];
+let mostrarResolvidos = false;
+
+// Opções de filtro de tempo (em dias) — ajustáveis direto na tela
+const OPCOES_SEM_RETORNO = [
+  { label:'2 dias', dias:2 }, { label:'15 dias', dias:15 }, { label:'1 mês', dias:30 },
+  { label:'2 meses', dias:60 }, { label:'3 meses', dias:90 }, { label:'6 meses', dias:180 },
+];
+const OPCOES_ORCAMENTO = [
+  { label:'3 dias', dias:3 }, { label:'1 semana', dias:7 }, { label:'1 mês', dias:30 },
+];
+let filtroSemRetornoDias = 30; // padrão: mostra quem está sem retorno há mais de 1 mês
+let filtroOrcamentoDias = 3; // padrão: mostra orçamentos abertos há mais de 3 dias
+
+function seletorFiltro(opcoes, valorAtual, onChange){
+  const sel = el('select', { style:'font-size:11.5px;font-weight:600;color:var(--blue-dark);border:1.5px solid var(--line-light);border-radius:8px;padding:4px 6px;background:#fff;text-transform:none;letter-spacing:normal;' });
+  opcoes.forEach(op => {
+    const opt = el('option', { value:String(op.dias) }, document.createTextNode('Há mais de ' + op.label));
+    if(op.dias === valorAtual) opt.setAttribute('selected','selected');
+    sel.appendChild(opt);
+  });
+  sel.onchange = (e) => onChange(parseInt(e.target.value,10));
+  return sel;
+}
+
+async function carregarResolvidos(){
+  const salvo = await ClinicaStorage.load(RESOLVIDOS_KEY);
+  resolvidos = Array.isArray(salvo) ? salvo : [];
+}
+function estaResolvido(chave){
+  return resolvidos.some(r => r.chave === chave);
+}
+function marcarResolvido(chave, titulo){
+  resolvidos.push({ chave, titulo, resolvidoEm: Date.now() });
+  ClinicaStorage.save(RESOLVIDOS_KEY, resolvidos);
+}
+function desfazerResolvido(chave){
+  resolvidos = resolvidos.filter(r => r.chave !== chave);
+  ClinicaStorage.save(RESOLVIDOS_KEY, resolvidos);
+}
+
+async function montarAlertas(){
+  const hoje = hojeISO();
+  const alertas = { semRetorno: [], pagamentosAtraso: [], boletos: [], orcamentosAbertos: [], retornoProcedimento: [] };
+
+  const [perfil, pacientes, dadosAgenda, dadosFinanceiro, dadosEstoque] = await Promise.all([
+    ClinicaStorage.load('clinica_perfil_v1'),
+    ClinicaStorage.load('clinica_pacientes_registro_v1'),
+    ClinicaStorage.load('controle_agendamento_progresso_v1'),
+    ClinicaStorage.load('controle_pagamentos_comissoes_v1'),
+    ClinicaStorage.load('controle_estoque_progresso_v1'),
+  ]);
+
+  const listaPacientes = pacientes || [];
+  const consultas = (dadosAgenda && dadosAgenda.consultas) || [];
+  const lancamentos = (dadosFinanceiro && dadosFinanceiro.lancamentos) || [];
+  const notasFiscais = (dadosEstoque && dadosEstoque.notasFiscais) || [];
+  const procedimentosCatalogo = (dadosEstoque && dadosEstoque.procedimentos) || [];
+  const procComRetorno = procedimentosCatalogo.filter(p => parseFloat(p.mesesRetorno) > 0);
+
+  // ---------- 1) Pacientes sem retorno (guarda os meses de TODOS, o filtro de exibição é escolhido na tela) ----------
+  const ultimaVisitaPorPaciente = {};
+  consultas.forEach(c => {
+    if(c.status !== 'confirmado' || !c.pacienteId || !c.data) return;
+    if(!ultimaVisitaPorPaciente[c.pacienteId] || c.data > ultimaVisitaPorPaciente[c.pacienteId]){
+      ultimaVisitaPorPaciente[c.pacienteId] = c.data;
+    }
+  });
+  listaPacientes.forEach(p => {
+    const ultimaData = ultimaVisitaPorPaciente[p.id];
+    if(!ultimaData) return;
+    const dias = diasEntre(ultimaData, hoje);
+    const meses = dias/30.44;
+    const chave = 'sem_retorno_' + p.id + '_' + ultimaData;
+    alertas.semRetorno.push({
+      chave, pacienteId: p.id, meses, dias,
+      titulo: p.nome,
+      sub: 'Última consulta confirmada em ' + formatDateBRISO(ultimaData) + ' (' + Math.floor(meses) + ' meses atrás)',
+      vencido: true
+    });
+  });
+
+  // ---------- 2) Parcelas em atraso ----------
+  lancamentos.forEach(l => {
+    (l.parcelas||[]).forEach(p => {
+      if(p.pago || !p.data || p.data >= hoje) return;
+      const chave = 'pagamento_atraso_' + (p.id || (l.id+'_'+p.data+'_'+p.valor));
+      const diasAtraso = diasEntre(p.data, hoje);
+      alertas.pagamentosAtraso.push({
+        chave, lancamentoId: l.id,
+        titulo: (l.paciente||'Paciente') + ' — R$ ' + formatMoney(p.valor),
+        sub: 'Venceu em ' + formatDateBRISO(p.data) + ' (' + diasAtraso + ' dia(s) de atraso)',
+        vencido: true
+      });
+    });
+  });
+
+  // ---------- 3) Boletos de notas fiscais a vencer/vencidos ----------
+  const em7dias = new Date(); em7dias.setDate(em7dias.getDate()+7);
+  const em7diasISO = em7dias.getFullYear()+'-'+String(em7dias.getMonth()+1).padStart(2,'0')+'-'+String(em7dias.getDate()).padStart(2,'0');
+  notasFiscais.forEach(n => {
+    if(n.pago || !n.dataVencimento) return;
+    if(n.dataVencimento > em7diasISO) return; // só mostra o que vence em até 7 dias, ou já venceu
+    const vencido = n.dataVencimento < hoje;
+    const chave = 'boleto_' + n.id + '_' + n.dataVencimento;
+    alertas.boletos.push({
+      chave, notaId: n.id,
+      titulo: (n.fornecedor||'Fornecedor') + (n.numero?(' — NF '+n.numero):'') + ' — R$ ' + formatMoney(parseFloat(n.valorTotal)||0),
+      sub: vencido ? ('Venceu em ' + formatDateBRISO(n.dataVencimento) + ' (' + diasEntre(n.dataVencimento, hoje) + ' dia(s) de atraso)')
+                   : ('Vence em ' + formatDateBRISO(n.dataVencimento) + ' (em ' + diasEntre(hoje, n.dataVencimento) + ' dia(s))'),
+      vencido
+    });
+  });
+
+  // ---------- 4) Orçamentos não fechados + 5) Retorno recomendado por procedimento ----------
+  // Precisa olhar a ficha de anamnese de cada paciente (onde ficam os orçamentos e os tratamentos feitos)
+  const fichasPorPaciente = await Promise.all(
+    listaPacientes.map(p => ClinicaStorage.load('ficha_anamnese_paciente_' + p.id).then(f => ({ paciente: p, ficha: f })).catch(() => ({ paciente: p, ficha: null })))
+  );
+
+  fichasPorPaciente.forEach(({ paciente: p, ficha }) => {
+    if(!ficha) return;
+
+    // 4) Orçamentos não fechados: um orçamento é considerado "fechado" se existe um lançamento
+    // no Financeiro pra esse paciente com data de contrato igual ou posterior à data do orçamento.
+    (ficha.historicoOrcamentos||[]).forEach(orc => {
+      const dataOrcISO = new Date(orc.dataGeracao).toISOString().slice(0,10);
+      const fechou = lancamentos.some(l => (l.paciente||'').trim().toLowerCase() === (p.nome||'').trim().toLowerCase() && l.dataContrato && l.dataContrato >= dataOrcISO);
+      if(fechou) return;
+      const diasAberto = diasEntre(dataOrcISO, hoje);
+      const chave = 'orcamento_aberto_' + p.id + '_' + orc.id;
+      alertas.orcamentosAbertos.push({
+        chave, pacienteId: p.id, dias: diasAberto,
+        titulo: p.nome + ' — R$ ' + formatMoney(orc.total||0),
+        sub: 'Orçamento gerado em ' + formatDateBRISO(dataOrcISO) + ', ainda não fechado (' + diasAberto + ' dia(s))',
+        vencido: true
+      });
+    });
+
+    // 5) Retorno recomendado por procedimento (ex: quem fez Canal, reavaliar em 6 meses)
+    if(ficha.dataContrato && procComRetorno.length){
+      const nomesToProcedimentos = [];
+      Object.values(ficha.toothData||{}).forEach(d => {
+        (d.tratamentos||[]).forEach(t => { if(t.tratamento) nomesToProcedimentos.push(t.tratamento); });
+      });
+      (ficha.outrosTratamentos||[]).forEach(o => { if(o.descricao) nomesToProcedimentos.push(o.descricao); });
+
+      procComRetorno.forEach(proc => {
+        const bateu = nomesToProcedimentos.some(n => n.toLowerCase().includes((proc.nome||'').toLowerCase()));
+        if(!bateu) return;
+        const diasDesde = diasEntre(ficha.dataContrato, hoje);
+        const mesesDesde = diasDesde/30.44;
+        const limiteMeses = parseFloat(proc.mesesRetorno);
+        if(mesesDesde < limiteMeses) return;
+        const chave = 'retorno_proc_' + p.id + '_' + proc.id + '_' + ficha.dataContrato;
+        alertas.retornoProcedimento.push({
+          chave, pacienteId: p.id,
+          titulo: p.nome + ' — reavaliação de ' + proc.nome,
+          sub: proc.nome + ' feito em ' + formatDateBRISO(ficha.dataContrato) + ', recomendado retorno em ' + proc.mesesRetorno + ' meses (' + Math.floor(mesesDesde) + ' meses atrás)',
+          vencido: true
+        });
+      });
+    }
+  });
+
+  return alertas;
+}
+
+function cardAlerta(item, hrefResolver){
+  const card = el('div', { class:'alerta-card' + (item.vencido ? ' vencido' : '') });
+  card.appendChild(el('div', { class:'alerta-titulo' }, document.createTextNode(item.titulo)));
+  card.appendChild(el('div', { class:'alerta-sub' }, document.createTextNode(item.sub)));
+  const actions = el('div', { class:'alerta-actions' });
+  if(hrefResolver){
+    const abrirBtn = el('a', { class:'btn-abrir', href: hrefResolver }, document.createTextNode('Abrir'));
+    actions.appendChild(abrirBtn);
+  }
+  const resolverBtn = el('div', { class:'btn-resolver' }, document.createTextNode('✓ Resolvido'));
+  resolverBtn.onclick = () => {
+    marcarResolvido(item.chave, item.titulo);
+    toast('Marcado como resolvido!');
+    render();
+  };
+  actions.appendChild(resolverBtn);
+  card.appendChild(actions);
+  return card;
+}
+
+async function render(){
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="empty-hint">Carregando...</div>';
+
+  await carregarResolvidos();
+  const alertas = await montarAlertas();
+
+  const semRetornoTodos = alertas.semRetorno.filter(a => !estaResolvido(a.chave));
+  const semRetorno = semRetornoTodos.filter(a => a.dias >= filtroSemRetornoDias);
+  const pagamentos = alertas.pagamentosAtraso.filter(a => !estaResolvido(a.chave));
+  const boletos = alertas.boletos.filter(a => !estaResolvido(a.chave));
+  const orcamentosTodos = alertas.orcamentosAbertos.filter(a => !estaResolvido(a.chave));
+  const orcamentos = orcamentosTodos.filter(a => a.dias >= filtroOrcamentoDias);
+  const retornoProc = alertas.retornoProcedimento.filter(a => !estaResolvido(a.chave));
+  const totalPendencias = semRetorno.length + pagamentos.length + boletos.length + orcamentos.length + retornoProc.length;
+
+  main.innerHTML = '';
+
+  const summary = el('div', { class:'summary-row' });
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num amber' }, document.createTextNode(String(semRetorno.length))),
+    el('div', { class:'summary-label' }, document.createTextNode('Sem retorno'))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num alert' }, document.createTextNode(String(pagamentos.length))),
+    el('div', { class:'summary-label' }, document.createTextNode('Pagamentos atrasados'))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num alert' }, document.createTextNode(String(boletos.length))),
+    el('div', { class:'summary-label' }, document.createTextNode('Boletos a vencer'))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num amber' }, document.createTextNode(String(orcamentos.length))),
+    el('div', { class:'summary-label' }, document.createTextNode('Orçamentos abertos'))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num amber' }, document.createTextNode(String(retornoProc.length))),
+    el('div', { class:'summary-label' }, document.createTextNode('Retorno por procedimento'))
+  ]));
+  main.appendChild(summary);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Lembrete automático de retorno (WhatsApp)')));
+  const cardLembrete = el('div', { class:'card' });
+  const lembreteField = el('label', { style:'display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:700;' });
+  const lembreteCheckbox = el('input', { type:'checkbox', style:'width:18px;height:18px;' });
+  lembreteCheckbox.checked = !!perfilCache.lembreteRetornoAtivo;
+  lembreteCheckbox.onchange = (e) => { perfilCache.lembreteRetornoAtivo = e.target.checked; salvarPerfilCacheDebounced(); };
+  lembreteField.appendChild(lembreteCheckbox);
+  lembreteField.appendChild(document.createTextNode('Enviar WhatsApp automático pedindo retorno de pacientes inativos'));
+  cardLembrete.appendChild(lembreteField);
+
+  const mesesField = el('div', { class:'field', style:'margin-top:14px;max-width:220px;' });
+  mesesField.appendChild(el('label', {}, document.createTextNode('Enviar após quantos meses sem consulta confirmada?')));
+  const mesesInput = el('input', { type:'text', value: perfilCache.lembreteRetornoMeses||'6' });
+  mesesInput.oninput = (e) => { perfilCache.lembreteRetornoMeses = e.target.value; salvarPerfilCacheDebounced(); };
+  mesesField.appendChild(mesesInput);
+  cardLembrete.appendChild(mesesField);
+
+  cardLembrete.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:10px;' },
+    document.createTextNode('O sistema verifica automaticamente, todos os dias, quais pacientes têm telefone cadastrado e não têm uma consulta confirmada há esse tempo, e envia uma mensagem de WhatsApp chamando para o retorno. Cada paciente só recebe uma vez por período de inatividade.')));
+  main.appendChild(cardLembrete);
+
+  if(totalPendencias === 0){
+    main.appendChild(el('div', { class:'tudo-ok', style:'margin-top:16px;' }, document.createTextNode('✓ Tudo em dia! Nenhuma pendência no momento.')));
+  } else {
+    // ---- Sem retorno (com filtro de tempo ajustável) ----
+    main.appendChild(el('div', { class:'section-title' }, [
+      document.createTextNode('Pacientes sem retorno'),
+      seletorFiltro(OPCOES_SEM_RETORNO, filtroSemRetornoDias, (v) => { filtroSemRetornoDias = v; render(); })
+    ]));
+    if(semRetorno.length){
+      semRetorno.forEach(item => main.appendChild(cardAlerta(item, 'paciente.html?id='+encodeURIComponent(item.pacienteId))));
+    } else {
+      main.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum paciente sem retorno nesse período.')));
+    }
+
+    if(pagamentos.length){
+      main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Pagamentos em atraso')));
+      pagamentos.forEach(item => main.appendChild(cardAlerta(item, 'financeiro.html')));
+    }
+    if(boletos.length){
+      main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Boletos por vencer/vencidos')));
+      boletos.forEach(item => main.appendChild(cardAlerta(item, 'estoque.html')));
+    }
+
+    // ---- Orçamentos não fechados (com filtro de tempo ajustável) ----
+    if(orcamentosTodos.length){
+      main.appendChild(el('div', { class:'section-title' }, [
+        document.createTextNode('Orçamentos não fechados'),
+        seletorFiltro(OPCOES_ORCAMENTO, filtroOrcamentoDias, (v) => { filtroOrcamentoDias = v; render(); })
+      ]));
+      if(orcamentos.length){
+        orcamentos.forEach(item => main.appendChild(cardAlerta(item, 'paciente.html?id='+encodeURIComponent(item.pacienteId))));
+      } else {
+        main.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum orçamento aberto nesse período.')));
+      }
+    }
+
+    // ---- Retorno recomendado por procedimento ----
+    if(retornoProc.length){
+      main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Retorno recomendado por procedimento')));
+      retornoProc.forEach(item => main.appendChild(cardAlerta(item, 'paciente.html?id='+encodeURIComponent(item.pacienteId))));
+    }
+  }
+
+  // ---------- Histórico de resolvidos ----------
+  const toggleTitulo = el('div', { class:'section-title' }, [
+    document.createTextNode('Resolvidos recentemente'),
+    (() => { const s = el('span', { class:'toggle-resolvidos' }, document.createTextNode(mostrarResolvidos ? 'Ocultar' : 'Mostrar ('+resolvidos.length+')'));
+      s.onclick = () => { mostrarResolvidos = !mostrarResolvidos; render(); };
+      return s; })()
+  ]);
+  main.appendChild(toggleTitulo);
+  if(mostrarResolvidos){
+    if(!resolvidos.length){
+      main.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhuma pendência resolvida ainda.')));
+    } else {
+      const lista = [...resolvidos].sort((a,b)=>b.resolvidoEm-a.resolvidoEm);
+      const wrap = el('div', { style:'background:#fff;border:1.5px solid var(--line-light);border-radius:10px;padding:4px 14px;' });
+      lista.forEach(r => {
+        const item = el('div', { class:'resolvido-item' });
+        item.appendChild(el('span', {}, document.createTextNode(r.titulo)));
+        const desfazerBtn = el('span', { class:'btn-desfazer' }, document.createTextNode('Desfazer'));
+        desfazerBtn.onclick = () => { desfazerResolvido(r.chave); toast('Pendência restaurada.'); render(); };
+        item.appendChild(desfazerBtn);
+        wrap.appendChild(item);
+      });
+      main.appendChild(wrap);
+    }
+  }
+}
+
+let perfilCache = null;
+function salvarPerfilCacheDebounced(){
+  clearTimeout(window._perfilSaveTimer);
+  window._perfilSaveTimer = setTimeout(() => ClinicaStorage.save('clinica_perfil_v1', perfilCache), 400);
+}
+
+(async function iniciar(){
+  const meResp = await fetch('/api/me', { credentials:'same-origin' });
+  if(meResp.status === 401){ window.location.href = '/login.html'; return; }
+  await aplicarIdentidadeClinica();
+  perfilCache = (await ClinicaStorage.load('clinica_perfil_v1')) || {};
+  render();
+})();
+</script>
+</body>
+</html>

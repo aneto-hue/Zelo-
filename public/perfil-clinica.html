@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Perfil da Clínica — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="shared-data.js"></script>
+<script src="nav-home.js"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{background:#fff; border-bottom:3px solid var(--blue-dark); padding:22px 16px 18px; text-align:center; position:relative;}
+  header.topbar h1{font-size:22px; margin:0; color:var(--blue-dark); font-weight:800;}
+  header.topbar p{margin:4px 0 0; font-size:13px; color:var(--muted);}
+  main{max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto; padding:20px 14px 50px;}
+  .section-title{font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:22px 0 10px;}
+  .section-title:first-child{margin-top:0;}
+  .card{background:#fff; border:1.5px solid var(--line-light); border-radius:14px; padding:16px; margin-bottom:12px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; margin-bottom:5px; color:var(--ink);}
+  .field input[type=text]{width:100%; padding:11px 10px; font-size:15px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit;}
+  .field input[type=color]{width:70px; height:44px; padding:2px; border:1.5px solid var(--line); border-radius:8px;}
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:130px;}
+  .add-row-btn{margin-top:8px; padding:12px 14px; border:none; border-radius:8px; color:#fff; background:var(--blue-dark); font-weight:700; font-size:13.5px; cursor:pointer; text-align:center;}
+  .add-row-btn.secondary{background:#fff; border:1.5px dashed var(--line); color:var(--blue-dark);}
+  .photo-box{position:relative; width:110px; height:110px; border-radius:12px; border:2px dashed var(--line); background:var(--blue-light); display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden;}
+  .photo-placeholder{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--blue-dark); font-size:11px; font-weight:600; text-align:center; padding:6px;}
+  .photo-preview{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-input{position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;}
+  .photo-remove{position:absolute; bottom:0; left:0; right:0; background:rgba(192,57,43,0.9); color:#fff; text-align:center; font-size:10px; font-weight:700; padding:4px 0; cursor:pointer;}
+  .pac-card{background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .pac-name{font-weight:700; color:var(--blue-dark); font-size:14px;}
+  .pac-sub{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .pac-del{color:var(--red); cursor:pointer; font-weight:700; font-size:13px; flex-shrink:0;}
+  .card-form{background:#fff; border:1.5px solid var(--blue-dark); border-radius:10px; padding:14px; margin-bottom:10px;}
+  .save-note{font-size:11.5px; color:var(--green); margin-top:8px; display:none;}
+  .save-note.show{display:block;}
+  .hint{font-size:12px; color:var(--muted); margin-top:-6px; margin-bottom:12px;}
+  select{width:100%; padding:11px 10px; font-size:15px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit;}
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1><img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Gear/3D/gear_3d.png" alt="" style="width:26px;height:26px;vertical-align:-8px;margin-right:6px;object-fit:contain;">Perfil da Clínica</h1>
+  <p>Configure uma vez — todos os módulos e documentos usam esses dados</p>
+</header>
+
+<main id="main"><div class="card">Carregando...</div></main>
+
+<script>
+const CLINICA_PERFIL_KEY = 'clinica_perfil_v1';
+
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+
+const perfil = {
+  nome:'', logo:'', corPrimaria:'#0A84FF', corSecundaria:'#22E0D0', marcaDagua:false,
+  endereco:'', cidade:'', cnpj:'', telefone:'', email:'',
+  dentista:'', cro:'',
+  lembreteRetornoAtivo:false, lembreteRetornoMeses:'6'
+};
+
+let _saveTimer = null;
+function salvarPerfilDebounced(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    ClinicaStorage.save(CLINICA_PERFIL_KEY, perfil);
+    const nota = document.getElementById('saveNote');
+    if(nota){ nota.classList.add('show'); setTimeout(()=>nota.classList.remove('show'), 1500); }
+  }, 400);
+}
+
+function maskCPF(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
+function maskTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 5) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length > 0) v = v.replace(/(\d{0,2})/,'($1');
+  return v.trim();
+}
+function maskRG(v){
+  let letraFinal = '';
+  if(/[Xx]$/.test(v.replace(/[^\dXx]/g,''))){
+    const limpoComX = v.replace(/[^\dXx]/g,'').slice(0,9);
+    if(/[Xx]$/.test(limpoComX)){ letraFinal = 'X'; v = limpoComX.slice(0,-1); }
+  }
+  v = v.replace(/\D/g,'').slice(0,9);
+  v = v.replace(/(\d{2})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  if(letraFinal) v = (v.endsWith('-') ? v : v + '-') + letraFinal;
+  return v;
+}
+function mascaraParaCampo(key){
+  const k = key.toLowerCase();
+  if(k==='cpf') return maskCPF;
+  if(k==='rg') return maskRG;
+  if(k.includes('telefone') || k==='whatsapp' || k==='celular') return maskTelefone;
+  return null;
+}
+
+function textField(label, store, key, onSave){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode(label)));
+  const mascara = mascaraParaCampo(key);
+  const input = el('input', { type:'text', value: store[key]||'' });
+  input.oninput = (e) => { if(mascara){ e.target.value = mascara(e.target.value); } store[key] = e.target.value; onSave(); };
+  f.appendChild(input);
+  return f;
+}
+
+function loadFixedImageDataURL(file, callback){
+  const maxDim = 800;
+  function fromBitmap(bitmap){
+    const canvas=document.createElement('canvas');
+    let w=bitmap.width, h=bitmap.height;
+    if(w>maxDim || h>maxDim){ const scale=maxDim/Math.max(w,h); w=Math.round(w*scale); h=Math.round(h*scale); }
+    canvas.width=w; canvas.height=h;
+    canvas.getContext('2d').drawImage(bitmap,0,0,w,h);
+    callback(canvas.toDataURL('image/png'));
+  }
+  if(window.createImageBitmap){
+    createImageBitmap(file).then(fromBitmap).catch(()=>fallback());
+  } else { fallback(); }
+  function fallback(){
+    const reader=new FileReader();
+    reader.onload=()=>{ const img=new Image(); img.onload=()=>fromBitmap(img); img.src=reader.result; };
+    reader.readAsDataURL(file);
+  }
+}
+
+function logoField(onSave){
+  const wrap = el('div', { class:'field' });
+  wrap.appendChild(el('label', {}, document.createTextNode('Logo da clínica')));
+  const box = el('div', { class:'photo-box' });
+  if(perfil.logo){
+    box.appendChild(el('img', { src: perfil.logo, class:'photo-preview' }));
+    const removeBtn = el('div', { class:'photo-remove' }, document.createTextNode('Remover'));
+    removeBtn.onclick = (e) => { e.stopPropagation(); perfil.logo=''; onSave(); renderTudo(); };
+    box.appendChild(removeBtn);
+  } else {
+    box.appendChild(el('div', { class:'photo-placeholder' }, [
+      el('div', { style:'font-size:24px;' }, document.createTextNode('🖼️')),
+      el('div', {}, document.createTextNode('Enviar logo'))
+    ]));
+  }
+  const input = el('input', { type:'file', accept:'image/*', class:'photo-input' });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file, (dataUrl) => { perfil.logo = dataUrl; onSave(); renderTudo(); });
+  };
+  box.appendChild(input);
+  wrap.appendChild(box);
+  return wrap;
+}
+
+function colorField(label, key, onSave){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode(label)));
+  const input = el('input', { type:'color', value: perfil[key]||'#0A84FF' });
+  input.oninput = (e) => { perfil[key] = e.target.value; onSave(); };
+  f.appendChild(input);
+  return f;
+}
+
+// ============ Profissionais da equipe (contas de acesso) ============
+let novoProfissionalAberto = false;
+let profissionalEditandoId = null;
+const CHAVE_PROFISSIONAIS_AGENDA = 'clinica_profissionais_agenda_v1';
+function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+const CORES_PRESET_AGENDA = ['#1F5C8B','#2E8B57','#C98A1F','#8E44AD','#C0392B','#16A085','#D35400','#2C3E50'];
+let profissionaisAgendaCache = [];
+let novoProfAgendaAberto = false;
+let profAgendaEmEdicao = null;
+
+function renderCamposProfissionalAgenda(container, prof, onSalvar, onCancelar){
+  if(!prof.pagamento) prof.pagamento = { percentual:'', diaria:'', fixo:'' };
+  const form = el('div', { class:'card', style:'border-color:var(--blue-dark);' });
+  const nomeField = el('div', { class:'field' });
+  nomeField.appendChild(el('label', {}, document.createTextNode('Nome')));
+  const nomeInput = el('input', { type:'text', value: prof.nome||'', placeholder:'Ex: Dra. Fernanda' });
+  nomeInput.oninput = (e) => { prof.nome = e.target.value; };
+  nomeField.appendChild(nomeInput);
+  form.appendChild(nomeField);
+
+  const telField = el('div', { class:'field' });
+  telField.appendChild(el('label', {}, document.createTextNode('WhatsApp do profissional (opcional)')));
+  const telInput = el('input', { type:'tel', value: prof.telefone||'', placeholder:'(44) 99999-8888' });
+  telInput.oninput = (e) => { e.target.value = maskTelefone(e.target.value); prof.telefone = e.target.value; };
+  telField.appendChild(telInput);
+  telField.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:4px 0 0;' },
+    document.createTextNode('Usado para avisar automaticamente quando um paciente dele chegar na recepção.')));
+  form.appendChild(telField);
+
+  form.appendChild(el('label', { style:'display:block;font-size:12.5px;font-weight:700;margin:10px 0 6px;' }, document.createTextNode('Cor na agenda')));
+  const coresRow = el('div', { style:'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;' });
+  const dots = [];
+  function estiloDot(cor){
+    return 'width:28px;height:28px;border-radius:50%;background:'+cor+';cursor:pointer;display:inline-block;transition:box-shadow .1s;'+(prof.cor===cor?'box-shadow:0 0 0 3px #fff, 0 0 0 5px '+cor+';':'');
+  }
+  CORES_PRESET_AGENDA.forEach(cor => {
+    const dot = el('span', { style:estiloDot(cor) });
+    dot.onclick = () => {
+      prof.cor = cor;
+      dots.forEach(([c,d]) => { d.style.cssText = estiloDot(c); });
+    };
+    dots.push([cor, dot]);
+    coresRow.appendChild(dot);
+  });
+  form.appendChild(coresRow);
+
+  form.appendChild(el('div', { style:'font-weight:700;font-size:13px;color:var(--blue-dark);margin:14px 0 6px;' },
+    document.createTextNode('Forma de pagamento')));
+  form.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:0;margin-bottom:10px;' },
+    document.createTextNode('Marque quantas opções fizerem sentido — dá pra combinar (ex: diária + percentual). Usado no cálculo de comissões do Financeiro.')));
+
+  function linhaPagamento(label, campo, placeholder, prefixo){
+    const linha = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:10px;' });
+    const cb = el('input', { type:'checkbox' });
+    cb.checked = prof.pagamento[campo] !== undefined && prof.pagamento[campo] !== '';
+    const valInput = el('input', { type:'number', min:'0', step:'0.01', value: prof.pagamento[campo]||'', placeholder,
+      style:'flex:1;padding:9px;font-size:14px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;'+(cb.checked?'':'opacity:0.4;') });
+    valInput.disabled = !cb.checked;
+    cb.onchange = (e) => {
+      valInput.disabled = !e.target.checked;
+      valInput.style.opacity = e.target.checked ? '1' : '0.4';
+      if(!e.target.checked) { prof.pagamento[campo] = ''; valInput.value=''; }
+      else if(!valInput.value){ prof.pagamento[campo] = '0'; valInput.value = '0'; }
+    };
+    valInput.oninput = (e) => { prof.pagamento[campo] = e.target.value; };
+    const labelEl = el('label', { style:'display:flex;align-items:center;gap:6px;width:110px;font-size:13px;font-weight:600;flex-shrink:0;' }, [cb, document.createTextNode(label)]);
+    linha.appendChild(labelEl);
+    if(prefixo) linha.appendChild(el('span', { style:'font-size:13px;color:var(--muted);' }, document.createTextNode(prefixo)));
+    linha.appendChild(valInput);
+    return linha;
+  }
+  form.appendChild(linhaPagamento('% Comissão', 'percentual', 'Ex: 40', null));
+  form.appendChild(linhaPagamento('Diária', 'diaria', 'Ex: 150,00', 'R$'));
+  form.appendChild(linhaPagamento('Fixo mensal', 'fixo', 'Ex: 2000,00', 'R$'));
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' }, document.createTextNode('Salvar'));
+  salvarBtn.onclick = () => {
+    if(!(prof.nome||'').trim()){ alert('Informe o nome.'); return; }
+    onSalvar();
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = onCancelar;
+  btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+  container.appendChild(form);
+}
+
+function renderProfissionaisAgenda(container){
+  if(novoProfAgendaAberto){
+    const novo = { id: 'prof'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), nome:'', cor: CORES_PRESET_AGENDA[profissionaisAgendaCache.length % CORES_PRESET_AGENDA.length] };
+    renderCamposProfissionalAgenda(container, novo,
+      async () => {
+        profissionaisAgendaCache.push(novo);
+        await ClinicaStorage.save(CHAVE_PROFISSIONAIS_AGENDA, profissionaisAgendaCache);
+        novoProfAgendaAberto = false; renderTudo();
+      },
+      () => { novoProfAgendaAberto = false; renderTudo(); }
+    );
+  } else {
+    const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Novo profissional/cadeira'));
+    addBtn.onclick = () => { novoProfAgendaAberto = true; renderTudo(); };
+    container.appendChild(addBtn);
+  }
+
+  if(!profissionaisAgendaCache.length && !novoProfAgendaAberto){
+    container.appendChild(el('div', { class:'empty-hint', style:'margin-top:10px;' }, document.createTextNode('Nenhum profissional cadastrado ainda.')));
+    return;
+  }
+
+  profissionaisAgendaCache.forEach(prof => {
+    if(profAgendaEmEdicao === prof.id){
+      renderCamposProfissionalAgenda(container, prof,
+        async () => {
+          await ClinicaStorage.save(CHAVE_PROFISSIONAIS_AGENDA, profissionaisAgendaCache);
+          profAgendaEmEdicao = null; renderTudo();
+        },
+        () => { profAgendaEmEdicao = null; renderTudo(); }
+      );
+      return;
+    }
+    const card = el('div', { class:'pac-card', style:'margin-top:10px;flex-direction:column;align-items:stretch;' });
+    const topRow = el('div', { style:'display:flex;align-items:center;justify-content:space-between;gap:8px;' });
+    const info = el('div', { style:'display:flex;align-items:center;gap:8px;' });
+    info.appendChild(el('span', { style:'width:14px;height:14px;border-radius:50%;background:'+(prof.cor||'#1F5C8B')+';flex-shrink:0;' }));
+    info.appendChild(el('span', { class:'pac-name' }, document.createTextNode(prof.nome)));
+    topRow.appendChild(info);
+    const acoes = el('div', { style:'display:flex;gap:12px;' });
+    const editar = el('span', { style:'color:var(--blue-dark);font-weight:700;font-size:12.5px;cursor:pointer;' }, document.createTextNode('Editar'));
+    editar.onclick = () => { profAgendaEmEdicao = prof.id; renderTudo(); };
+    const excluir = el('span', { class:'pac-del' }, document.createTextNode('Excluir'));
+    excluir.onclick = async () => {
+      if(!confirm('Excluir "'+prof.nome+'"? Consultas e bloqueios já criados para ele no Agendamento não serão apagados, mas ficarão sem profissional vinculado.')) return;
+      profissionaisAgendaCache = profissionaisAgendaCache.filter(p=>p.id!==prof.id);
+      await ClinicaStorage.save(CHAVE_PROFISSIONAIS_AGENDA, profissionaisAgendaCache);
+      renderTudo();
+    };
+    acoes.appendChild(editar); acoes.appendChild(excluir);
+    topRow.appendChild(acoes);
+    card.appendChild(topRow);
+    const pg = prof.pagamento || {};
+    const partes = [];
+    if((pg.percentual!==undefined && pg.percentual!=='')) partes.push(pg.percentual+'% comissão');
+    if(parseFloat(pg.diaria)>0) partes.push('R$ '+formatMoney(parseFloat(pg.diaria))+'/diária');
+    if(parseFloat(pg.fixo)>0) partes.push('R$ '+formatMoney(parseFloat(pg.fixo))+'/mês fixo');
+    card.appendChild(el('div', { class:'pac-sub', style:'margin-top:4px;' },
+      document.createTextNode(partes.length ? partes.join(' + ') : 'Sem forma de pagamento configurada')));
+    container.appendChild(card);
+  });
+}
+
+function renderProfissionais(container){
+  const wrap = el('div', {});
+  container.appendChild(wrap);
+
+  const MODULOS_DISPONIVEIS = [
+    { id:'pacientes', nome:'Pacientes' },
+    { id:'anamnese', nome:'Ficha de Anamnese' },
+    { id:'prontuario', nome:'Prontuário' },
+    { id:'agendamento', nome:'Agendamento' },
+    { id:'estoque', nome:'Estoque' },
+    { id:'financeiro', nome:'Financeiro' },
+    { id:'alertas', nome:'Central de Pendências' },
+  ];
+
+  function renderSeletorModulos(dados, campoWrap){
+    campoWrap.innerHTML = '';
+    if(dados.papel === 'admin'){
+      campoWrap.appendChild(el('p', { style:'font-size:12px;color:var(--muted);' },
+        document.createTextNode('Administradores sempre têm acesso a todos os módulos.')));
+      return;
+    }
+    campoWrap.appendChild(el('label', { style:'display:block;margin-bottom:6px;' }, document.createTextNode('Módulos que esta pessoa pode acessar')));
+    campoWrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:0;margin-bottom:8px;' },
+      document.createTextNode('Não marque nenhum para dar acesso a tudo (padrão). Marque só os necessários para restringir — ex: uma secretária pode ver só Pacientes e Agendamento.')));
+    const grid = el('div', { style:'display:grid;grid-template-columns:1fr 1fr;gap:8px;' });
+    MODULOS_DISPONIVEIS.forEach(m => {
+      const label = el('label', { style:'display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;' });
+      const cb = el('input', { type:'checkbox' });
+      cb.checked = dados.modulosPermitidos.includes(m.id);
+      cb.onchange = (e) => {
+        if(e.target.checked) dados.modulosPermitidos.push(m.id);
+        else dados.modulosPermitidos = dados.modulosPermitidos.filter(x=>x!==m.id);
+      };
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(m.nome));
+      grid.appendChild(label);
+    });
+    campoWrap.appendChild(grid);
+  }
+
+  async function carregar(){
+    wrap.innerHTML = '';
+    if(novoProfissionalAberto){
+      const dados = { nome:'', email:'', senha:'', papel:'profissional', cargo:'', modulosPermitidos:[] };
+      const form = el('div', { class:'card-form' });
+      form.appendChild(textField('Nome', dados, 'nome', ()=>{}));
+      const cargoField = el('div', { class:'field' });
+      cargoField.appendChild(el('label', {}, document.createTextNode('Cargo / função')));
+      const cargoSelect = el('select', {});
+      ['Dentista','Secretária','Recepção','Auxiliar','Gerente','Outro'].forEach(opt => {
+        cargoSelect.appendChild(el('option', { value:opt }, document.createTextNode(opt)));
+      });
+      dados.cargo = 'Dentista';
+      cargoSelect.onchange = (e) => { dados.cargo = e.target.value; };
+      cargoField.appendChild(cargoSelect);
+      cargoField.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:4px 0 0;' },
+        document.createTextNode('Qualquer cargo pode ter acesso ao sistema — não precisa ser dentista. Secretárias e outros funcionários também podem entrar aqui.')));
+      form.appendChild(cargoField);
+      form.appendChild(textField('E-mail (usado para login)', dados, 'email', ()=>{}));
+      form.appendChild(textField('Senha provisória', dados, 'senha', ()=>{}));
+      const papelField = el('div', { class:'field' });
+      papelField.appendChild(el('label', {}, document.createTextNode('Papel')));
+      const papelSelect = el('select', {});
+      papelSelect.appendChild(el('option', { value:'profissional' }, document.createTextNode('Profissional (acesso normal)')));
+      papelSelect.appendChild(el('option', { value:'admin' }, document.createTextNode('Administrador (gerencia usuários)')));
+      papelSelect.onchange = (e) => { dados.papel = e.target.value; renderSeletorModulos(dados, modulosField); };
+      papelField.appendChild(papelSelect);
+      form.appendChild(papelField);
+      const modulosField = el('div', { class:'field' });
+      form.appendChild(modulosField);
+      renderSeletorModulos(dados, modulosField);
+      const btnRow = el('div', { class:'row' });
+      const salvarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Criar acesso'));
+      salvarBtn.onclick = async () => {
+        if(!dados.nome.trim() || !dados.email.trim() || !dados.senha.trim()){ alert('Preencha nome, e-mail e senha.'); return; }
+        const resp = await fetch('/api/profissionais', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dados) });
+        const data = await resp.json();
+        if(!resp.ok){ alert(data.erro || 'Não foi possível criar.'); return; }
+        novoProfissionalAberto = false;
+        carregar();
+      };
+      const cancelarBtn = el('div', { class:'add-row-btn secondary', style:'flex:1;' }, document.createTextNode('Cancelar'));
+      cancelarBtn.onclick = () => { novoProfissionalAberto = false; carregar(); };
+      btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
+      form.appendChild(btnRow);
+      wrap.appendChild(form);
+    } else {
+      const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Novo profissional (login)'));
+      addBtn.onclick = () => { novoProfissionalAberto = true; carregar(); };
+      wrap.appendChild(addBtn);
+    }
+
+    const resp = await fetch('/api/profissionais', { credentials:'same-origin' });
+    const data = await resp.json();
+    (data.profissionais||[]).forEach(p => {
+      const card = el('div', { class:'pac-card', style:'flex-direction:column;align-items:stretch;' });
+      const topRow = el('div', { style:'display:flex;justify-content:space-between;align-items:flex-start;gap:8px;' });
+      const info = el('div', {});
+      info.appendChild(el('div', { class:'pac-name' }, document.createTextNode(p.nome + (p.ativo===false?' (desativado)':''))));
+      info.appendChild(el('div', { class:'pac-sub' }, document.createTextNode(p.email + ' • ' + (p.cargo || (p.papel==='admin'?'Administrador':'Profissional')))));
+      info.appendChild(el('div', { class:'pac-sub', style:'margin-top:4px;' }, document.createTextNode(
+        p.papel==='admin' ? 'Acesso total (administrador)' :
+        (!p.modulosPermitidos || !p.modulosPermitidos.length) ? 'Acesso total (sem restrição configurada)' :
+        'Acesso a: ' + p.modulosPermitidos.map(id => (MODULOS_DISPONIVEIS.find(m=>m.id===id)||{nome:id}).nome).join(', ')
+      )));
+      topRow.appendChild(info);
+      if(p.ativo !== false){
+        const acoesWrap = el('div', { style:'display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;' });
+        if(p.papel !== 'admin'){
+          const editarBtn = el('span', { style:'color:var(--blue-dark);cursor:pointer;font-weight:700;font-size:12.5px;' }, document.createTextNode('Editar acesso'));
+          editarBtn.onclick = () => { profissionalEditandoId = (profissionalEditandoId===p.id) ? null : p.id; carregar(); };
+          acoesWrap.appendChild(editarBtn);
+        }
+        const del = el('span', { class:'pac-del' }, document.createTextNode('Desativar'));
+        del.onclick = async () => {
+          if(!confirm('Desativar o acesso de "'+p.nome+'"? Ele não conseguirá mais fazer login.')) return;
+          await fetch('/api/profissionais/'+p.id, { method:'DELETE', credentials:'same-origin' });
+          carregar();
+        };
+        acoesWrap.appendChild(del);
+        topRow.appendChild(acoesWrap);
+      }
+      card.appendChild(topRow);
+
+      if(profissionalEditandoId === p.id){
+        const dadosEdicao = { papel: p.papel, modulosPermitidos: (p.modulosPermitidos||[]).slice() };
+        const editCampo = el('div', { style:'margin-top:12px;padding-top:12px;border-top:1px solid var(--line-light);' });
+        renderSeletorModulos(dadosEdicao, editCampo);
+        card.appendChild(editCampo);
+        const salvarEdicaoBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;' }, document.createTextNode('Salvar acesso'));
+        salvarEdicaoBtn.onclick = async () => {
+          await fetch('/api/profissionais/'+p.id, {
+            method:'PUT', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ modulosPermitidos: dadosEdicao.modulosPermitidos })
+          });
+          profissionalEditandoId = null;
+          carregar();
+        };
+        card.appendChild(salvarEdicaoBtn);
+      }
+      wrap.appendChild(card);
+    });
+  }
+  carregar();
+}
+
+function renderTudo(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Identidade da clínica')));
+  main.appendChild(el('p', { class:'hint' }, document.createTextNode(
+    'Esses dados aparecem no cabeçalho de todos os documentos gerados (fichas, contratos, relatórios) e no visual do sistema.'
+  )));
+  const cardIdentidade = el('div', { class:'card' });
+  cardIdentidade.appendChild(logoField(salvarPerfilDebounced));
+  cardIdentidade.appendChild(textField('Nome da clínica', perfil, 'nome', salvarPerfilDebounced));
+  const rowCor = el('div', { class:'row' });
+  rowCor.appendChild(colorField('Cor principal', 'corPrimaria', salvarPerfilDebounced));
+  rowCor.appendChild(colorField('Cor secundária', 'corSecundaria', salvarPerfilDebounced));
+  cardIdentidade.appendChild(rowCor);
+  cardIdentidade.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:-4px;' },
+    document.createTextNode('As cores só valem a partir do próximo carregamento de cada página.')));
+
+  const marcaField = el('label', { style:'display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:14px;font-size:13px;font-weight:700;' });
+  const marcaCheckbox = el('input', { type:'checkbox', style:'width:18px;height:18px;' });
+  marcaCheckbox.checked = !!perfil.marcaDagua;
+  marcaCheckbox.onchange = (e) => { perfil.marcaDagua = e.target.checked; salvarPerfilDebounced(); };
+  marcaField.appendChild(marcaCheckbox);
+  marcaField.appendChild(document.createTextNode('Adicionar marca d\'água nos documentos em PDF'));
+  cardIdentidade.appendChild(marcaField);
+  cardIdentidade.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:4px;' },
+    document.createTextNode('Usa a logo da clínica (bem sutil, atrás do texto). Se não houver logo, usa o nome da clínica na diagonal.')));
+
+  const nota = el('div', { id:'saveNote', class:'save-note' }, document.createTextNode('✓ Salvo automaticamente'));
+  cardIdentidade.appendChild(nota);
+  main.appendChild(cardIdentidade);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Dados de contato e documentos')));
+  const cardContato = el('div', { class:'card' });
+  const row1 = el('div', { class:'row' });
+  row1.appendChild(textField('Telefone', perfil, 'telefone', salvarPerfilDebounced));
+  row1.appendChild(textField('E-mail', perfil, 'email', salvarPerfilDebounced));
+  cardContato.appendChild(row1);
+  cardContato.appendChild(textField('Endereço', perfil, 'endereco', salvarPerfilDebounced));
+  const row2 = el('div', { class:'row' });
+  row2.appendChild(textField('Cidade', perfil, 'cidade', salvarPerfilDebounced));
+  row2.appendChild(textField('CNPJ', perfil, 'cnpj', salvarPerfilDebounced));
+  cardContato.appendChild(row2);
+  main.appendChild(cardContato);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Responsável técnico (assinatura em contratos)')));
+  const cardResp = el('div', { class:'card' });
+  const row3 = el('div', { class:'row' });
+  row3.appendChild(textField('Dentista responsável', perfil, 'dentista', salvarPerfilDebounced));
+  row3.appendChild(textField('CRO', perfil, 'cro', salvarPerfilDebounced));
+  cardResp.appendChild(row3);
+  main.appendChild(cardResp);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Profissionais / Cadeiras (para a Agenda)')));
+  main.appendChild(el('p', { class:'hint' }, document.createTextNode('Dentistas ou cadeiras que aparecem no Agendamento e no cálculo de comissões do Financeiro. Não precisam de login — são só um nome e uma cor.')));
+  const cardAgenda = el('div', {});
+  renderProfissionaisAgenda(cardAgenda);
+  main.appendChild(cardAgenda);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Profissionais da equipe (acesso ao sistema)')));
+  main.appendChild(el('p', { class:'hint' }, document.createTextNode('Somente administradores veem e gerenciam esta lista.')));
+  const cardEquipe = el('div', {});
+  if(window._clinicaMe && window._clinicaMe.papel === 'admin'){
+    renderProfissionais(cardEquipe);
+  } else {
+    cardEquipe.appendChild(el('div', { class:'card' }, document.createTextNode('Fale com um administrador do sistema para adicionar ou remover profissionais.')));
+  }
+  main.appendChild(cardEquipe);
+}
+
+(async function iniciar(){
+  await aplicarIdentidadeClinica();
+  const meResp = await fetch('/api/me', { credentials:'same-origin' });
+  if(meResp.status === 401){ window.location.href = '/login.html'; return; }
+  window._clinicaMe = await meResp.json();
+
+  const salvo = await ClinicaStorage.load(CLINICA_PERFIL_KEY);
+  if(salvo) Object.assign(perfil, salvo);
+
+  profissionaisAgendaCache = (await ClinicaStorage.load(CHAVE_PROFISSIONAIS_AGENDA)) || [];
+
+  renderTudo();
+})();
+</script>
+</body>
+</html>

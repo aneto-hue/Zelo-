@@ -1,0 +1,13 @@
+{
+  "name": "zelo",
+  "version": "1.0.0",
+  "description": "Zelo — Sistema de gestão para clínicas odontológicas (multi-clínica, com login e acesso remoto)",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {}
+}

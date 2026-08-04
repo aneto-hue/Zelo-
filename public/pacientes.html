@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Pacientes — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="shared-data.js"></script>
+<script src="nav-home.js"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{background:#fff; border-bottom:3px solid var(--blue-dark); padding:22px 16px 18px; text-align:center; position:relative;}
+  header.topbar h1{font-size:22px; margin:0; color:var(--blue-dark); font-weight:800;}
+  header.topbar p{margin:4px 0 0; font-size:13px; color:var(--muted);}
+  main{max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto; padding:20px 14px 50px;}
+  .section-title{font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:22px 0 10px;}
+  .section-title:first-child{margin-top:0;}
+  .summary-row{display:flex; gap:10px; margin-bottom:6px;}
+  .summary-card{flex:1; background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:12px; text-align:center;}
+  .summary-num{font-size:20px; font-weight:800; color:var(--blue-dark);}
+  .summary-label{font-size:10.5px; color:var(--muted); font-weight:700; text-transform:uppercase; margin-top:2px;}
+  .pac-search{width:100%; padding:12px 10px; font-size:15px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit; margin-bottom:10px;}
+  .pac-card{background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .pac-name{font-weight:700; color:var(--blue-dark); font-size:14px;}
+  .pac-sub{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .pac-del{color:var(--red); cursor:pointer; font-weight:700; font-size:13px; flex-shrink:0;}
+  .empty-hint{text-align:center; padding:20px; color:var(--muted); font-size:13px; background:#fff; border:1.5px dashed var(--line-light); border-radius:10px;}
+  .add-row-btn{margin-top:8px; padding:12px 14px; border:1.5px dashed var(--line); background:#fff; border-radius:8px; color:var(--blue-dark); font-weight:700; font-size:13.5px; cursor:pointer; text-align:center;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; margin-bottom:5px; color:var(--ink);}
+  .field input{width:100%; padding:11px 10px; font-size:15px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit;}
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:120px;}
+  .card-form{background:#fff; border:1.5px solid var(--blue-dark); border-radius:10px; padding:14px; margin-bottom:10px;}
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1><svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round;vertical-align:-4px;margin-right:6px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Pacientes</h1>
+  <p>Cadastro compartilhado com todos os módulos</p>
+</header>
+
+<main id="main"></main>
+
+<script>
+function formatDateBR(str){ if(!str) return ''; const [y,m,d]=String(str).split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
+
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+
+let novoPacienteAberto = false;
+let filtroPacientes = '';
+
+function maskCPF(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
+function maskTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 5) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length > 0) v = v.replace(/(\d{0,2})/,'($1');
+  return v.trim();
+}
+function maskRG(v){
+  let letraFinal = '';
+  if(/[Xx]$/.test(v.replace(/[^\dXx]/g,''))){
+    const limpoComX = v.replace(/[^\dXx]/g,'').slice(0,9);
+    if(/[Xx]$/.test(limpoComX)){ letraFinal = 'X'; v = limpoComX.slice(0,-1); }
+  }
+  v = v.replace(/\D/g,'').slice(0,9);
+  v = v.replace(/(\d{2})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  if(letraFinal) v = (v.endsWith('-') ? v : v + '-') + letraFinal;
+  return v;
+}
+function maskDataDigitada(v){
+  v = v.replace(/\D/g,'').slice(0,8);
+  if(v.length > 4) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/, '$1/$2/$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,2})/, '$1/$2');
+  return v;
+}
+function dataDigitadaParaISO(v){
+  const partes = v.split('/');
+  if(partes.length !== 3) return '';
+  const [d,m,a] = partes;
+  if(d.length!==2 || m.length!==2 || a.length!==4) return '';
+  return a + '-' + m + '-' + d;
+}
+function isoParaDataDigitada(iso){
+  if(!iso) return '';
+  const [a,m,d] = String(iso).split('-');
+  if(!a||!m||!d) return '';
+  return d + '/' + m + '/' + a;
+}
+function campoDataNascimento(store, key, onSave){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode('Data de nascimento')));
+  const input = el('input', { type:'text', inputmode:'numeric', placeholder:'DD/MM/AAAA', value: isoParaDataDigitada(store[key]||'') });
+  input.oninput = (e) => {
+    e.target.value = maskDataDigitada(e.target.value);
+    const iso = dataDigitadaParaISO(e.target.value);
+    store[key] = iso || (e.target.value === '' ? '' : store[key]);
+  };
+  if(onSave) input.onchange = () => onSave();
+  f.appendChild(input);
+  return f;
+}
+
+function mascaraParaCampo(key){
+  const k = key.toLowerCase();
+  if(k==='cpf') return maskCPF;
+  if(k==='rg') return maskRG;
+  if(k.includes('telefone') || k==='whatsapp' || k==='celular') return maskTelefone;
+  return null;
+}
+
+function textFieldSimple(label, store, key){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode(label)));
+  const mascara = mascaraParaCampo(key);
+  const input = el('input', { type:'text', value: store[key]||'' });
+  input.oninput = (e) => { if(mascara){ e.target.value = mascara(e.target.value); } store[key] = e.target.value; };
+  f.appendChild(input);
+  return f;
+}
+
+function renderNovoPacienteForm(container){
+  const dados = { nome:'', nasc:'', telefone:'', cpf:'' };
+  const form = el('div', { class:'card-form' });
+  form.appendChild(textFieldSimple('Nome completo', dados, 'nome'));
+  const row = el('div', { class:'row' });
+  row.appendChild(campoDataNascimento(dados, 'nasc'));
+  row.appendChild(textFieldSimple('Telefone', dados, 'telefone'));
+  form.appendChild(row);
+  form.appendChild(textFieldSimple('CPF', dados, 'cpf'));
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;text-align:center;' }, document.createTextNode('Salvar'));
+  salvarBtn.onclick = () => {
+    if(!(dados.nome||'').trim()){ alert('Informe o nome do paciente.'); return; }
+    clinicaUpsertPaciente(dados);
+    novoPacienteAberto = false;
+    render();
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;text-align:center;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = () => { novoPacienteAberto = false; render(); };
+  btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+  container.appendChild(form);
+}
+
+function render(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  const pacientes = clinicaGetPacientes();
+
+  const summaryRow = el('div', { class:'summary-row' });
+  summaryRow.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num' }, document.createTextNode(String(pacientes.length))),
+    el('div', { class:'summary-label' }, document.createTextNode('Pacientes cadastrados'))
+  ]));
+  main.appendChild(summaryRow);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Cadastro de pacientes')));
+  main.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:12px;' },
+    document.createTextNode('Toque num paciente para abrir a Ficha do Paciente (agenda, prontuário, anamnese e financeiro reunidos). Esses pacientes ficam disponíveis automaticamente em todos os módulos.')));
+
+  const fichaExternaLink = el('a', {
+    href: 'ficha_dados_paciente_saude.html',
+    style: 'display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--line-light);border-radius:10px;padding:12px 14px;margin-bottom:14px;text-decoration:none;color:inherit;'
+  }, [
+    el('span', { style:'font-size:18px;' }, document.createTextNode('📋')),
+    el('div', {}, [
+      el('div', { style:'font-weight:700;font-size:13.5px;' }, document.createTextNode('Ficha para o paciente preencher')),
+      el('div', { style:'font-size:11.5px;color:var(--muted);' }, document.createTextNode('Gera um PDF que o paciente preenche em casa e você importa na Anamnese')),
+    ]),
+    el('span', { style:'margin-left:auto;color:#c7c7c7;font-size:18px;' }, document.createTextNode('›'))
+  ]);
+  main.appendChild(fichaExternaLink);
+
+  if(novoPacienteAberto){
+    renderNovoPacienteForm(main);
+  } else {
+    const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Novo paciente'));
+    addBtn.onclick = () => { novoPacienteAberto = true; render(); };
+    main.appendChild(addBtn);
+  }
+
+  const searchInput = el('input', { class:'pac-search', type:'text', placeholder:'Buscar paciente...', value: filtroPacientes });
+  searchInput.oninput = (e) => { filtroPacientes = e.target.value; renderListaPacientes(); };
+  main.appendChild(searchInput);
+
+  const listaWrap = el('div', {});
+  main.appendChild(listaWrap);
+  renderListaPacientes();
+
+  function renderListaPacientes(){
+    listaWrap.innerHTML = '';
+    const termo = filtroPacientes.trim().toLowerCase();
+    const filtrados = pacientes.filter(p => !termo || (p.nome||'').toLowerCase().includes(termo));
+    if(!filtrados.length){
+      listaWrap.appendChild(el('div', { class:'empty-hint' }, document.createTextNode(
+        pacientes.length ? 'Nenhum paciente encontrado.' : 'Nenhum paciente cadastrado ainda. Eles também são criados automaticamente ao usar os módulos.'
+      )));
+      return;
+    }
+    filtrados.forEach(p => {
+      const card = el('div', { class:'pac-card', style:'cursor:pointer;' });
+      card.onclick = () => { window.location.href = 'paciente.html?id=' + encodeURIComponent(p.id); };
+      const linhaEsquerda = el('div', { style:'display:flex;align-items:center;gap:10px;min-width:0;' });
+      const avatar = el('div', { style:'width:40px;height:40px;border-radius:50%;flex-shrink:0;overflow:hidden;background:var(--bg);border:1.5px solid var(--line-light);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--blue-dark);font-size:15px;' });
+      if(p.foto){
+        avatar.appendChild(el('img', { src:p.foto, style:'width:100%;height:100%;object-fit:cover;' }));
+      } else {
+        avatar.appendChild(document.createTextNode((p.nome||'?').trim().charAt(0).toUpperCase()));
+      }
+      linhaEsquerda.appendChild(avatar);
+      const info = el('div', { style:'min-width:0;' });
+      info.appendChild(el('div', { class:'pac-name' }, document.createTextNode(p.nome)));
+      info.appendChild(el('div', { class:'pac-sub' }, document.createTextNode(
+        [formatDateBR(p.nasc), p.telefone].filter(Boolean).join(' • ') || 'Sem dados adicionais'
+      )));
+      linhaEsquerda.appendChild(info);
+      card.appendChild(linhaEsquerda);
+      const linkBtn = el('span', { style:'color:var(--blue-dark);cursor:pointer;font-weight:700;font-size:13px;margin-right:10px;', title:'Gerar link para o paciente preencher os dados' }, document.createTextNode('🔗'));
+      linkBtn.onclick = async (e) => {
+        e.stopPropagation();
+        const resp = await fetch('/api/portal/gerar-link', {
+          method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ pacienteId: p.id })
+        });
+        const data = await resp.json();
+        if(!resp.ok){ alert(data.erro || 'Não foi possível gerar o link.'); return; }
+        const linkCompleto = window.location.origin + data.url;
+        try{
+          await navigator.clipboard.writeText(linkCompleto);
+          alert('Link copiado! Envie para o paciente (ex: por WhatsApp):\n\n' + linkCompleto);
+        }catch(e){
+          prompt('Copie o link abaixo e envie para o paciente:', linkCompleto);
+        }
+      };
+      card.appendChild(linkBtn);
+      const del = el('span', { class:'pac-del' }, document.createTextNode('✕'));
+      del.onclick = (e) => {
+        e.stopPropagation();
+        if(confirm('Remover "'+p.nome+'" do cadastro compartilhado? Isso não apaga fichas ou consultas já criadas, só o cadastro central.')){
+          clinicaRemovePaciente(p.id);
+          render();
+        }
+      };
+      card.appendChild(del);
+      listaWrap.appendChild(card);
+    });
+  }
+}
+
+(async function iniciar(){
+  await aplicarIdentidadeClinica();
+  const meResp = await fetch('/api/me', { credentials:'same-origin' });
+  if(meResp.status === 401){ window.location.href = '/login.html'; return; }
+  await clinicaInitPacientes();
+  const params = new URLSearchParams(window.location.search);
+  const buscaDaUrl = params.get('busca');
+  if(buscaDaUrl) filtroPacientes = buscaDaUrl;
+  render();
+})();
+</script>
+</body>
+</html>

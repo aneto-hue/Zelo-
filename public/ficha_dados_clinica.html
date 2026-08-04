@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dados da Clínica — Zelo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+  document.head.appendChild(s);
+"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{
+    background:#fff; border-bottom:3px solid var(--blue-dark); padding:14px 16px;
+    display:flex; align-items:center; gap:14px; position:sticky; top:0; z-index:20;
+  }
+  header.topbar h1{font-size:17px; margin:0; color:var(--blue-dark); font-weight:700;}
+  header.topbar p{margin:2px 0 0; font-size:12px; color:var(--muted); font-style:italic;}
+  main{max-width:640px; margin:0 auto; padding:18px 14px 60px;}
+  .section-title{
+    background:var(--blue-dark); color:#fff; font-weight:700; font-size:14px; letter-spacing:.5px;
+    padding:10px 14px; border-radius:6px; margin:18px 0 12px; text-transform:uppercase;
+  }
+  .section-title:first-child{margin-top:0;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; font-weight:700; margin-bottom:5px; color:var(--ink);}
+  .field input[type=text]{
+    width:100%; padding:12px 10px; font-size:16px; border:1.5px solid var(--line); border-radius:8px;
+    background:#fff; font-family:inherit;
+  }
+  .field input:focus{outline:none; border-color:var(--blue-dark); box-shadow:0 0 0 3px var(--blue-head);}
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:140px;}
+  .photo-field{margin-bottom:16px;}
+  .photo-box{
+    position:relative; width:120px; height:120px; border-radius:12px; border:2px dashed var(--line);
+    background:var(--blue-light); display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden;
+  }
+  .photo-placeholder{display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--blue-dark); font-size:12px; font-weight:600; text-align:center; padding:8px;}
+  .photo-icon{font-size:26px;}
+  .photo-preview{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-input{position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;}
+  .photo-remove{position:absolute; bottom:0; left:0; right:0; background:rgba(192,57,43,0.9); color:#fff; text-align:center; font-size:11px; font-weight:700; padding:5px 0; cursor:pointer; z-index:2;}
+  .add-row-btn{margin-top:10px; padding:14px; border:none; border-radius:8px; font-weight:700; font-size:15px; cursor:pointer; text-align:center;}
+  .hint{font-size:12.5px; color:var(--muted); line-height:1.5; margin-bottom:16px;}
+  .success-box{
+    display:none; background:#E4F3EA; border:1.5px solid var(--green); border-radius:10px; padding:16px; margin-top:16px;
+    font-size:13.5px; color:var(--ink); line-height:1.5;
+  }
+  .success-box.show{display:block;}
+  .toast{
+    position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; transition:all .25s; z-index:50; pointer-events:none; text-align:center; max-width:90%;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+<link rel="stylesheet" href="theme.css">
+<script src="nav-home.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>Dados da Clínica</h1>
+    <p>Ficha de pré-preenchimento</p>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const state = { nome:'', dentista:'', cro:'', endereco:'', cidade:'', telefone:'', email:'', cnpj:'', logo:'' };
+const STORAGE_KEY = 'ficha_dados_clinica_v1';
+function saveProgress(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
+let _saveTimer=null;
+function saveProgressDebounced(){ clearTimeout(_saveTimer); _saveTimer=setTimeout(saveProgress,400); }
+function loadProgress(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const saved = JSON.parse(raw);
+    Object.keys(state).forEach(k => { if(saved[k]!==undefined) state[k]=saved[k]; });
+  }catch(e){}
+}
+
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+}
+
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function textField(label, store, key){
+  const f=el('div',{class:'field'});
+  f.appendChild(el('label',{},document.createTextNode(label)));
+  const input=el('input',{type:'text', value:store[key]||''});
+  input.oninput=(e)=>{ store[key]=e.target.value; saveProgressDebounced(); };
+  f.appendChild(input);
+  return f;
+}
+
+function loadFixedImageDataURL(file, callback){
+  const maxDim = 1400;
+  function fromBitmap(bitmap){
+    const canvas=document.createElement('canvas');
+    let w=bitmap.width, h=bitmap.height;
+    if(w>maxDim || h>maxDim){ const scale=maxDim/Math.max(w,h); w=Math.round(w*scale); h=Math.round(h*scale); }
+    canvas.width=w; canvas.height=h;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(bitmap,0,0,w,h);
+    callback(canvas.toDataURL('image/jpeg',0.9));
+  }
+  if(window.createImageBitmap){
+    createImageBitmap(file,{imageOrientation:'from-image'}).then(fromBitmap).catch(()=>fallbackViaImageEl());
+  } else { fallbackViaImageEl(); }
+  function fallbackViaImageEl(){
+    const reader=new FileReader();
+    reader.onload=()=>{ const img=new Image(); img.onload=()=>fromBitmap(img); img.src=reader.result; };
+    reader.readAsDataURL(file);
+  }
+}
+
+function logoField(){
+  const wrap=el('div',{class:'field photo-field'});
+  wrap.appendChild(el('label',{},document.createTextNode('Logo da clínica (opcional)')));
+  const box=el('div',{class:'photo-box'});
+  if(state.logo){
+    box.appendChild(el('img',{src:state.logo, class:'photo-preview'}));
+    const removeBtn=el('div',{class:'photo-remove'},document.createTextNode('✕ Remover'));
+    removeBtn.onclick=(e)=>{ e.stopPropagation(); state.logo=''; saveProgressDebounced(); render(); };
+    box.appendChild(removeBtn);
+  } else {
+    box.appendChild(el('div',{class:'photo-placeholder'},[
+      el('div',{class:'photo-icon'},document.createTextNode('🖼️')),
+      el('div',{},document.createTextNode('Tocar para enviar logo'))
+    ]));
+  }
+  const input=el('input',{type:'file', accept:'image/*', class:'photo-input'});
+  input.onchange=(e)=>{
+    const file=e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file,(dataUrl)=>{ state.logo=dataUrl; saveProgressDebounced(); render(); });
+  };
+  box.appendChild(input);
+  wrap.appendChild(box);
+  return wrap;
+}
+
+// ============ GERAÇÃO DO PDF COM DADOS EMBUTIDOS ============
+const PDF_DATA_TAG = 'FICHA_ANAMNESE_DATA:';
+function encodePdfData(obj){
+  try{
+    const json=JSON.stringify(obj);
+    return btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }catch(e){ return null; }
+}
+
+function generatePDF(){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW=595.28, marginX=50, contentW=pageW-marginX*2;
+  const BLUE=[31,92,139], INK=[26,26,26], MUTED=[91,107,122];
+  let y=60;
+
+  if(state.logo){
+    try{
+      const fmt = state.logo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.logo, fmt, marginX, y-10, 54, 54);
+    }catch(e){}
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...BLUE);
+  doc.text('Dados da Clínica', marginX + (state.logo?66:0), y+16);
+  y += 50;
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.2);
+  doc.line(marginX, y, pageW-marginX, y);
+  y += 26;
+
+  const linhas = [
+    ['Nome da clínica', state.nome], ['Dentista responsável', state.dentista], ['CRO', state.cro],
+    ['Endereço', state.endereco], ['Cidade', state.cidade], ['CNPJ', state.cnpj],
+    ['Telefone', state.telefone], ['E-mail', state.email]
+  ];
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  linhas.forEach(([label,val]) => {
+    doc.setFont('helvetica','bold'); doc.setTextColor(...BLUE);
+    doc.text(label+':', marginX, y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(...INK);
+    const lines = doc.splitTextToSize(val||'—', contentW-140);
+    doc.text(lines, marginX+140, y);
+    y += 16 * Math.max(1, lines.length) + 6;
+  });
+
+  y += 14;
+  doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  const rodape = doc.splitTextToSize('Este PDF contém os dados desta ficha para importação automática na Ficha de Anamnese Odontológica. Envie-o de volta à clínica (ex: por WhatsApp ou e-mail) sem editar o arquivo.', contentW);
+  doc.text(rodape, marginX, y);
+
+  const payload = { nome:state.nome, dentista:state.dentista, cro:state.cro, endereco:state.endereco,
+    cidade:state.cidade, telefone:state.telefone, email:state.email, cnpj:state.cnpj, logo:state.logo };
+  const code = encodePdfData(payload);
+  if(code) doc.setProperties({ keywords: PDF_DATA_TAG + code });
+
+  const safeName = (state.nome||'clinica').trim().replace(/\s+/g,'_') || 'clinica';
+  doc.save('dados_clinica_' + safeName + '.pdf');
+  document.getElementById('successBox').classList.add('show');
+  toast('PDF gerado com sucesso!');
+}
+
+// ============ RENDER ============
+function render(){
+  const main=document.getElementById('main');
+  main.innerHTML='';
+
+  main.appendChild(el('div',{class:'section-title'},document.createTextNode('Preencha os dados da clínica')));
+  main.appendChild(el('p',{class:'hint'},document.createTextNode(
+    'Preencha os campos abaixo e gere o PDF ao final. Envie esse PDF para a clínica (ex: por WhatsApp ou e-mail) — ' +
+    'ela vai importá-lo diretamente na Ficha de Anamnese, sem precisar digitar nada de novo.'
+  )));
+
+  main.appendChild(logoField());
+  main.appendChild(textField('Nome da clínica', state, 'nome'));
+  const row1=el('div',{class:'row'});
+  row1.appendChild(textField('Nome do dentista responsável', state, 'dentista'));
+  row1.appendChild(textField('CRO', state, 'cro'));
+  main.appendChild(row1);
+  main.appendChild(textField('Endereço da clínica', state, 'endereco'));
+  const row2=el('div',{class:'row'});
+  row2.appendChild(textField('Cidade', state, 'cidade'));
+  row2.appendChild(textField('CNPJ', state, 'cnpj'));
+  main.appendChild(row2);
+  const row3=el('div',{class:'row'});
+  row3.appendChild(textField('Telefone / WhatsApp', state, 'telefone'));
+  row3.appendChild(textField('E-mail', state, 'email'));
+  main.appendChild(row3);
+
+  const pdfBtn=el('div',{class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;'},
+    document.createTextNode('📄 Gerar PDF para enviar à clínica'));
+  pdfBtn.onclick=generatePDF;
+  main.appendChild(pdfBtn);
+
+  const successBox=el('div',{id:'successBox', class:'success-box'},
+    document.createTextNode('✓ PDF gerado! Agora envie o arquivo baixado para a clínica (WhatsApp, e-mail etc). Ela vai usar o botão "Importar PDF — Dados da clínica" na Ficha de Anamnese para preencher tudo automaticamente.'));
+  main.appendChild(successBox);
+}
+
+loadProgress();
+render();
+</script>
+</body>
+</html>

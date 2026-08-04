@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Agendamento — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="shared-data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+  document.head.appendChild(s);
+"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B;
+    --blue-med:#2E75B6;
+    --blue-head:#D6E7F3;
+    --blue-light:#EFF6FB;
+    --line:#9BBBD4;
+    --line-light:#C9DCEC;
+    --ink:#1A1A1A;
+    --muted:#5B6B7A;
+    --green:#2E8B57;
+    --red:#C0392B;
+    --amber:#C98A1F;
+    --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-tap-highlight-color: transparent;
+  }
+  header.topbar{
+    background:#fff;
+    border-bottom:3px solid var(--blue-dark);
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  header.topbar h1{font-size:18px;margin:0;color:var(--blue-dark);font-weight:700;}
+  header.topbar p{margin:2px 0 0;font-size:12px;color:var(--muted);font-style:italic;}
+
+  nav.steps{
+    display:flex;
+    overflow-x:auto;
+    background:#fff;
+    border-bottom:1px solid var(--line-light);
+    position:sticky;
+    top:62px;
+    z-index:19;
+    -webkit-overflow-scrolling:touch;
+  }
+  nav.steps button{
+    flex:0 0 auto;
+    padding:12px 16px;
+    font-size:13px;
+    font-weight:700;
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    border-bottom:3px solid transparent;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  nav.steps button.active{
+    color:var(--blue-dark);
+    border-bottom-color:var(--blue-dark);
+  }
+
+  main{
+    max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto;
+    padding:18px 14px 40px;
+    transition:max-width .15s ease;
+  }
+
+  .section-title{
+    background:var(--blue-dark);
+    color:#fff;
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:0.5px;
+    padding:10px 14px;
+    border-radius:6px;
+    margin:18px 0 12px;
+    text-transform:uppercase;
+  }
+  .section-title:first-child{margin-top:0;}
+
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:13px;
+    font-weight:700;
+    margin-bottom:5px;
+    color:var(--ink);
+  }
+  .field input[type=text], .field input[type=date], .field input[type=time], .field input[type=tel],
+  .field textarea, .field select{
+    width:100%;
+    padding:12px 10px;
+    font-size:16px;
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    font-family:inherit;
+  }
+  .field input[type=color]{ width:60px; height:44px; padding:2px; border:1.5px solid var(--line); border-radius:8px; background:#fff; }
+  .field textarea{resize:vertical;}
+  .field input:focus, .field textarea:focus, .field select:focus{
+    outline:none;
+    border-color:var(--blue-dark);
+    box-shadow:0 0 0 3px var(--blue-head);
+  }
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:120px;}
+
+  .add-row-btn{
+    margin-top:8px; padding:12px 14px; border:1.5px dashed var(--line);
+    background:#fff; border-radius:8px; color:var(--blue-dark); font-weight:700; font-size:14px; cursor:pointer; text-align:center;
+  }
+
+  .card{
+    background:#fff; border:1.5px solid var(--line-light); border-radius:10px;
+    padding:14px; margin-bottom:12px;
+  }
+  .card.aguardando-piscando{
+    animation: piscarAguardando 1.1s ease-in-out infinite;
+  }
+  @keyframes piscarAguardando{
+    0%, 100% { background:#fff; border-color:var(--line-light); box-shadow:none; }
+    50% { background:#FFF6E0; border-color:var(--amber); box-shadow:0 0 0 3px rgba(201,138,31,0.25); }
+  }
+  .card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .card-title{font-size:15px; font-weight:700; color:var(--blue-dark);}
+  .card-sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .card-actions{display:flex; gap:14px; flex-shrink:0;}
+  .card-actions span{cursor:pointer; font-size:14px; font-weight:700;}
+
+  .empty-hint{text-align:center; padding:20px; color:var(--muted); font-size:13px; background:#fff; border:1.5px dashed var(--line-light); border-radius:10px;}
+
+  .chip-group{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+  .chip{
+    padding:9px 14px; border-radius:20px; border:1.5px solid var(--line);
+    background:#fff; font-weight:700; font-size:12.5px; color:var(--muted); cursor:pointer; user-select:none;
+  }
+  .chip.selected{background:var(--blue-dark); border-color:var(--blue-dark); color:#fff;}
+  .chip.selected.status-confirmado{background:var(--green); border-color:var(--green);}
+  .chip.selected.status-faltou{background:var(--red); border-color:var(--red);}
+  .chip.selected.status-cancelado{background:var(--muted); border-color:var(--muted);}
+
+  .badge{display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700;}
+  .badge.status-agendado{background:var(--blue-head); color:var(--blue-dark);}
+  .badge.status-confirmado{background:#E4F3EA; color:var(--green);}
+  .badge.status-faltou{background:#FBEAEA; color:var(--red);}
+  .badge.status-cancelado{background:#ECECEC; color:var(--muted); text-decoration:line-through;}
+  .badge.bloqueio{background:#FCF1DC; color:var(--amber);}
+
+  .color-dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; flex-shrink:0;}
+
+  .nav-bar{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:14px;}
+  .nav-bar button{
+    padding:10px 14px; border-radius:8px; border:1.5px solid var(--line); background:#fff;
+    color:var(--blue-dark); font-weight:700; font-size:15px; cursor:pointer; flex-shrink:0;
+  }
+  .nav-bar .period-label{font-size:15px; font-weight:700; color:var(--blue-dark); text-align:center; flex:1;}
+  .today-btn{
+    display:block; margin:0 auto 14px; padding:8px 16px; border-radius:20px; border:1.5px solid var(--blue-dark);
+    background:#fff; color:var(--blue-dark); font-weight:700; font-size:12.5px; cursor:pointer; text-align:center; width:fit-content;
+  }
+
+  .view-toggle{display:flex; gap:6px; margin-bottom:16px; background:var(--blue-light); border-radius:10px; padding:4px;}
+  .view-toggle button{
+    flex:1; padding:9px 0; border:none; border-radius:8px; background:transparent; color:var(--muted);
+    font-weight:700; font-size:12.5px; cursor:pointer;
+  }
+  .view-toggle button.active{background:var(--blue-dark); color:#fff;}
+
+  .month-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:10px;}
+  .month-weekday{text-align:center; font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; padding-bottom:4px;}
+  .month-cell{
+    border-radius:8px; border:1.5px solid var(--line-light); background:#fff;
+    display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; padding:4px 3px;
+    cursor:pointer; position:relative; min-height:66px; gap:2px;
+  }
+  .month-cell.outside{opacity:0.4;}
+  .month-cell.today{box-shadow:inset 0 0 0 3px var(--blue-dark);}
+  .month-cell .day-num{font-size:11px; font-weight:700; color:var(--ink); margin-bottom:1px;}
+  .month-cell .evt-bar{
+    background:var(--blue-dark); color:#fff; font-size:8px; font-weight:700; border-radius:3px;
+    padding:1.5px 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.5;
+  }
+  .month-cell .evt-more{font-size:7.5px; color:var(--muted); font-weight:700; padding:1px 3px;}
+
+  .dia-colunas{display:flex; gap:10px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:8px; align-items:flex-start;}
+  .dia-coluna{flex:1 0 220px; min-width:220px; background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:10px; }
+  .dia-coluna-header{display:flex; align-items:center; gap:8px; padding-bottom:8px; margin-bottom:8px; border-bottom:2px solid var(--line-light);}
+  .dia-coluna-header .nome{font-weight:700; color:var(--blue-dark); font-size:13.5px;}
+  .dia-coluna-header .count{font-size:11px; color:var(--muted); font-weight:700; margin-left:auto;}
+  .mini-card{
+    border:1.5px solid var(--line-light); border-radius:8px; padding:8px; margin-bottom:8px; background:var(--blue-light);
+    font-size:12px; cursor:pointer;
+  }
+  .mini-card .mc-hora{font-weight:700; color:var(--ink);}
+  .mini-card .mc-sub{color:var(--muted); font-size:11px; margin-top:2px;}
+  .mini-card .mc-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:4px;}
+  .mini-card .mc-actions span{font-size:12.5px; font-weight:700; cursor:pointer;}
+  .mini-empty{font-size:11.5px; color:var(--muted); text-align:center; padding:10px 0;}
+
+  .week-day-section{margin-bottom:14px;}
+  .week-day-header{
+    display:flex; justify-content:space-between; align-items:center; padding:8px 12px;
+    background:var(--blue-head); border-radius:8px; cursor:pointer; margin-bottom:6px;
+  }
+  .week-day-header .wd-title{font-weight:700; font-size:13px; color:var(--blue-dark);}
+  .week-day-header .wd-count{font-size:11px; color:var(--blue-dark); font-weight:700;}
+
+  .year-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media(min-width:480px){.year-grid{grid-template-columns:1fr 1fr 1fr;}}
+  .year-card{
+    background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:14px; text-align:center; cursor:pointer;
+  }
+  .year-card .month-name{font-weight:700; color:var(--blue-dark); font-size:14px;}
+  .year-card .month-count{font-size:22px; font-weight:700; color:var(--ink); margin-top:6px;}
+  .year-card .month-count-label{font-size:10.5px; color:var(--muted);}
+
+  .toast{
+    position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; transition:all .25s; z-index:50; pointer-events:none; text-align:center; max-width:90%;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+<link rel="stylesheet" href="theme.css">
+<script src="nav-home.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>Controle de Agendamento</h1>
+    <p id="clinicSubtitle">Agenda da clínica</p>
+  </div>
+</header>
+
+<nav class="steps" id="stepsNav"></nav>
+
+<main id="main"></main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ ESTADO ============
+function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+const CORES_PRESET = ['#1F5C8B','#2E8B57','#C98A1F','#8E44AD','#C0392B','#16A085','#D35400','#2980B9'];
+
+const state = {
+  profissionais: [],
+  consultas: [],   // {id, profissionalId, data, horaInicio, horaFim, paciente, telefone, procedimento, status, obs}
+  bloqueios: []    // {id, profissionalId('' = todos), dataInicio, dataFim, horaInicio, horaFim, motivo}
+};
+
+const STEPS = ['Profissionais','Agenda','Bloqueios'];
+let currentStep = 1;
+
+// ============ INTEGRAÇÃO COM O FINANCEIRO (forma de pagamento do profissional) ============
+let financeiroProfissionaisCache = [];
+
+async function carregarFinanceiroProfissionaisCache(){
+  try{
+    const dados = await ClinicaStorage.load('controle_pagamentos_comissoes_v1');
+    financeiroProfissionaisCache = (dados && dados.profissionais) || [];
+  }catch(e){
+    financeiroProfissionaisCache = [];
+  }
+}
+
+function formatMoneyLocal(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function parseMoneyLocal(str){
+  if(!str) return 0;
+  const limpo = String(str).replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3},)/g,'').replace(',', '.');
+  return parseFloat(limpo) || 0;
+}
+function formatCurrencyMask(value){
+  let digits = String(value).replace(/\D/g,'');
+  if(!digits) return '';
+  digits = digits.replace(/^0+(?=\d)/,'');
+  while(digits.length < 3) digits = '0' + digits;
+  const cents = digits.slice(-2);
+  let intPart = digits.slice(0, -2).replace(/^0+(?=\d)/,'');
+  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return 'R$ ' + intPart + ',' + cents;
+}
+
+// Calcula quanto pagar ao profissional por ESSA consulta específica, de acordo com a forma de
+// pagamento configurada dele no Financeiro (percentual, diária, ou os dois combinados).
+// gravarDiaria=true marca essa consulta como a que "conta" a diária do dia (evita pagar 2x
+// no mesmo dia se o profissional tiver mais de uma consulta confirmada no mesmo dia).
+// Calcula, separadamente, quanto dessa consulta é percentual (comissão) e quanto é diária —
+// cada um tem uma regra própria de quando fica "devido" no Financeiro:
+//  • Percentual: só conta quando o profissional marcar o procedimento como FINALIZADO no Prontuário
+//    (consulta.percentualDevido = true). Aqui só calculamos o valor e deixamos pronto pra quando isso acontecer.
+//  • Diária: conta automaticamente a partir das 19h do dia da consulta (calculado no Financeiro, não aqui).
+function calcularValorProfissional(consulta, gravarFlags){
+  const profAgenda = getProfissional(consulta.profissionalId);
+  if(!profAgenda) return { valorPercentual:0, valorDiaria:0, origem:'' };
+  const profFin = financeiroProfissionaisCache.find(p => (p.nome||'').trim().toLowerCase() === (profAgenda.nome||'').trim().toLowerCase());
+  if(!profFin || !profFin.pagamento) return { valorPercentual:0, valorDiaria:0, origem:'' };
+
+  const pg = profFin.pagamento;
+  let valorPercentual = 0, valorDiaria = 0;
+  const origens = [];
+  let diariaJaContabilizadaHoje = false;
+
+  const pctValor = parseFloat(pg.percentual)||0;
+  if(pctValor > 0 && consulta.valor){
+    valorPercentual = parseMoneyLocal(consulta.valor) * pctValor / 100;
+    origens.push(pctValor+'% do procedimento (devido quando o profissional finalizar no Prontuário)');
+  }
+
+  const diariaValor = parseFloat(pg.diaria)||0;
+  if(diariaValor > 0 && consulta.status === 'confirmado'){
+    // só conta a diária uma vez por profissional/dia — verifica se já tem outra consulta
+    // confirmada no mesmo dia, do mesmo profissional, que já "levou" a diária.
+    const outraJaContou = (state.consultas||[]).some(c =>
+      c.id !== consulta.id && c.profissionalId === consulta.profissionalId &&
+      c.data === consulta.data && c.status === 'confirmado' && c.diariaContabilizada
+    );
+    if(!outraJaContou){
+      valorDiaria = diariaValor;
+      origens.push('diária de R$ '+formatMoneyLocal(diariaValor)+' (devida às 19h do dia da consulta)');
+      if(gravarFlags) consulta.diariaContabilizada = true;
+    } else {
+      diariaJaContabilizadaHoje = true;
+      if(gravarFlags) consulta.diariaContabilizada = false;
+    }
+  } else if(gravarFlags){
+    consulta.diariaContabilizada = false;
+  }
+
+  let origemFinal = origens.join(' + ');
+  if(!origemFinal){
+    origemFinal = diariaJaContabilizadaHoje
+      ? 'diária deste dia já contabilizada em outra consulta do profissional'
+      : 'sem forma de pagamento configurada';
+  }
+  return { valorPercentual, valorDiaria, origem: origemFinal };
+}
+
+// ============ PERSISTÊNCIA (servidor com reserva local) ============
+const STORAGE_KEY = 'controle_agendamento_progresso_v1';
+function saveProgress(){
+  ClinicaStorage.save(STORAGE_KEY, state);
+}
+let _saveTimer = null;
+function saveProgressDebounced(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveProgress, 400);
+}
+async function loadProgress(){
+  const saved = await ClinicaStorage.load(STORAGE_KEY);
+  if(!saved) return false;
+  Object.keys(state).forEach(k => { if(saved[k] !== undefined) state[k] = saved[k]; });
+  return true;
+}
+function clearProgress(){ ClinicaStorage.save(STORAGE_KEY, null); try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
+
+// A partir de agora, quem cadastra profissionais é o Perfil da Clínica (lista compartilhada,
+// visível também no Financeiro). Aqui, só migra os dados antigos (se o agendamento já tinha
+// profissionais cadastrados por ele mesmo, antes dessa mudança) e depois só faz leitura.
+const CHAVE_PROFISSIONAIS_COMPARTILHADA = 'clinica_profissionais_agenda_v1';
+async function carregarProfissionaisCompartilhados(){
+  let compartilhados = await ClinicaStorage.load(CHAVE_PROFISSIONAIS_COMPARTILHADA);
+  if((!compartilhados || !compartilhados.length) && state.profissionais && state.profissionais.length){
+    // Migração única: leva os profissionais que já existiam localmente no agendamento
+    // para o local compartilhado, preservando os IDs (as consultas e bloqueios já os referenciam).
+    compartilhados = state.profissionais;
+    await ClinicaStorage.save(CHAVE_PROFISSIONAIS_COMPARTILHADA, compartilhados);
+  }
+  state.profissionais = compartilhados || [];
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+// ============ HELPERS DE RENDER ============
+function el(tag, attrs={}, children=[]){
+  const e = document.createElement(tag);
+  for(const k in attrs){
+    if(k === 'class') e.className = attrs[k];
+    else if(k === 'html') e.innerHTML = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c => { if(c) e.appendChild(c); });
+  return e;
+}
+function maskCPF(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
+function maskTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 5) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length > 0) v = v.replace(/(\d{0,2})/,'($1');
+  return v.trim();
+}
+function maskRG(v){
+  let letraFinal = '';
+  if(/[Xx]$/.test(v.replace(/[^\dXx]/g,''))){
+    const limpoComX = v.replace(/[^\dXx]/g,'').slice(0,9);
+    if(/[Xx]$/.test(limpoComX)){ letraFinal = 'X'; v = limpoComX.slice(0,-1); }
+  }
+  v = v.replace(/\D/g,'').slice(0,9);
+  v = v.replace(/(\d{2})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  if(letraFinal) v = (v.endsWith('-') ? v : v + '-') + letraFinal;
+  return v;
+}
+function mascaraParaCampo(key){
+  const k = key.toLowerCase();
+  if(k==='cpf') return maskCPF;
+  if(k==='rg') return maskRG;
+  if(k.includes('telefone') || k==='whatsapp' || k==='celular') return maskTelefone;
+  return null;
+}
+
+function textField(label, store, key, opts={}){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode(label)));
+  const mascara = opts.mask===false ? null : mascaraParaCampo(key);
+  const input = el('input', { type: opts.type||'text', value: store[key]||'' });
+  input.oninput = (e) => { if(mascara){ e.target.value = mascara(e.target.value); } store[key] = e.target.value; saveProgressDebounced(); if(opts.onInput) opts.onInput(); };
+  f.appendChild(input);
+  return f;
+}
+
+// ============ HELPERS DE DATA ============
+function pad2(n){ return String(n).padStart(2,'0'); }
+function toISO(date){ return date.getFullYear()+'-'+pad2(date.getMonth()+1)+'-'+pad2(date.getDate()); }
+function parseISO(str){ const [y,m,d] = str.split('-').map(Number); return new Date(y, m-1, d); }
+function formatDateBR(str){ if(!str) return ''; const [y,m,d]=str.split('-'); return `${d}/${m}/${y}`; }
+function formatDateBRISOLocal(timestampOuData){
+  if(!timestampOuData) return '';
+  const d = new Date(timestampOuData);
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+}
+function addDays(date, n){ const d = new Date(date); d.setDate(d.getDate()+n); return d; }
+function addMonths(date, n){ const d = new Date(date); d.setMonth(d.getMonth()+n); return d; }
+function addYears(date, n){ const d = new Date(date); d.setFullYear(d.getFullYear()+n); return d; }
+function getMonday(date){
+  const d = new Date(date);
+  const dow = (d.getDay()+6)%7; // 0=Segunda .. 6=Domingo
+  d.setDate(d.getDate()-dow);
+  return d;
+}
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DIAS_SEMANA_CURTO = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+const DIAS_SEMANA_LONGO = ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'];
+
+function isDateInRange(dateISO, startISO, endISO){
+  const end = endISO || startISO;
+  return dateISO >= startISO && dateISO <= end;
+}
+
+// ============ CONSULTAS / BLOQUEIOS DE UM DIA ============
+function getProfissional(id){ return state.profissionais.find(p => p.id === id); }
+
+function consultasDoDia(dateISO, profissionalFiltro){
+  return state.consultas
+    .filter(c => c.data === dateISO && (!profissionalFiltro || c.profissionalId === profissionalFiltro))
+    .sort((a,b) => (a.horaInicio||'').localeCompare(b.horaInicio||''));
+}
+function bloqueiosDoDia(dateISO, profissionalFiltro){
+  return state.bloqueios
+    .filter(b => isDateInRange(dateISO, b.dataInicio, b.dataFim) && (!profissionalFiltro || !b.profissionalId || b.profissionalId === profissionalFiltro))
+    .sort((a,b) => (a.horaInicio||'').localeCompare(b.horaInicio||''));
+}
+function contagemDoDia(dateISO, profissionalFiltro){
+  return consultasDoDia(dateISO, profissionalFiltro).length;
+}
+function profissionaisComConsultaNoDia(dateISO){
+  const ids = new Set(state.consultas.filter(c=>c.data===dateISO).map(c=>c.profissionalId));
+  return Array.from(ids).map(getProfissional).filter(Boolean);
+}
+
+const STATUS_LABELS = { agendado:'Agendado', confirmado:'Confirmado', faltou:'Faltou', cancelado:'Cancelado' };
+
+// ============ RENDER: PROFISSIONAIS ============
+let novoProfissionalAberto = false;
+let profissionalEmEdicao = null;
+
+function renderProfissionalForm(container, prof, onSalvar, onCancelar){
+  const form = el('div', { class:'card', style:'border-color:var(--blue-dark);' });
+  form.appendChild(textField('Nome do profissional', prof, 'nome'));
+  const corField = el('div', { class:'field' });
+  corField.appendChild(el('label', {}, document.createTextNode('Cor de identificação na agenda')));
+  const corInput = el('input', { type:'color', value: prof.cor || '#1F5C8B' });
+  corInput.oninput = (e) => { prof.cor = e.target.value; };
+  corField.appendChild(corInput);
+  form.appendChild(corField);
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' },
+    document.createTextNode('Salvar'));
+  salvarBtn.onclick = () => {
+    if(!(prof.nome||'').trim()){ alert('Informe o nome do profissional.'); return; }
+    onSalvar();
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = onCancelar;
+  btnRow.appendChild(salvarBtn);
+  btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+  container.appendChild(form);
+}
+
+function renderProfissionais(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Profissionais / Cadeiras')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
+    document.createTextNode('Para adicionar, editar ou remover um profissional, use o Perfil da Clínica.')));
+
+  const irBtn = el('a', { href:'perfil-clinica.html', class:'add-row-btn', style:'display:block;text-align:center;text-decoration:none;margin-bottom:14px;' },
+    document.createTextNode('Gerenciar profissionais no Perfil da Clínica →'));
+  container.appendChild(irBtn);
+
+  if(!state.profissionais.length){
+    container.appendChild(el('div', { class:'empty-hint' },
+      document.createTextNode('Nenhum profissional cadastrado ainda.')));
+    return;
+  }
+
+  state.profissionais.forEach(prof => {
+    const card = el('div', { class:'card' });
+    const top = el('div', { class:'card-top' });
+    const info = el('div', { style:'display:flex;align-items:center;gap:8px;' });
+    info.appendChild(el('span', { class:'color-dot', style:'background:'+(prof.cor||'#1F5C8B')+';width:14px;height:14px;' }));
+    info.appendChild(el('span', { class:'card-title' }, document.createTextNode(prof.nome)));
+    top.appendChild(info);
+    card.appendChild(top);
+    container.appendChild(card);
+  });
+}
+
+// ============ FORMULÁRIO DE CONSULTA ============
+function renderConsultaForm(container, consulta, dataFixa, onSalvar, onCancelar){
+  const form = el('div', { class:'card', style:'border-color:var(--blue-dark);' });
+
+  if(!state.profissionais.length){
+    form.appendChild(el('p', { style:'font-size:13px;color:var(--red);' },
+      document.createTextNode('Cadastre ao menos um profissional na aba "Profissionais" antes de agendar.')));
+    container.appendChild(form);
+    return;
+  }
+
+  const profField = el('div', { class:'field' });
+  profField.appendChild(el('label', {}, document.createTextNode('Profissional')));
+  const profSelect = el('select', {});
+  state.profissionais.forEach(p => {
+    const opt = el('option', { value:p.id }, document.createTextNode(p.nome));
+    if(consulta.profissionalId === p.id) opt.setAttribute('selected','selected');
+    profSelect.appendChild(opt);
+  });
+  if(!consulta.profissionalId) consulta.profissionalId = state.profissionais[0].id;
+  profSelect.onchange = (e) => { consulta.profissionalId = e.target.value; };
+  profField.appendChild(profSelect);
+  form.appendChild(profField);
+
+  const row1 = el('div', { class:'row' });
+  const dataField = el('div', { class:'field' });
+  dataField.appendChild(el('label', {}, document.createTextNode('Data')));
+  const dataInput = el('input', { type:'date', value: consulta.data || dataFixa || toISO(new Date()) });
+  dataInput.oninput = (e) => { consulta.data = e.target.value; };
+  dataField.appendChild(dataInput);
+  row1.appendChild(dataField);
+
+  const horaField = el('div', { class:'field' });
+  horaField.appendChild(el('label', {}, document.createTextNode('Horário')));
+  const horaInput = el('input', { type:'time', value: consulta.horaInicio||'' });
+  horaInput.oninput = (e) => { consulta.horaInicio = e.target.value; recalcularHoraFim(); };
+  horaField.appendChild(horaInput);
+  row1.appendChild(horaField);
+  form.appendChild(row1);
+
+  const row1b = el('div', { class:'row' });
+  const duracaoField = el('div', { class:'field' });
+  duracaoField.appendChild(el('label', {}, document.createTextNode('Duração (minutos)')));
+  const duracaoInput = el('input', { type:'number', min:'5', step:'5', value: consulta.duracaoMinutos||'', placeholder:'Ex: 60' });
+  duracaoInput.oninput = (e) => { consulta.duracaoMinutos = e.target.value; recalcularHoraFim(); };
+  duracaoField.appendChild(duracaoInput);
+  row1b.appendChild(duracaoField);
+
+  const horaFimField = el('div', { class:'field' });
+  horaFimField.appendChild(el('label', {}, document.createTextNode('Término (calculado)')));
+  const horaFimInput = el('input', { type:'time', value: consulta.horaFim||'' });
+  horaFimInput.oninput = (e) => { consulta.horaFim = e.target.value; }; // dá pra ajustar manualmente também
+  horaFimField.appendChild(horaFimInput);
+  row1b.appendChild(horaFimField);
+  form.appendChild(row1b);
+  function recalcularHoraFim(){
+    if(!consulta.horaInicio || !consulta.duracaoMinutos) return;
+    const [h,m] = consulta.horaInicio.split(':').map(Number);
+    const totalMin = h*60 + m + parseInt(consulta.duracaoMinutos,10);
+    const hFim = Math.floor(totalMin/60) % 24;
+    const mFim = totalMin % 60;
+    consulta.horaFim = String(hFim).padStart(2,'0') + ':' + String(mFim).padStart(2,'0');
+    horaFimInput.value = consulta.horaFim;
+  }
+
+  const pacField = el('div', { class:'field' });
+  pacField.appendChild(el('label', {}, document.createTextNode('Paciente')));
+  const pacDatalistId = typeof clinicaGarantirDatalist === 'function' ? clinicaGarantirDatalist() : null;
+  const pacInput = el('input', { type:'text', value: consulta.paciente||'', placeholder:'Digite para buscar um paciente já cadastrado...' });
+  if(pacDatalistId) pacInput.setAttribute('list', pacDatalistId);
+  pacInput.oninput = (e) => {
+    consulta.paciente = e.target.value;
+    // Item 5: se o nome digitado bater com um paciente já cadastrado, preenche o telefone dele sozinho.
+    const pacEncontrado = typeof clinicaFindPacienteByNome === 'function' ? clinicaFindPacienteByNome(e.target.value) : null;
+    if(pacEncontrado){
+      consulta.pacienteId = pacEncontrado.id;
+      if(pacEncontrado.telefone && !consulta.telefone){
+        consulta.telefone = pacEncontrado.telefone;
+        telInputDireto.value = pacEncontrado.telefone;
+      }
+    }
+    buscarProcedimentosDoOdontograma();
+  };
+  pacField.appendChild(pacInput);
+  form.appendChild(pacField);
+  const row2 = el('div', { class:'row' });
+  const telField = el('div', { class:'field' });
+  telField.appendChild(el('label', {}, document.createTextNode('Telefone (opcional)')));
+  const telInputDireto = el('input', { type:'tel', value: consulta.telefone||'' });
+  telInputDireto.oninput = (e) => { consulta.telefone = e.target.value; saveProgressDebounced(); };
+  telField.appendChild(telInputDireto);
+  row2.appendChild(telField);
+  const procField = el('div', { class:'field' });
+  procField.appendChild(el('label', {}, document.createTextNode('Procedimento')));
+  const procInputDireto = el('input', { type:'text', value: consulta.procedimento||'' });
+  procInputDireto.oninput = (e) => { consulta.procedimento = e.target.value; saveProgressDebounced(); };
+  procField.appendChild(procInputDireto);
+  row2.appendChild(procField);
+  form.appendChild(row2);
+
+  // ---- Procedimentos do orçamento deste paciente (ou do odontograma, se ainda não tiver orçamento gerado) ----
+  const odontoWrap = el('div', {});
+  form.appendChild(odontoWrap);
+  async function buscarProcedimentosDoOdontograma(){
+    odontoWrap.innerHTML = '';
+    const pac = typeof clinicaFindPacienteByNome === 'function' ? clinicaFindPacienteByNome(consulta.paciente||'') : null;
+    if(!pac) return;
+    let ficha;
+    try{ ficha = await ClinicaStorage.load('ficha_anamnese_paciente_'+pac.id); }catch(e){ return; }
+    if(!ficha) return;
+
+    const itens = [];
+    let fonte = '';
+    if(ficha.historicoOrcamentos && ficha.historicoOrcamentos.length){
+      // Usa o orçamento mais recente gerado pra esse paciente.
+      const orcMaisRecente = ficha.historicoOrcamentos[0];
+      (orcMaisRecente.itens||[]).forEach(t => {
+        if(t.tratamento) itens.push({ label:'Dente '+t.dente+': '+t.tratamento, tratamento:t.tratamento, valor:t.valor||'' });
+      });
+      (orcMaisRecente.outros||[]).forEach(o => { if(o.descricao) itens.push({ label:o.descricao, tratamento:o.descricao, valor:o.valor||'' }); });
+      fonte = 'do orçamento de ' + formatDateBRISOLocal(orcMaisRecente.dataGeracao);
+    } else {
+      // Sem orçamento gerado ainda — usa o plano de tratamento atual do odontograma como alternativa.
+      Object.entries(ficha.toothData||{}).forEach(([dente,d]) => {
+        (d.tratamentos||[]).forEach(t => {
+          if(t.tratamento) itens.push({ label:'Dente '+dente+': '+t.tratamento, tratamento:t.tratamento, valor:t.valor||'' });
+        });
+      });
+      (ficha.outrosTratamentos||[]).forEach(o => { if(o.descricao) itens.push({ label:o.descricao, tratamento:o.descricao, valor:o.valor||'' }); });
+      fonte = 'do odontograma (ainda sem orçamento gerado)';
+    }
+    if(!itens.length) return;
+
+    odontoWrap.appendChild(el('label', { style:'display:block;font-size:12.5px;font-weight:700;margin-bottom:2px;color:var(--blue-dark);' },
+      document.createTextNode('Procedimento previsto para este paciente')));
+    odontoWrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:0;margin-bottom:6px;' },
+      document.createTextNode('Lista '+fonte+'.')));
+    const sel = el('select', { style:'width:100%;padding:11px;font-size:14px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;margin-bottom:12px;' });
+    sel.appendChild(el('option', { value:'nenhum' }, document.createTextNode('Nenhum procedimento previsto (horário livre)')));
+    itens.forEach((item, idx) => {
+      sel.appendChild(el('option', { value:String(idx) }, document.createTextNode(item.label + (item.valor?(' — '+item.valor):''))));
+    });
+    sel.onchange = async (e) => {
+      if(e.target.value==='nenhum'){ return; }
+      const item = itens[parseInt(e.target.value,10)];
+      consulta.procedimento = item.tratamento;
+      procInputDireto.value = item.tratamento;
+      if(item.valor){
+        consulta.valor = formatCurrencyMask(String(Math.round(parseMoneyLocal(item.valor)*100)));
+        valorInput.value = consulta.valor;
+      }
+      // Procura a duração cadastrada desse procedimento no catálogo do Estoque, pra calcular o horário de término.
+      const estoqueDados = await ClinicaStorage.load('controle_estoque_progresso_v1');
+      const catalogo = (estoqueDados && estoqueDados.procedimentos) || [];
+      const match = catalogo.find(p => (p.nome||'').toLowerCase().trim() === (item.tratamento||'').toLowerCase().trim());
+      if(match && match.duracaoMinutos){
+        consulta.duracaoMinutos = match.duracaoMinutos;
+        duracaoInput.value = match.duracaoMinutos;
+        recalcularHoraFim();
+      }
+      atualizarPreviewValorProfissional();
+      saveProgressDebounced();
+    };
+    odontoWrap.appendChild(sel);
+  }
+  buscarProcedimentosDoOdontograma();
+
+  const valorField = el('div', { class:'field' });
+  valorField.appendChild(el('label', {}, document.createTextNode('Valor do procedimento (R$, opcional)')));
+  const valorInput = el('input', { type:'text', inputmode:'numeric', value: consulta.valor?formatCurrencyMask(consulta.valor):'', placeholder:'R$ 0,00' });
+  valorInput.oninput = (e) => { e.target.value = formatCurrencyMask(e.target.value); consulta.valor = e.target.value; };
+  valorField.appendChild(valorInput);
+  valorField.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:4px;' },
+    document.createTextNode('Usado para calcular a comissão do profissional, se ele receber por percentual.')));
+  form.appendChild(valorField);
+
+  const valorProfPreview = el('p', { style:'font-size:12px;color:var(--blue-dark);font-weight:700;margin-top:-6px;margin-bottom:12px;' });
+  form.appendChild(valorProfPreview);
+  function atualizarPreviewValorProfissional(){
+    const r = calcularValorProfissional(consulta, false);
+    const total = r.valorPercentual + r.valorDiaria;
+    valorProfPreview.textContent = total>0 ? ('💰 Valor a pagar ao profissional: R$ '+formatMoneyLocal(total)+' ('+r.origem+')') : '';
+  }
+  profSelect.addEventListener('change', atualizarPreviewValorProfissional);
+  valorInput.addEventListener('input', atualizarPreviewValorProfissional);
+  atualizarPreviewValorProfissional();
+
+  const statusField = el('div', { class:'field' });
+  statusField.appendChild(el('label', {}, document.createTextNode('Status')));
+  const statusGroup = el('div', { class:'chip-group' });
+  if(!consulta.status) consulta.status = 'agendado';
+  Object.keys(STATUS_LABELS).forEach(st => {
+    const chip = el('div', { class:'chip'+(consulta.status===st?' selected status-'+st:'') }, document.createTextNode(STATUS_LABELS[st]));
+    chip.onclick = () => { consulta.status = st; renderContainerStatus(); atualizarPreviewValorProfissional(); };
+    statusGroup.appendChild(chip);
+  });
+  statusField.appendChild(statusGroup);
+  form.appendChild(statusField);
+  function renderContainerStatus(){
+    Array.from(statusGroup.children).forEach((chip,i) => {
+      const st = Object.keys(STATUS_LABELS)[i];
+      chip.className = 'chip'+(consulta.status===st?' selected status-'+st:'');
+    });
+  }
+
+  form.appendChild(textField('Observação (opcional)', consulta, 'obs'));
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' },
+    document.createTextNode('Salvar consulta'));
+  salvarBtn.onclick = () => {
+    if(!(consulta.paciente||'').trim()){ alert('Informe o nome do paciente.'); return; }
+    if(!consulta.data){ alert('Informe a data.'); return; }
+    if(!consulta.horaInicio){ alert('Informe o horário.'); return; }
+    if(typeof clinicaUpsertPaciente === 'function'){
+      const pac = clinicaUpsertPaciente({ nome: consulta.paciente, telefone: consulta.telefone });
+      if(pac) consulta.pacienteId = pac.id;
+    }
+    // Calcula (e só GRAVA de vez) o valor a pagar ao profissional no momento do agendamento/confirmação —
+    // não espera o fechamento financeiro depois. Percentual e diária ficam separados, porque cada um
+    // tem sua própria regra de quando fica "devido" (ver calcularValorProfissional).
+    const resultado = calcularValorProfissional(consulta, true);
+    consulta.valorPercentual = resultado.valorPercentual;
+    consulta.valorDiaria = resultado.valorDiaria;
+    consulta.valorProfissionalOrigem = resultado.origem;
+    if(consulta.percentualDevido === undefined) consulta.percentualDevido = false;
+    onSalvar();
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = onCancelar;
+  btnRow.appendChild(salvarBtn);
+  btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+
+  container.appendChild(form);
+}
+
+// ============ RENDER: AGENDA ============
+let viewMode = 'dia'; // dia | semana | mes | ano
+let currentDate = new Date();
+let filtroProfissionalId = '';
+let novaConsultaAberta = false;
+let consultaEmEdicao = null;
+let consultaDataPreSelecionada = null;
+
+function renderFiltroProfissional(container){
+  if(!state.profissionais.length) return;
+  const field = el('div', { class:'field' });
+  field.appendChild(el('label', {}, document.createTextNode('Filtrar por profissional')));
+  const select = el('select', {});
+  select.appendChild(el('option', { value:'' }, document.createTextNode('Todos os profissionais')));
+  state.profissionais.forEach(p => {
+    const opt = el('option', { value:p.id }, document.createTextNode(p.nome));
+    if(filtroProfissionalId === p.id) opt.setAttribute('selected','selected');
+    select.appendChild(opt);
+  });
+  select.onchange = (e) => { filtroProfissionalId = e.target.value; refreshPanel(); };
+  field.appendChild(select);
+  container.appendChild(field);
+}
+
+function renderItemConsulta(container, consulta, contexto){
+  const prof = getProfissional(consulta.profissionalId);
+  const card = el('div', { class:'card'+(consulta.aguardando?' aguardando-piscando':''), style:'border-left:5px solid '+(prof?prof.cor:'#999')+';' });
+  const top = el('div', { class:'card-top' });
+  const info = el('div', {});
+  info.appendChild(el('div', { class:'card-title' }, [
+    document.createTextNode((consulta.horaInicio||'--:--') + ' — '),
+    consulta.pacienteId
+      ? el('a', { href:'paciente.html?id='+encodeURIComponent(consulta.pacienteId), style:'color:inherit;text-decoration:underline;' }, document.createTextNode(consulta.paciente||'(sem nome)'))
+      : document.createTextNode(consulta.paciente||'(sem nome)')
+  ]));
+  info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(
+    [prof?prof.nome:'(profissional removido)', consulta.procedimento].filter(Boolean).join(' • ')
+  )));
+  if(consulta.telefone){
+    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode('Tel: '+consulta.telefone)));
+  }
+  if(consulta.obs){
+    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(consulta.obs)));
+  }
+  const totalProf = (consulta.valorPercentual||0) + (consulta.valorDiaria||0);
+  if(totalProf > 0){
+    info.appendChild(el('div', { class:'card-sub', style:'color:var(--green);font-weight:700;' },
+      document.createTextNode('💰 R$ '+formatMoneyLocal(totalProf)+' para o profissional'+(consulta.valorProfissionalOrigem?(' ('+consulta.valorProfissionalOrigem+')'):''))));
+    if(consulta.valorPercentual > 0){
+      info.appendChild(el('div', { class:'card-sub', style:'font-size:11px;' },
+        document.createTextNode(consulta.percentualDevido ? '✓ Percentual finalizado no Prontuário — já conta no Financeiro' : '⏳ Percentual ainda não conta — aguarda o profissional finalizar o procedimento no Prontuário')));
+    }
+  }
+  info.appendChild(el('div', { style:'margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;' }, [
+    el('span', { class:'badge status-'+consulta.status }, document.createTextNode(STATUS_LABELS[consulta.status]||'Agendado')),
+    consulta.aguardando ? el('span', { class:'badge', style:'background:var(--amber);color:#fff;' }, document.createTextNode('🔔 Paciente aguardando')) : null
+  ].filter(Boolean)));
+
+  // ---- Ação: recepção marca "paciente aguardando" / profissional confirma "iniciar atendimento" ----
+  if(!consulta.aguardando){
+    const aguardandoBtn = el('div', { class:'add-row-btn', style:'margin-top:8px;background:var(--amber);color:#fff;border:none;font-size:12.5px;padding:9px;' },
+      document.createTextNode('🔔 Marcar paciente como aguardando'));
+    aguardandoBtn.onclick = async () => {
+      consulta.aguardando = true;
+      consulta.horaChegada = new Date().toISOString();
+      saveProgress(); refreshPanel(); toast('Paciente marcado como aguardando!');
+      if(prof && prof.telefone){
+        try{
+          const resp = await fetch('/api/notificar-paciente-aguardando', {
+            method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ telefoneProfissional: prof.telefone.replace(/\D/g,''), nomePaciente: consulta.paciente||'Paciente' })
+          });
+          if(resp.ok) toast('Aviso enviado no WhatsApp de '+prof.nome+'!');
+        }catch(e){ console.error('Não foi possível avisar o profissional:', e); }
+      }
+    };
+    info.appendChild(aguardandoBtn);
+  } else {
+    const iniciarBtn = el('div', { class:'add-row-btn', style:'margin-top:8px;background:var(--green);color:#fff;border:none;font-size:12.5px;padding:9px;' },
+      document.createTextNode('✓ Iniciar atendimento'));
+    iniciarBtn.onclick = () => {
+      consulta.aguardando = false;
+      saveProgress(); refreshPanel(); toast('Atendimento iniciado.');
+    };
+    info.appendChild(iniciarBtn);
+  }
+
+  top.appendChild(info);
+
+  const actions = el('div', { class:'card-actions' });
+  const editIcon = el('span', { style:'color:var(--blue-dark);' }, document.createTextNode('✎'));
+  editIcon.onclick = () => { consultaEmEdicao = consulta.id; refreshPanel(); };
+  const delIcon = el('span', { style:'color:var(--red);' }, document.createTextNode('✕'));
+  delIcon.onclick = () => {
+    if(confirm('Excluir esta consulta?')){
+      state.consultas = state.consultas.filter(c=>c.id!==consulta.id);
+      saveProgress(); refreshPanel(); toast('Consulta excluída.');
+    }
+  };
+  actions.appendChild(editIcon);
+  actions.appendChild(delIcon);
+  top.appendChild(actions);
+  card.appendChild(top);
+  container.appendChild(card);
+}
+
+function renderItemBloqueio(container, bloqueio){
+  const prof = bloqueio.profissionalId ? getProfissional(bloqueio.profissionalId) : null;
+  const card = el('div', { class:'card', style:'border-left:5px solid var(--amber);background:#FFFBF2;' });
+  const top = el('div', { class:'card-top' });
+  const info = el('div', {});
+  const periodo = (bloqueio.horaInicio||bloqueio.horaFim) ?
+    ((bloqueio.horaInicio||'--:--') + (bloqueio.horaFim?(' às '+bloqueio.horaFim):'')) : 'Dia inteiro';
+  info.appendChild(el('div', { class:'card-title', style:'color:var(--amber);' }, document.createTextNode(
+    '🚫 ' + (bloqueio.motivo||'Bloqueio') + ' — ' + periodo
+  )));
+  info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(prof ? prof.nome : 'Todos os profissionais')));
+  top.appendChild(info);
+  const actions = el('div', { class:'card-actions' });
+  const delIcon = el('span', { style:'color:var(--red);' }, document.createTextNode('✕'));
+  delIcon.onclick = () => {
+    if(confirm('Excluir este bloqueio?')){
+      state.bloqueios = state.bloqueios.filter(b=>b.id!==bloqueio.id);
+      saveProgress(); refreshPanel(); toast('Bloqueio excluído.');
+    }
+  };
+  actions.appendChild(delIcon);
+  top.appendChild(actions);
+  card.appendChild(top);
+  container.appendChild(card);
+}
+
+function irParaDia(date){
+  currentDate = date;
+  viewMode = 'dia';
+  refreshPanel();
+}
+
+function renderViewToggle(container){
+  const toggle = el('div', { class:'view-toggle' });
+  [['dia','Dia'],['semana','Semana'],['mes','Mês'],['ano','Ano']].forEach(([key,label]) => {
+    const btn = el('button', { class: viewMode===key?'active':'' }, document.createTextNode(label));
+    btn.onclick = () => { viewMode = key; refreshPanel(); };
+    toggle.appendChild(btn);
+  });
+  container.appendChild(toggle);
+}
+
+function renderNavBar(container, label, onPrev, onNext){
+  const bar = el('div', { class:'nav-bar' });
+  const prevBtn = el('button', {}, document.createTextNode('‹'));
+  prevBtn.onclick = onPrev;
+  const nextBtn = el('button', {}, document.createTextNode('›'));
+  nextBtn.onclick = onNext;
+  bar.appendChild(prevBtn);
+  bar.appendChild(el('div', { class:'period-label' }, document.createTextNode(label)));
+  bar.appendChild(nextBtn);
+  container.appendChild(bar);
+  const todayBtn = el('div', { class:'today-btn' }, document.createTextNode('Hoje'));
+  todayBtn.onclick = () => { currentDate = new Date(); refreshPanel(); };
+  container.appendChild(todayBtn);
+}
+
+function renderAgenda(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Agenda')));
+  renderViewToggle(container);
+  renderFiltroProfissional(container);
+
+  if(viewMode === 'dia') renderViewDia(container);
+  else if(viewMode === 'semana') renderViewSemana(container);
+  else if(viewMode === 'mes') renderViewMes(container);
+  else renderViewAno(container);
+}
+
+function renderViewDia(container){
+  const dateISO = toISO(currentDate);
+  const label = DIAS_SEMANA_LONGO[(currentDate.getDay()+6)%7] + ', ' + currentDate.getDate() + ' de ' + MESES_PT[currentDate.getMonth()] + ' de ' + currentDate.getFullYear();
+  renderNavBar(container, label, () => { currentDate = addDays(currentDate,-1); refreshPanel(); }, () => { currentDate = addDays(currentDate,1); refreshPanel(); });
+
+  if(novaConsultaAberta){
+    const nova = { id: uid(), profissionalId: filtroProfissionalId||'', data: dateISO, horaInicio:'', paciente:'', telefone:'', procedimento:'', status:'agendado', obs:'' };
+    if(window._pacientePreSelecionado){
+      nova.paciente = window._pacientePreSelecionado.nome || '';
+      nova.pacienteId = window._pacientePreSelecionado.id;
+      nova.telefone = window._pacientePreSelecionado.telefone || '';
+    }
+    renderConsultaForm(container, nova, dateISO,
+      () => { state.consultas.push(nova); novaConsultaAberta=false; saveProgress(); refreshPanel(); toast('Consulta agendada!'); },
+      () => { novaConsultaAberta=false; refreshPanel(); }
+    );
+  } else if(state.profissionais.length) {
+    const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Nova consulta neste dia'));
+    addBtn.onclick = () => { novaConsultaAberta = true; refreshPanel(); };
+    container.appendChild(addBtn);
+  }
+
+  const bloqueios = bloqueiosDoDia(dateISO, filtroProfissionalId);
+  const consultas = consultasDoDia(dateISO, filtroProfissionalId);
+
+  if(bloqueios.length || consultas.length){
+    const pdfBtn = el('div', { class:'add-row-btn', style:'background:var(--green);color:#fff;border:none;margin-bottom:0;' },
+      document.createTextNode('📄 Gerar PDF da agenda deste dia'));
+    pdfBtn.onclick = () => generateAgendaDiaPDF(dateISO);
+    container.appendChild(pdfBtn);
+  }
+
+  const listWrap = el('div', { style:'margin-top:14px;' });
+  container.appendChild(listWrap);
+
+  if(!bloqueios.length && !consultas.length && !novaConsultaAberta){
+    listWrap.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhuma consulta ou bloqueio neste dia.')));
+    return;
+  }
+
+  bloqueios.forEach(b => renderItemBloqueio(listWrap, b));
+
+  // Quando o filtro está em "Todos" e há mais de um profissional, mostra a agenda em colunas lado a lado
+  // (uma coluna por profissional), funcionando como a agenda geral da clínica.
+  if(!filtroProfissionalId && state.profissionais.length > 1){
+    const colunas = el('div', { class:'dia-colunas' });
+    let consultaEmEdicaoNestaVisao = null;
+
+    state.profissionais.forEach(prof => {
+      const doProf = consultas.filter(c => c.profissionalId === prof.id);
+      const coluna = el('div', { class:'dia-coluna', style:'border-top:4px solid '+prof.cor+';' });
+      const header = el('div', { class:'dia-coluna-header' });
+      header.appendChild(el('span', { class:'nome' }, document.createTextNode(prof.nome)));
+      header.appendChild(el('span', { class:'count' }, document.createTextNode(String(doProf.length))));
+      coluna.appendChild(header);
+
+      if(!doProf.length){
+        coluna.appendChild(el('div', { class:'mini-empty' }, document.createTextNode('Sem consultas.')));
+      } else {
+        doProf.forEach(c => {
+          if(consultaEmEdicao === c.id){
+            consultaEmEdicaoNestaVisao = c;
+            const placeholder = el('div', { class:'mini-card', style:'background:var(--blue-head);text-align:center;font-weight:700;color:var(--blue-dark);' },
+              document.createTextNode('✎ Editando abaixo ↓'));
+            coluna.appendChild(placeholder);
+            return;
+          }
+          const mini = el('div', { class:'mini-card' });
+          mini.appendChild(el('div', { class:'mc-hora' }, document.createTextNode((c.horaInicio||'--:--')+' — '+(c.paciente||'(sem nome)'))));
+          if(c.procedimento) mini.appendChild(el('div', { class:'mc-sub' }, document.createTextNode(c.procedimento)));
+          mini.appendChild(el('div', { style:'margin-top:4px;' }, [
+            el('span', { class:'badge status-'+c.status, style:'font-size:10px;padding:2px 7px;' }, document.createTextNode(STATUS_LABELS[c.status]||'Agendado'))
+          ]));
+          const actions = el('div', { class:'mc-actions' });
+          const editIcon = el('span', { style:'color:var(--blue-dark);' }, document.createTextNode('✎'));
+          editIcon.onclick = (e) => { e.stopPropagation(); consultaEmEdicao = c.id; refreshPanel(); };
+          const delIcon = el('span', { style:'color:var(--red);' }, document.createTextNode('✕'));
+          delIcon.onclick = (e) => {
+            e.stopPropagation();
+            if(confirm('Excluir esta consulta?')){
+              state.consultas = state.consultas.filter(x=>x.id!==c.id);
+              saveProgress(); refreshPanel(); toast('Consulta excluída.');
+            }
+          };
+          actions.appendChild(editIcon);
+          actions.appendChild(delIcon);
+          mini.appendChild(actions);
+          coluna.appendChild(mini);
+        });
+      }
+      colunas.appendChild(coluna);
+    });
+    listWrap.appendChild(colunas);
+
+    const semProfissional = consultas.filter(c => !getProfissional(c.profissionalId));
+    semProfissional.forEach(c => {
+      if(consultaEmEdicao === c.id) consultaEmEdicaoNestaVisao = c;
+      else renderItemConsulta(listWrap, c);
+    });
+
+    if(consultaEmEdicaoNestaVisao){
+      const editWrap = el('div', { style:'margin-top:14px;' });
+      listWrap.appendChild(editWrap);
+      renderConsultaForm(editWrap, consultaEmEdicaoNestaVisao, dateISO,
+        () => { consultaEmEdicao=null; saveProgress(); refreshPanel(); toast('Consulta atualizada!'); },
+        () => { consultaEmEdicao=null; refreshPanel(); }
+      );
+    }
+  } else {
+    consultas.forEach(c => {
+      if(consultaEmEdicao === c.id){
+        renderConsultaForm(listWrap, c, dateISO,
+          () => { consultaEmEdicao=null; saveProgress(); refreshPanel(); toast('Consulta atualizada!'); },
+          () => { consultaEmEdicao=null; refreshPanel(); }
+        );
+      } else {
+        renderItemConsulta(listWrap, c);
+      }
+    });
+  }
+}
+
+function renderViewSemana(container){
+  const monday = getMonday(currentDate);
+  const sunday = addDays(monday,6);
+  const label = monday.getDate()+' '+MESES_PT[monday.getMonth()].slice(0,3)+' — '+sunday.getDate()+' '+MESES_PT[sunday.getMonth()].slice(0,3)+' de '+sunday.getFullYear();
+  renderNavBar(container, label, () => { currentDate = addDays(currentDate,-7); refreshPanel(); }, () => { currentDate = addDays(currentDate,7); refreshPanel(); });
+
+  const pdfBtn = el('div', { class:'add-row-btn', style:'background:var(--green);color:#fff;border:none;margin-bottom:16px;' },
+    document.createTextNode('📄 Gerar PDF da agenda desta semana'));
+  pdfBtn.onclick = () => generateAgendaSemanaPDF(monday);
+  container.appendChild(pdfBtn);
+
+  for(let i=0;i<7;i++){
+    const dia = addDays(monday, i);
+    const dateISO = toISO(dia);
+    const consultas = consultasDoDia(dateISO, filtroProfissionalId);
+    const bloqueios = bloqueiosDoDia(dateISO, filtroProfissionalId);
+    const section = el('div', { class:'week-day-section' });
+    const isToday = toISO(new Date()) === dateISO;
+    const header = el('div', { class:'week-day-header', style: isToday ? 'border:1.5px solid var(--blue-dark);' : '' });
+    header.appendChild(el('span', { class:'wd-title' }, document.createTextNode(DIAS_SEMANA_CURTO[i]+' '+dia.getDate()+'/'+(dia.getMonth()+1))));
+    header.appendChild(el('span', { class:'wd-count' }, document.createTextNode(consultas.length+' consulta(s)')));
+    header.onclick = () => irParaDia(dia);
+    section.appendChild(header);
+    if(!consultas.length && !bloqueios.length){
+      section.appendChild(el('div', { style:'font-size:12px;color:var(--muted);padding:0 4px;' }, document.createTextNode('Sem agendamentos.')));
+    } else {
+      bloqueios.forEach(b => {
+        section.appendChild(el('div', { style:'font-size:12px;color:var(--amber);padding:2px 4px;font-weight:700;' },
+          document.createTextNode('🚫 '+(b.motivo||'Bloqueio'))));
+      });
+      consultas.forEach(c => {
+        const prof = getProfissional(c.profissionalId);
+        const line = el('div', { style:'display:flex;align-items:center;gap:6px;padding:4px;font-size:12.5px;cursor:pointer;' });
+        line.appendChild(el('span', { class:'color-dot', style:'background:'+(prof?prof.cor:'#999')+';' }));
+        line.appendChild(document.createTextNode((c.horaInicio||'--:--')+' '+(c.paciente||'')+(prof?(' ('+prof.nome+')'):'')));
+        line.onclick = () => { consultaEmEdicao = c.id; irParaDia(dia); };
+        section.appendChild(line);
+      });
+    }
+    container.appendChild(section);
+  }
+}
+
+function renderViewMes(container){
+  const year = currentDate.getFullYear(), month = currentDate.getMonth();
+  const label = MESES_PT[month] + ' de ' + year;
+  renderNavBar(container, label, () => { currentDate = addMonths(currentDate,-1); refreshPanel(); }, () => { currentDate = addMonths(currentDate,1); refreshPanel(); });
+
+  const grid = el('div', { class:'month-grid' });
+  DIAS_SEMANA_CURTO.forEach(d => grid.appendChild(el('div', { class:'month-weekday' }, document.createTextNode(d))));
+
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = (firstOfMonth.getDay()+6)%7; // segunda=0
+  const gridStart = addDays(firstOfMonth, -startOffset);
+  const todayISO = toISO(new Date());
+
+  const LIMITE_VISIVEL = 3;
+  for(let i=0;i<42;i++){
+    const dia = addDays(gridStart, i);
+    const dateISO = toISO(dia);
+    const outside = dia.getMonth() !== month;
+    const consultasDia = consultasDoDia(dateISO, filtroProfissionalId);
+    const cell = el('div', { class:'month-cell'+(outside?' outside':'')+(dateISO===todayISO?' today':'') });
+    cell.appendChild(el('div', { class:'day-num' }, document.createTextNode(String(dia.getDate()))));
+    consultasDia.slice(0, LIMITE_VISIVEL).forEach(c => {
+      const prof = getProfissional(c.profissionalId);
+      const texto = (c.horaInicio||'--:--') + ' ' + (c.paciente||'') + (prof ? (' — '+prof.nome) : '');
+      cell.appendChild(el('div', { class:'evt-bar', style:'background:'+(prof?prof.cor:'#999')+';', title:texto }, document.createTextNode(texto)));
+    });
+    if(consultasDia.length > LIMITE_VISIVEL){
+      cell.appendChild(el('div', { class:'evt-more' }, document.createTextNode('+'+(consultasDia.length-LIMITE_VISIVEL)+' mais')));
+    }
+    cell.onclick = () => irParaDia(dia);
+    grid.appendChild(cell);
+    if(i===41) break;
+    // limita a 5 ou 6 semanas conforme necessário
+    if(i>=34 && (i+1)%7===0){
+      const proximaSemanaInicio = addDays(gridStart, i+1);
+      if(proximaSemanaInicio.getMonth() !== month) break;
+    }
+  }
+  container.appendChild(grid);
+}
+
+function renderViewAno(container){
+  const year = currentDate.getFullYear();
+  renderNavBar(container, String(year), () => { currentDate = addYears(currentDate,-1); refreshPanel(); }, () => { currentDate = addYears(currentDate,1); refreshPanel(); });
+
+  const grid = el('div', { class:'year-grid' });
+  for(let m=0;m<12;m++){
+    let count = 0;
+    const daysInThisMonth = new Date(year, m+1, 0).getDate();
+    for(let d=1; d<=daysInThisMonth; d++){
+      const dateISO = year+'-'+pad2(m+1)+'-'+pad2(d);
+      count += contagemDoDia(dateISO, filtroProfissionalId);
+    }
+    const card = el('div', { class:'year-card' });
+    card.appendChild(el('div', { class:'month-name' }, document.createTextNode(MESES_PT[m])));
+    card.appendChild(el('div', { class:'month-count' }, document.createTextNode(String(count))));
+    card.appendChild(el('div', { class:'month-count-label' }, document.createTextNode('consulta(s)')));
+    card.onclick = () => { currentDate = new Date(year, m, 1); viewMode = 'mes'; refreshPanel(); };
+    grid.appendChild(card);
+  }
+  container.appendChild(grid);
+}
+
+// ============ RENDER: BLOQUEIOS ============
+let novoBloqueioAberto = false;
+
+function renderBloqueioForm(container, bloqueio, onSalvar, onCancelar){
+  const form = el('div', { class:'card', style:'border-color:var(--blue-dark);' });
+
+  const profField = el('div', { class:'field' });
+  profField.appendChild(el('label', {}, document.createTextNode('Profissional')));
+  const profSelect = el('select', {});
+  profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Todos os profissionais')));
+  state.profissionais.forEach(p => {
+    const opt = el('option', { value:p.id }, document.createTextNode(p.nome));
+    if(bloqueio.profissionalId === p.id) opt.setAttribute('selected','selected');
+    profSelect.appendChild(opt);
+  });
+  profSelect.onchange = (e) => { bloqueio.profissionalId = e.target.value; };
+  profField.appendChild(profSelect);
+  form.appendChild(profField);
+
+  const motivoField = el('div', { class:'field' });
+  motivoField.appendChild(el('label', {}, document.createTextNode('Motivo')));
+  const motivoInput = el('input', { type:'text', value: bloqueio.motivo||'', list:'motivosList', placeholder:'Ex: Almoço, Feriado, Folga...' });
+  motivoInput.oninput = (e) => { bloqueio.motivo = e.target.value; };
+  motivoField.appendChild(motivoInput);
+  form.appendChild(motivoField);
+
+  const row1 = el('div', { class:'row' });
+  const diField = el('div', { class:'field' });
+  diField.appendChild(el('label', {}, document.createTextNode('Data início')));
+  const diInput = el('input', { type:'date', value: bloqueio.dataInicio||toISO(new Date()) });
+  diInput.oninput = (e) => { bloqueio.dataInicio = e.target.value; };
+  diField.appendChild(diInput);
+  row1.appendChild(diField);
+
+  const dfField = el('div', { class:'field' });
+  dfField.appendChild(el('label', {}, document.createTextNode('Data fim (opcional)')));
+  const dfInput = el('input', { type:'date', value: bloqueio.dataFim||'' });
+  dfInput.oninput = (e) => { bloqueio.dataFim = e.target.value; };
+  dfField.appendChild(dfInput);
+  row1.appendChild(dfField);
+  form.appendChild(row1);
+
+  const row2 = el('div', { class:'row' });
+  const hiField = el('div', { class:'field' });
+  hiField.appendChild(el('label', {}, document.createTextNode('Hora início (opcional)')));
+  const hiInput = el('input', { type:'time', value: bloqueio.horaInicio||'' });
+  hiInput.oninput = (e) => { bloqueio.horaInicio = e.target.value; };
+  hiField.appendChild(hiInput);
+  row2.appendChild(hiField);
+
+  const hfField = el('div', { class:'field' });
+  hfField.appendChild(el('label', {}, document.createTextNode('Hora fim (opcional)')));
+  const hfInput = el('input', { type:'time', value: bloqueio.horaFim||'' });
+  hfInput.oninput = (e) => { bloqueio.horaFim = e.target.value; };
+  hfField.appendChild(hfInput);
+  row2.appendChild(hfField);
+  form.appendChild(row2);
+  form.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:-8px;' },
+    document.createTextNode('Deixe as horas em branco para bloquear o dia inteiro. Preencha "Data fim" para bloquear um período (ex: férias).')));
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' },
+    document.createTextNode('Salvar bloqueio'));
+  salvarBtn.onclick = () => {
+    if(!bloqueio.dataInicio){ alert('Informe a data de início.'); return; }
+    if(!(bloqueio.motivo||'').trim()){ alert('Informe o motivo do bloqueio.'); return; }
+    onSalvar();
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = onCancelar;
+  btnRow.appendChild(salvarBtn);
+  btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+  container.appendChild(form);
+}
+
+function renderBloqueios(container){
+  container.appendChild(el('datalist', { id:'motivosList' }, ['Almoço','Feriado','Folga','Férias','Curso/Congresso','Outro'].map(m=>el('option',{value:m}))));
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Bloqueios de horário')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
+    document.createTextNode('Use para marcar almoço, feriados, folgas ou férias — esses períodos aparecem na agenda como indisponíveis.')));
+
+  if(novoBloqueioAberto){
+    const novo = { id: uid(), profissionalId:'', dataInicio: toISO(new Date()), dataFim:'', horaInicio:'', horaFim:'', motivo:'' };
+    renderBloqueioForm(container, novo,
+      () => { state.bloqueios.push(novo); novoBloqueioAberto=false; saveProgress(); refreshPanel(); toast('Bloqueio adicionado!'); },
+      () => { novoBloqueioAberto=false; refreshPanel(); }
+    );
+  } else {
+    const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Novo bloqueio'));
+    addBtn.onclick = () => { novoBloqueioAberto = true; refreshPanel(); };
+    container.appendChild(addBtn);
+  }
+
+  if(!state.bloqueios.length){
+    container.appendChild(el('div', { class:'empty-hint', style:'margin-top:14px;' }, document.createTextNode('Nenhum bloqueio cadastrado ainda.')));
+    return;
+  }
+
+  const ordenados = [...state.bloqueios].sort((a,b) => (a.dataInicio||'').localeCompare(b.dataInicio||''));
+  ordenados.forEach(b => {
+    const prof = b.profissionalId ? getProfissional(b.profissionalId) : null;
+    const card = el('div', { class:'card' });
+    const top = el('div', { class:'card-top' });
+    const info = el('div', {});
+    const periodoTxt = b.dataFim && b.dataFim !== b.dataInicio ?
+      (formatDateBR(b.dataInicio)+' a '+formatDateBR(b.dataFim)) : formatDateBR(b.dataInicio);
+    info.appendChild(el('div', { class:'card-title' }, document.createTextNode('🚫 '+(b.motivo||'Bloqueio'))));
+    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(periodoTxt + ((b.horaInicio||b.horaFim) ? (' • '+(b.horaInicio||'')+(b.horaFim?(' às '+b.horaFim):'')) : ' • Dia inteiro'))));
+    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(prof ? prof.nome : 'Todos os profissionais')));
+    top.appendChild(info);
+    const actions = el('div', { class:'card-actions' });
+    const delIcon = el('span', { style:'color:var(--red);' }, document.createTextNode('✕ Excluir'));
+    delIcon.onclick = () => {
+      if(confirm('Excluir este bloqueio?')){
+        state.bloqueios = state.bloqueios.filter(x=>x.id!==b.id);
+        saveProgress(); refreshPanel(); toast('Bloqueio excluído.');
+      }
+    };
+    actions.appendChild(delIcon);
+    top.appendChild(actions);
+    card.appendChild(top);
+    container.appendChild(card);
+  });
+}
+
+// ============ GERAÇÃO DE PDF DA AGENDA ============
+function pdfSetup(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  return doc;
+}
+const PDF_COLORS = {
+  BLUE:[31,92,139], BLUEHEAD:[214,231,243], BLUELIGHT:[239,246,251],
+  LINECOL:[155,187,212], INK:[26,26,26], MUTED:[91,107,122],
+  RED:[192,57,43], AMBER:[201,138,31], GREEN:[46,139,87]
+};
+function statusColorPdf(status){
+  if(status==='confirmado') return PDF_COLORS.GREEN;
+  if(status==='faltou' || status==='cancelado') return PDF_COLORS.RED;
+  return PDF_COLORS.BLUE;
+}
+
+function drawAgendaHeader(doc, pageW, marginX, y, titulo, subtitulo){
+  const perfil = window._clinicaPerfil;
+  if(perfil && (perfil.nome || perfil.logo)){
+    if(perfil.logo){
+      try{
+        const fmt = perfil.logo.includes('image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(perfil.logo, fmt, marginX, y-14, 30, 30);
+      }catch(e){}
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...PDF_COLORS.MUTED);
+    doc.text(perfil.nome || '', marginX + (perfil.logo?36:0), y);
+    y += 16;
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...PDF_COLORS.BLUE);
+  doc.text(titulo, marginX, y);
+  y += 18;
+  if(subtitulo){
+    doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...PDF_COLORS.MUTED);
+    doc.text(subtitulo, marginX, y);
+    y += 16;
+  }
+  doc.setDrawColor(...PDF_COLORS.BLUE); doc.setLineWidth(1.2);
+  doc.line(marginX, y, pageW-marginX, y);
+  y += 18;
+  return y;
+}
+
+function drawAgendaLista(doc, items, marginX, contentW, pageH, y, ensureSpace, newPage, mostrarProfissional){
+  if(!items.length){
+    doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(...PDF_COLORS.MUTED);
+    doc.text('Nenhuma consulta ou bloqueio.', marginX, y);
+    return y + 20;
+  }
+  items.forEach(item => {
+    const rowH = item.tipo==='bloqueio' ? 22 : (mostrarProfissional ? 34 : 26);
+    ({y} = ensureSpace(rowH+6, y));
+    if(item.tipo==='bloqueio'){
+      doc.setFillColor(...[255,251,242]);
+      doc.setDrawColor(...PDF_COLORS.AMBER);
+      doc.rect(marginX, y, contentW, rowH, 'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...PDF_COLORS.AMBER);
+      const periodo = (item.horaInicio||item.horaFim) ? ((item.horaInicio||'--:--')+(item.horaFim?(' às '+item.horaFim):'')) : 'Dia inteiro';
+      doc.text('🚫 ' + (item.motivo||'Bloqueio') + ' — ' + periodo, marginX+8, y+14);
+      y += rowH + 6;
+      return;
+    }
+    doc.setFillColor(...PDF_COLORS.BLUELIGHT);
+    doc.setDrawColor(...PDF_COLORS.LINECOL);
+    doc.rect(marginX, y, contentW, rowH, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(...PDF_COLORS.INK);
+    doc.text((item.horaInicio||'--:--') + '   ' + (item.paciente||'(sem nome)'), marginX+8, y+14);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...PDF_COLORS.MUTED);
+    const linha2 = [mostrarProfissional ? item.profissionalNome : null, item.procedimento].filter(Boolean).join(' • ');
+    if(linha2) doc.text(linha2, marginX+8, y+(mostrarProfissional?26:22));
+    const statusColor = statusColorPdf(item.status);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...statusColor);
+    doc.text((STATUS_LABELS[item.status]||'Agendado').toUpperCase(), marginX+contentW-90, y+14, { align:'left' });
+    y += rowH + 6;
+  });
+  return y;
+}
+
+function montarItensDoDia(dateISO, profissionalFiltro){
+  const bloqueios = bloqueiosDoDia(dateISO, profissionalFiltro).map(b => Object.assign({tipo:'bloqueio'}, b));
+  const consultas = consultasDoDia(dateISO, profissionalFiltro).map(c => {
+    const prof = getProfissional(c.profissionalId);
+    return Object.assign({tipo:'consulta', profissionalNome: prof?prof.nome:'(profissional removido)'}, c);
+  });
+  return { bloqueios, consultas };
+}
+
+function generateAgendaDiaPDF(dateISO){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+  const doc = pdfSetup();
+  const pageW = 595.28, pageH = 841.89, marginX = 40, contentW = pageW - marginX*2;
+  let y = 40;
+  function newPage(){ doc.addPage(); desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil); return 40; }
+  function ensureSpace(needed, yCur){ if(yCur + needed > pageH - 50){ return { y: newPage() }; } return { y: yCur }; }
+  desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil);
+
+  const dataObj = parseISO(dateISO);
+  const dataLabel = DIAS_SEMANA_LONGO[(dataObj.getDay()+6)%7] + ', ' + dataObj.getDate() + ' de ' + MESES_PT[dataObj.getMonth()] + ' de ' + dataObj.getFullYear();
+  const prof = filtroProfissionalId ? getProfissional(filtroProfissionalId) : null;
+
+  y = drawAgendaHeader(doc, pageW, marginX, y+20,
+    prof ? ('Agenda de '+prof.nome) : 'Agenda geral da clínica',
+    dataLabel
+  );
+
+  const { bloqueios, consultas } = montarItensDoDia(dateISO, filtroProfissionalId);
+
+  if(!filtroProfissionalId && state.profissionais.length > 1){
+    y = drawAgendaLista(doc, bloqueios, marginX, contentW, pageH, y, ensureSpace, newPage, false);
+    state.profissionais.forEach(p => {
+      const doProf = consultas.filter(c => c.profissionalId === p.id);
+      if(!doProf.length) return;
+      ({y} = ensureSpace(26, y));
+      doc.setFont('helvetica','bold'); doc.setFontSize(11.5); doc.setTextColor(...PDF_COLORS.BLUE);
+      doc.text(p.nome + ' — ' + doProf.length + ' consulta(s)', marginX, y+12);
+      y += 22;
+      y = drawAgendaLista(doc, doProf, marginX, contentW, pageH, y, ensureSpace, newPage, false);
+    });
+    const semProf = consultas.filter(c => !getProfissional(c.profissionalId));
+    if(semProf.length) y = drawAgendaLista(doc, semProf, marginX, contentW, pageH, y, ensureSpace, newPage, true);
+  } else {
+    const todosItens = [...bloqueios, ...consultas].sort((a,b) => (a.horaInicio||'').localeCompare(b.horaInicio||''));
+    y = drawAgendaLista(doc, todosItens, marginX, contentW, pageH, y, ensureSpace, newPage, false);
+  }
+
+  const sufixo = prof ? prof.nome.trim().replace(/\s+/g,'_') : 'geral';
+  doc.save('agenda_'+dateISO+'_'+sufixo+'.pdf');
+  toast('PDF da agenda gerado com sucesso!');
+}
+
+function generateAgendaSemanaPDF(mondayDate){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+  const doc = pdfSetup();
+  const pageW = 595.28, pageH = 841.89, marginX = 40, contentW = pageW - marginX*2;
+  let y = 40;
+  function newPage(){ doc.addPage(); desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil); return 40; }
+  function ensureSpace(needed, yCur){ if(yCur + needed > pageH - 50){ return { y: newPage() }; } return { y: yCur }; }
+  desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil);
+
+  const sunday = addDays(mondayDate, 6);
+  const prof = filtroProfissionalId ? getProfissional(filtroProfissionalId) : null;
+  const periodoLabel = mondayDate.getDate()+' de '+MESES_PT[mondayDate.getMonth()]+' a '+sunday.getDate()+' de '+MESES_PT[sunday.getMonth()]+' de '+sunday.getFullYear();
+
+  y = drawAgendaHeader(doc, pageW, marginX, y+20,
+    prof ? ('Agenda semanal de '+prof.nome) : 'Agenda semanal geral da clínica',
+    periodoLabel
+  );
+
+  for(let i=0;i<7;i++){
+    const dia = addDays(mondayDate, i);
+    const dateISO = toISO(dia);
+    const { bloqueios, consultas } = montarItensDoDia(dateISO, filtroProfissionalId);
+    if(!bloqueios.length && !consultas.length) continue;
+    ({y} = ensureSpace(30, y));
+    doc.setFont('helvetica','bold'); doc.setFontSize(11.5); doc.setTextColor(...PDF_COLORS.BLUE);
+    doc.text(DIAS_SEMANA_LONGO[i] + ' — ' + pad2(dia.getDate())+'/'+pad2(dia.getMonth()+1), marginX, y+12);
+    y += 22;
+    const todosItens = [...bloqueios, ...consultas].sort((a,b) => (a.horaInicio||'').localeCompare(b.horaInicio||''));
+    y = drawAgendaLista(doc, todosItens, marginX, contentW, pageH, y, ensureSpace, newPage, !filtroProfissionalId);
+    y += 6;
+  }
+
+  const sufixo = prof ? prof.nome.trim().replace(/\s+/g,'_') : 'geral';
+  doc.save('agenda_semana_'+toISO(mondayDate)+'_'+sufixo+'.pdf');
+  toast('PDF da agenda semanal gerado com sucesso!');
+}
+
+// ============ NAVEGAÇÃO PRINCIPAL ============
+function renderNav(){
+  const nav = document.getElementById('stepsNav');
+  nav.innerHTML = '';
+  STEPS.forEach((label, i) => {
+    const btn = el('button', { class: i===currentStep?'active':'' }, document.createTextNode(label));
+    btn.onclick = () => { currentStep = i; renderPanel(i); };
+    nav.appendChild(btn);
+  });
+}
+function renderPanel(stepIndex, opts={}){
+  currentStep = stepIndex;
+  renderNav();
+  const main = document.getElementById('main');
+  const scrollY = window.scrollY;
+  main.innerHTML = '';
+  const renderers = [renderProfissionais, renderAgenda, renderBloqueios];
+  renderers[stepIndex](main);
+  // Nas visões de mês e ano, a grade é mais larga (7 colunas) — aproveita mais a tela.
+  main.classList.toggle('wide', stepIndex === 1 && (viewMode === 'mes' || viewMode === 'ano'));
+  if(opts.keepScroll){ window.scrollTo(0, scrollY); } else { window.scrollTo(0,0); }
+}
+function refreshPanel(){ renderPanel(currentStep, { keepScroll:true }); }
+
+// ============ INICIALIZAÇÃO ============
+(async function iniciarAgendamento(){
+  window._clinicaPerfil = await aplicarIdentidadeClinica();
+  await carregarFinanceiroProfissionaisCache();
+  if(window._clinicaCorPrimariaRGB){
+    PDF_COLORS.BLUE = window._clinicaCorPrimariaRGB;
+    PDF_COLORS.BLUEHEAD = window.clarearCor(PDF_COLORS.BLUE, 0.85);
+    PDF_COLORS.BLUELIGHT = window.clarearCor(PDF_COLORS.BLUE, 0.93);
+  }
+  await clinicaInitPacientes();
+  await loadProgress();
+  await carregarProfissionaisCompartilhados();
+  const params = new URLSearchParams(window.location.search);
+  const pacienteId = params.get('paciente');
+  if(pacienteId){
+    window._pacientePreSelecionado = clinicaFindPacienteById(pacienteId) || null;
+    if(window._pacientePreSelecionado){
+      novaConsultaAberta = true;
+      viewMode = 'dia';
+    }
+  }
+  renderPanel(currentStep);
+})();
+</script>
+</body>
+</html>

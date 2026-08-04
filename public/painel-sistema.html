@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Painel do Sistema — Zelo</title>
+<style>
+  :root{
+    --dark:#0F172A; --card:#161F35; --accent:#E23FD1; --accent2:#22E0D0; --line:rgba(148,163,184,0.14); --muted:#94A3B8;
+    --bg:#080D1A; --green:#34D399; --red:#FF6B6B; --amber:#FBBF24;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Arial,Helvetica,sans-serif; background:
+    radial-gradient(900px 500px at 100% -10%, rgba(226,63,209,0.10), transparent 60%),
+    radial-gradient(800px 500px at -10% 0%, rgba(34,224,208,0.08), transparent 55%),
+    var(--bg); color:#F1F5F9; -webkit-tap-highlight-color:transparent; letter-spacing:-0.011em;}
+  header.topbar{
+    background:linear-gradient(135deg, #241259 0%, #4B2AA8 55%, #17123f 100%);
+    padding:22px 20px; display:flex;
+    align-items:center; justify-content:space-between;
+    box-shadow:0 8px 30px -8px rgba(36,18,89,0.5);
+  }
+  header.topbar h1{font-size:20px; margin:0; color:#fff; font-weight:750; letter-spacing:-0.02em;}
+  header.topbar p{margin:3px 0 0; font-size:12px; color:rgba(255,255,255,0.75);}
+  #sairBtn{color:#FF9B9B; font-weight:600; cursor:pointer; font-size:12.5px; padding:8px 12px; border-radius:10px; background:rgba(255,107,107,0.12);}
+
+  main{max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto; padding:24px 16px 50px;}
+  .section-title{font-size:11.5px; font-weight:650; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:28px 0 12px; opacity:0.85;}
+  .section-title:first-child{margin-top:0;}
+
+  .summary-row{display:flex; gap:12px; margin-bottom:6px; flex-wrap:wrap;}
+  .summary-card{flex:1; min-width:120px; background:var(--card); border-radius:18px; padding:16px; text-align:center;
+    box-shadow:0 1px 2px rgba(0,0,0,0.2), 0 8px 24px -6px rgba(0,0,0,0.4);}
+  .summary-num{font-size:24px; font-weight:750; color:#fff; letter-spacing:-0.02em;}
+  .summary-label{font-size:9.5px; color:var(--muted); font-weight:650; text-transform:uppercase; margin-top:3px; letter-spacing:.04em;}
+
+  .clinica-card{background:var(--card); border-radius:18px; padding:18px; margin-bottom:12px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.2), 0 8px 24px -6px rgba(0,0,0,0.4);
+    transition:box-shadow .18s ease, transform .18s ease;}
+  .clinica-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .clinica-nome{font-size:16px; font-weight:700; color:#fff; letter-spacing:-0.01em;}
+  .clinica-sub{font-size:11.5px; color:var(--muted); margin-top:3px;}
+  .badge{display:inline-block; padding:4px 11px; border-radius:20px; font-size:10.5px; font-weight:650; margin-top:8px; margin-right:6px;}
+  .badge.ativa{background:rgba(52,211,153,0.15); color:var(--green);}
+  .badge.inativa{background:rgba(255,107,107,0.15); color:var(--red);}
+  .badge.status-teste{background:rgba(251,191,36,0.15); color:var(--amber);}
+  .badge.status-ativa{background:rgba(52,211,153,0.15); color:var(--green);}
+  .badge.status-atrasada{background:rgba(251,191,36,0.15); color:var(--amber);}
+  .badge.status-cancelada{background:rgba(255,107,107,0.15); color:var(--red);}
+
+  .campos{display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);}
+  .campos.show{display:block;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:11.5px; font-weight:650; margin-bottom:6px; color:#CBD5E1;}
+  .field input, .field select{
+    width:100%; padding:11px; font-size:14px; border:1.5px solid transparent; border-radius:12px; font-family:inherit;
+    background:rgba(148,163,184,0.10); color:#fff; transition:background .15s, box-shadow .15s;
+  }
+  .field input:focus, .field select:focus{ background:rgba(148,163,184,0.16); box-shadow:0 0 0 3px rgba(34,224,208,0.25); outline:none; }
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:130px;}
+  .btn{padding:11px 16px; border:none; border-radius:12px; font-weight:650; font-size:12.5px; cursor:pointer; text-align:center; transition:transform .12s, filter .12s;}
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:linear-gradient(135deg, var(--accent2), #2C4BFF); color:#fff; box-shadow:0 4px 14px -2px rgba(34,224,208,0.35);}
+  .btn-toggle{background:rgba(148,163,184,0.1); color:#CBD5E1;}
+  .btn-danger{background:rgba(255,107,107,0.12); color:var(--red);}
+  .btn-ok{background:rgba(52,211,153,0.14); color:var(--green);}
+  .empty-hint{text-align:center; padding:34px; color:var(--muted); font-size:13px; border:1.5px dashed rgba(148,163,184,0.22); border-radius:16px;}
+  .search-input{width:100%; padding:13px; font-size:15px; border:1.5px solid transparent; border-radius:14px; font-family:inherit; background:var(--card); color:#fff; margin-bottom:16px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.2), 0 8px 24px -6px rgba(0,0,0,0.4);}
+  .search-input:focus{ box-shadow:0 0 0 3px rgba(34,224,208,0.25); outline:none; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>🔐 Zelo <span style="font-weight:400;opacity:0.7;">— Painel do Sistema</span></h1>
+    <p>Todas as clínicas cadastradas</p>
+  </div>
+  <span id="sairBtn">Sair</span>
+</header>
+
+<main id="main"></main>
+
+<script>
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function formatDate(ts){ return new Date(ts).toLocaleDateString('pt-BR'); }
+function formatDateISO(str){ if(!str) return ''; const [y,m,d]=str.split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
+
+const STATUS_LABELS = { teste:'Em teste', ativa:'Assinatura ativa', atrasada:'Pagamento atrasado', cancelada:'Cancelada' };
+
+let clinicaExpandida = null;
+let filtro = '';
+let mostrarRestaurar = false;
+
+async function carregarClinicas(){
+  const resp = await fetch('/api/sistema/clinicas', { credentials:'same-origin' });
+  if(resp.status === 401){ window.location.href = '/painel-sistema-login.html'; return []; }
+  const data = await resp.json();
+  return data.clinicas || [];
+}
+
+async function salvarClinica(id, campos){
+  await fetch('/api/sistema/clinicas/' + id, {
+    method:'PUT', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(campos)
+  });
+}
+
+async function render(){
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="empty-hint">Carregando...</div>';
+  const clinicas = await carregarClinicas();
+  main.innerHTML = '';
+
+  const ativas = clinicas.filter(c => c.ativa).length;
+  const atrasadas = clinicas.filter(c => c.assinaturaStatus === 'atrasada').length;
+  const summaryRow = el('div', { class:'summary-row' });
+  summaryRow.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num' }, document.createTextNode(String(clinicas.length))),
+    el('div', { class:'summary-label' }, document.createTextNode('Clínicas'))
+  ]));
+  summaryRow.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num', style:'color:var(--green);' }, document.createTextNode(String(ativas))),
+    el('div', { class:'summary-label' }, document.createTextNode('Ativas'))
+  ]));
+  summaryRow.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num', style:'color:var(--amber);' }, document.createTextNode(String(atrasadas))),
+    el('div', { class:'summary-label' }, document.createTextNode('Pagamento atrasado'))
+  ]));
+  main.appendChild(summaryRow);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Lembretes de retorno (WhatsApp)')));
+  const cardWpp = el('div', { class:'clinica-card' });
+  const statusResp = await fetch('/api/sistema/whatsapp-status', { credentials:'same-origin' });
+  const statusData = await statusResp.json();
+  const badgeWpp = el('span', { class:'badge ' + (statusData.configurado ? 'ativa' : 'status-atrasada') },
+    document.createTextNode(statusData.configurado ? '🟢 API do WhatsApp configurada' : '🟡 Ainda não configurada — envios só simulados'));
+  cardWpp.appendChild(badgeWpp);
+  cardWpp.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin:10px 0 12px;' },
+    document.createTextNode('Para ativar de verdade, configure as variáveis de ambiente WHATSAPP_360DIALOG_API_KEY, WHATSAPP_TEMPLATE_NAME e WHATSAPP_TEMPLATE_LANG no servidor (veja o DEPLOY.md). O sistema verifica sozinho, todo dia, quais clínicas têm o lembrete ativado no Perfil da Clínica delas.')));
+  const testarBtn = el('div', { class:'btn btn-primary' }, document.createTextNode('▶ Testar agora (roda a checagem imediatamente)'));
+  testarBtn.onclick = async () => {
+    testarBtn.textContent = 'Verificando...';
+    const resp = await fetch('/api/sistema/testar-lembretes', { method:'POST', credentials:'same-origin' });
+    const data = await resp.json();
+    testarBtn.textContent = '▶ Testar agora (roda a checagem imediatamente)';
+    if(!resp.ok){ alert(data.erro || 'Erro ao testar.'); return; }
+    const linhas = (data.resumo||[]).map(r => r.clinica + ': ' + (r.erro ? ('erro — '+r.erro) : (r.enviados+' enviado(s) de '+r.verificados+' paciente(s) verificado(s)'))).join('\n');
+    alert('Checagem concluída:\n\n' + (linhas || 'Nenhuma clínica com o lembrete ativado ainda.'));
+  };
+  cardWpp.appendChild(testarBtn);
+  main.appendChild(cardWpp);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Backup dos dados') ));
+  const cardBackup = el('div', { class:'clinica-card' });
+  const statusBackupResp = await fetch('/api/sistema/backup-status', { credentials:'same-origin' });
+  const statusBackupData = await statusBackupResp.json();
+  const badgeBackup = el('span', { class:'badge ' + (statusBackupData.googleConfigurado ? 'ativa' : 'status-atrasada') },
+    document.createTextNode(statusBackupData.googleConfigurado ? '🟢 Backup automático no Google Drive ativado' : '🟡 Backup automático não configurado'));
+  cardBackup.appendChild(badgeBackup);
+  cardBackup.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin:10px 0 14px;' },
+    document.createTextNode('O backup manual (baixar arquivo) sempre funciona, mesmo sem o Google configurado. Para o envio automático diário, configure GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_KEY e GOOGLE_DRIVE_FOLDER_ID no servidor (veja o DEPLOY.md).')));
+
+  const btnRowBackup = el('div', { class:'row' });
+  const baixarBtn = el('div', { class:'btn btn-primary', style:'flex:1;' }, document.createTextNode('⬇ Baixar backup agora (.json)'));
+  baixarBtn.onclick = () => { window.location.href = '/api/sistema/backup-baixar'; };
+  btnRowBackup.appendChild(baixarBtn);
+
+  if(statusBackupData.googleConfigurado){
+    const enviarBtn = el('div', { class:'btn btn-ok', style:'flex:1;' }, document.createTextNode('☁ Enviar para o Google Drive agora'));
+    enviarBtn.onclick = async () => {
+      enviarBtn.textContent = 'Enviando...';
+      const resp = await fetch('/api/sistema/backup-agora', { method:'POST', credentials:'same-origin' });
+      const data = await resp.json();
+      enviarBtn.textContent = '☁ Enviar para o Google Drive agora';
+      if(!resp.ok){ alert(data.erro || 'Não foi possível enviar o backup.'); return; }
+      alert('Backup enviado com sucesso para o Google Drive!');
+    };
+    btnRowBackup.appendChild(enviarBtn);
+  }
+  cardBackup.appendChild(btnRowBackup);
+
+  const restaurarToggle = el('div', { style:'margin-top:14px;font-size:12px;font-weight:700;color:var(--accent2);cursor:pointer;' },
+    document.createTextNode(mostrarRestaurar ? '▾ Ocultar restauração de backup' : '▸ Restaurar um backup (avançado)'));
+  restaurarToggle.onclick = () => { mostrarRestaurar = !mostrarRestaurar; render(); };
+  cardBackup.appendChild(restaurarToggle);
+
+  if(mostrarRestaurar){
+    const avisoRestaurar = el('p', { style:'font-size:11.5px;color:#FF9B9B;margin:10px 0;' },
+      document.createTextNode('⚠ Isso SUBSTITUI todos os dados atuais de todas as clínicas pelos dados do arquivo, e desloga todos os profissionais (inclusive você) — será preciso entrar de novo depois. Não pode ser desfeito. Use somente para recuperação de desastre.'));
+    cardBackup.appendChild(avisoRestaurar);
+    const fileInput = el('input', { type:'file', accept:'.json', style:'color:#CBD5E1;font-size:12px;margin-bottom:10px;' });
+    cardBackup.appendChild(fileInput);
+    const restaurarBtn = el('div', { class:'btn btn-danger' }, document.createTextNode('Restaurar este arquivo'));
+    restaurarBtn.onclick = () => {
+      const arquivo = fileInput.files && fileInput.files[0];
+      if(!arquivo){ alert('Selecione um arquivo de backup (.json) primeiro.'); return; }
+      if(!confirm('Tem certeza? Isso vai substituir TODOS os dados atuais de TODAS as clínicas pelos dados desse arquivo. Essa ação não pode ser desfeita.')) return;
+      const leitor = new FileReader();
+      leitor.onload = async (e) => {
+        try{
+          const conteudo = JSON.parse(e.target.result);
+          const resp = await fetch('/api/sistema/backup-restaurar', {
+            method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(conteudo)
+          });
+          const data = await resp.json();
+          if(!resp.ok){ alert(data.erro || 'Não foi possível restaurar o backup.'); return; }
+          alert('Backup restaurado com sucesso! (' + data.tabelasRestauradas + ' tabelas, ' + data.chavesRestauradas + ' registros de dados)');
+          mostrarRestaurar = false;
+          render();
+        }catch(err){
+          alert('Arquivo inválido: ' + err.message);
+        }
+      };
+      leitor.readAsText(arquivo);
+    };
+    cardBackup.appendChild(restaurarBtn);
+  }
+  main.appendChild(cardBackup);
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Clínicas cadastradas')));
+
+  const searchInput = el('input', { class:'search-input', type:'text', placeholder:'Buscar clínica...', value: filtro });
+  searchInput.oninput = (e) => { filtro = e.target.value; renderLista(); };
+  main.appendChild(searchInput);
+
+  const listWrap = el('div', {});
+  main.appendChild(listWrap);
+
+  function renderLista(){
+    listWrap.innerHTML = '';
+    const termo = filtro.trim().toLowerCase();
+    const filtradas = clinicas.filter(c => !termo || c.nome.toLowerCase().includes(termo));
+    if(!filtradas.length){
+      listWrap.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhuma clínica encontrada.')));
+      return;
+    }
+    filtradas.forEach(c => {
+      const card = el('div', { class:'clinica-card' });
+      const top = el('div', { class:'clinica-top' });
+      const info = el('div', {});
+      info.appendChild(el('div', { class:'clinica-nome' }, document.createTextNode(c.nome)));
+      info.appendChild(el('div', { class:'clinica-sub' }, document.createTextNode(
+        'Criada em ' + formatDate(c.criadoEm) + ' • ' + c.totalProfissionais + ' profissional(is)'
+      )));
+      const badges = el('div', {});
+      badges.appendChild(el('span', { class:'badge ' + (c.ativa?'ativa':'inativa') }, document.createTextNode(c.ativa?'Ativa':'Desativada')));
+      badges.appendChild(el('span', { class:'badge status-'+c.assinaturaStatus }, document.createTextNode(STATUS_LABELS[c.assinaturaStatus]||c.assinaturaStatus)));
+      if(c.assinaturaVencimento) badges.appendChild(el('span', { class:'badge', style:'background:rgba(148,163,184,0.15);color:#CBD5E1;' }, document.createTextNode('Vence em ' + formatDateISO(c.assinaturaVencimento))));
+      info.appendChild(badges);
+      top.appendChild(info);
+
+      const editBtn = el('span', { style:'color:var(--accent2);font-weight:700;cursor:pointer;font-size:12.5px;flex-shrink:0;' },
+        document.createTextNode(clinicaExpandida===c.id ? '✕' : '⚙'));
+      editBtn.onclick = () => { clinicaExpandida = clinicaExpandida===c.id ? null : c.id; renderLista(); };
+      top.appendChild(editBtn);
+      card.appendChild(top);
+
+      if(clinicaExpandida === c.id){
+        const campos = el('div', { class:'campos show' });
+
+        const statusField = el('div', { class:'field' });
+        statusField.appendChild(el('label', {}, document.createTextNode('Status da assinatura')));
+        const statusSelect = el('select', {});
+        Object.keys(STATUS_LABELS).forEach(s => {
+          const opt = el('option', { value:s }, document.createTextNode(STATUS_LABELS[s]));
+          if(c.assinaturaStatus === s) opt.setAttribute('selected','selected');
+          statusSelect.appendChild(opt);
+        });
+        statusSelect.onchange = async (e) => { c.assinaturaStatus = e.target.value; await salvarClinica(c.id, { assinaturaStatus: e.target.value }); renderLista(); };
+        statusField.appendChild(statusSelect);
+        campos.appendChild(statusField);
+
+        const vencField = el('div', { class:'field' });
+        vencField.appendChild(el('label', {}, document.createTextNode('Vencimento da assinatura')));
+        const vencInput = el('input', { type:'date', value: c.assinaturaVencimento||'' });
+        vencInput.onchange = async (e) => { c.assinaturaVencimento = e.target.value; await salvarClinica(c.id, { assinaturaVencimento: e.target.value }); renderLista(); };
+        vencField.appendChild(vencInput);
+        campos.appendChild(vencField);
+
+        const obsField = el('div', { class:'field' });
+        obsField.appendChild(el('label', {}, document.createTextNode('Observações (só você vê)')));
+        const obsInput = el('input', { type:'text', value: c.observacoes||'', placeholder:'Ex: negociando desconto, aguardando NF...' });
+        obsInput.onchange = async (e) => { c.observacoes = e.target.value; await salvarClinica(c.id, { observacoes: e.target.value }); };
+        obsField.appendChild(obsInput);
+        campos.appendChild(obsField);
+
+        const btnRow = el('div', { class:'row' });
+        if(c.ativa){
+          const desativarBtn = el('div', { class:'btn btn-danger', style:'flex:1;' }, document.createTextNode('🚫 Desativar acesso desta clínica'));
+          desativarBtn.onclick = async () => {
+            if(!confirm('Desativar "'+c.nome+'"? Nenhum profissional dela vai conseguir mais entrar no sistema até você reativar.')) return;
+            c.ativa = false; await salvarClinica(c.id, { ativa:false }); renderLista();
+          };
+          btnRow.appendChild(desativarBtn);
+        } else {
+          const ativarBtn = el('div', { class:'btn btn-ok', style:'flex:1;' }, document.createTextNode('✓ Reativar acesso desta clínica'));
+          ativarBtn.onclick = async () => {
+            c.ativa = true; await salvarClinica(c.id, { ativa:true }); renderLista();
+          };
+          btnRow.appendChild(ativarBtn);
+        }
+        campos.appendChild(btnRow);
+
+        const resetBtn = el('div', { class:'btn btn-toggle', style:'margin-top:8px;' }, document.createTextNode('🔑 Gerar nova senha temporária pro administrador'));
+        resetBtn.onclick = async () => {
+          if(!confirm('Isso troca a senha do administrador de "'+c.nome+'" por uma nova, gerada agora. A senha antiga para de funcionar. Continuar?')) return;
+          const resp = await fetch('/api/sistema/resetar-senha-admin/'+c.id, { method:'POST', credentials:'same-origin' });
+          const data = await resp.json();
+          if(!resp.ok){ alert(data.erro || 'Não foi possível gerar a nova senha.'); return; }
+          alert('Nova senha temporária gerada!\n\nE-mail: ' + data.email + '\nSenha: ' + data.novaSenha + '\n\nAnote agora — essa senha não aparece de novo. Passe pro responsável da clínica com segurança, e recomende trocar assim que entrar (🔑 Senha, no canto da tela inicial).');
+        };
+        campos.appendChild(resetBtn);
+
+        card.appendChild(campos);
+      }
+
+      listWrap.appendChild(card);
+    });
+  }
+  renderLista();
+}
+
+document.getElementById('sairBtn').onclick = async () => {
+  await fetch('/api/sistema/logout', { method:'POST', credentials:'same-origin' });
+  window.location.href = '/painel-sistema-login.html';
+};
+
+(async function iniciar(){
+  const meResp = await fetch('/api/sistema/me', { credentials:'same-origin' });
+  if(meResp.status === 401){ window.location.href = '/painel-sistema-login.html'; return; }
+  render();
+})();
+</script>
+</body>
+</html>

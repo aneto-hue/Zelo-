@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Painel do Sistema — Zelo</title>
+<style>
+  :root{
+    --dark:#161F35; --accent:#E23FD1; --line:rgba(148,163,184,0.14); --muted:#94A3B8; --bg:#080D1A; --red:#FF6B6B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Arial,Helvetica,sans-serif;
+    background:
+      radial-gradient(900px 500px at 100% -10%, rgba(226,63,209,0.12), transparent 60%),
+      radial-gradient(800px 500px at -10% 100%, rgba(34,224,208,0.10), transparent 55%),
+      var(--bg);
+    color:#F1F5F9; padding:20px; letter-spacing:-0.011em;
+  }
+  .login-box{
+    width:100%; max-width:380px; background:var(--dark); border-radius:22px;
+    padding:32px 28px; text-align:center;
+    box-shadow:0 1px 2px rgba(0,0,0,0.25), 0 20px 50px -12px rgba(0,0,0,0.55);
+  }
+  .login-box h1{font-size:20px; color:#fff; margin:0 0 4px; font-weight:700; letter-spacing:-0.02em;}
+  .login-box p.sub{font-size:12px; color:var(--muted); margin:0 0 24px;}
+  .field{margin-bottom:16px; text-align:left;}
+  .field label{display:block; font-size:12px; font-weight:650; margin-bottom:6px; color:#CBD5E1;}
+  .field input{
+    width:100%; padding:13px 12px; font-size:15px; border:1.5px solid transparent; border-radius:13px; font-family:inherit;
+    background:rgba(148,163,184,0.10); color:#fff; transition:background .15s, box-shadow .15s;
+  }
+  .field input:focus{outline:none; background:rgba(148,163,184,0.16); box-shadow:0 0 0 3px rgba(226,63,209,0.25);}
+  .entrar-btn{
+    width:100%; padding:14px; border:none; border-radius:13px;
+    background:linear-gradient(135deg, var(--accent), #7B3CE0); color:#fff;
+    font-weight:650; font-size:15px; cursor:pointer; margin-top:8px;
+    box-shadow:0 6px 18px -4px rgba(226,63,209,0.4);
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .entrar-btn:active{ transform:scale(0.98); }
+  .entrar-btn:disabled{opacity:0.6; cursor:default;}
+  .erro-msg{
+    background:rgba(255,107,107,0.12); color:#FF9B9B; border:none; border-radius:12px;
+    padding:11px 14px; font-size:12.5px; margin-bottom:16px; display:none; text-align:left;
+  }
+  .erro-msg.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="login-box">
+  <h1>🔐 Zelo <span style="font-weight:400;opacity:0.7;">— Painel do Sistema</span></h1>
+  <p class="sub">Acesso restrito ao dono/operador do sistema</p>
+
+  <div class="erro-msg" id="erroMsg"></div>
+
+  <div class="field">
+    <label>E-mail</label>
+    <input type="email" id="email" autocomplete="username" />
+  </div>
+  <div class="field">
+    <label>Senha</label>
+    <input type="password" id="senha" autocomplete="current-password" />
+  </div>
+  <button class="entrar-btn" id="entrarBtn">Entrar</button>
+</div>
+
+<script>
+const emailInput = document.getElementById('email');
+const senhaInput = document.getElementById('senha');
+const entrarBtn = document.getElementById('entrarBtn');
+const erroMsg = document.getElementById('erroMsg');
+
+async function tentarLogin(){
+  const email = emailInput.value.trim();
+  const senha = senhaInput.value;
+  if(!email || !senha){
+    erroMsg.textContent = 'Preencha e-mail e senha.';
+    erroMsg.classList.add('show');
+    return;
+  }
+  entrarBtn.disabled = true;
+  entrarBtn.textContent = 'Entrando...';
+  erroMsg.classList.remove('show');
+  try{
+    const resp = await fetch('/api/sistema/login', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, senha })
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      erroMsg.textContent = data.erro || 'Não foi possível entrar.';
+      erroMsg.classList.add('show');
+      entrarBtn.disabled = false;
+      entrarBtn.textContent = 'Entrar';
+      return;
+    }
+    window.location.href = '/painel-sistema.html';
+  }catch(e){
+    erroMsg.textContent = 'Não foi possível conectar ao servidor.';
+    erroMsg.classList.add('show');
+    entrarBtn.disabled = false;
+    entrarBtn.textContent = 'Entrar';
+  }
+}
+
+entrarBtn.onclick = tentarLogin;
+senhaInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') tentarLogin(); });
+</script>
+</body>
+</html>

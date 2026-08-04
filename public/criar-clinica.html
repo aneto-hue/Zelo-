@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Criar Clínica — Zelo</title>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --red:#C0392B; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  html body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:Arial, Helvetica, sans-serif; color:var(--ink); padding:20px;
+    background:
+      linear-gradient(rgba(10,10,10,0.20), rgba(10,10,10,0.30)),
+      url('img/clinica-bg.jpg') center/cover no-repeat fixed !important;
+  }
+  .box{
+    width:100%; max-width:420px; background:rgba(255,255,255,0.96); border:none; border-radius:18px;
+    padding:32px 26px; box-shadow:0 24px 60px -14px rgba(0,0,0,0.45); backdrop-filter:blur(6px);
+  }
+  .box h1{font-size:20px; color:var(--blue-dark); margin:0 0 4px; text-align:center;}
+  .box p.sub{font-size:12.5px; color:var(--muted); margin:0 0 22px; text-align:center;}
+  .field{margin-bottom:14px; text-align:left;}
+  .field label{display:block; font-size:12.5px; font-weight:700; margin-bottom:5px;}
+  .field input{
+    width:100%; padding:12px 10px; font-size:15px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit;
+  }
+  .field input:focus{outline:none; border-color:var(--blue-dark); box-shadow:0 0 0 3px var(--blue-head);}
+  .criar-btn{
+    width:100%; padding:13px; border:none; border-radius:8px; background:var(--blue-dark); color:#fff;
+    font-weight:700; font-size:15px; cursor:pointer; margin-top:6px;
+  }
+  .criar-btn:disabled{opacity:0.6; cursor:default;}
+  .erro-msg{
+    background:#FBEAEA; color:var(--red); border:1.5px solid var(--red); border-radius:8px;
+    padding:10px 12px; font-size:12.5px; margin-bottom:14px; display:none; text-align:left;
+  }
+  .erro-msg.show{display:block;}
+  .voltar-login{display:block; text-align:center; margin-top:16px; font-size:12.5px; color:var(--blue-dark); text-decoration:none; font-weight:700;}
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="box">
+  <h1><img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Tooth/3D/tooth_3d.png" alt="" style="width:26px;height:26px;vertical-align:-8px;margin-right:6px;object-fit:contain;">Zelo</h1>
+  <p class="sub" style="margin-bottom:16px;">Configure sua clínica no sistema em menos de 1 minuto</p>
+
+  <div class="erro-msg" id="erroMsg"></div>
+
+  <div class="field">
+    <label>Nome da clínica</label>
+    <input type="text" id="nomeClinica" />
+  </div>
+  <div class="field">
+    <label>Seu nome</label>
+    <input type="text" id="nomeAdmin" />
+  </div>
+  <div class="field">
+    <label>Seu e-mail (será seu login)</label>
+    <input type="email" id="email" autocomplete="username" />
+  </div>
+  <div class="field">
+    <label>Crie uma senha (mínimo 6 caracteres)</label>
+    <input type="password" id="senha" autocomplete="new-password" />
+  </div>
+  <button class="criar-btn" id="criarBtn">Criar minha clínica</button>
+  <a href="login.html" class="voltar-login">Já tenho uma conta — entrar</a>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const criarBtn = $('criarBtn');
+const erroMsg = $('erroMsg');
+
+async function tentarCriar(){
+  const nomeClinica = $('nomeClinica').value.trim();
+  const nomeAdmin = $('nomeAdmin').value.trim();
+  const email = $('email').value.trim();
+  const senha = $('senha').value;
+
+  if(!nomeClinica || !nomeAdmin || !email || !senha){
+    erroMsg.textContent = 'Preencha todos os campos.';
+    erroMsg.classList.add('show');
+    return;
+  }
+  if(senha.length < 6){
+    erroMsg.textContent = 'A senha precisa ter pelo menos 6 caracteres.';
+    erroMsg.classList.add('show');
+    return;
+  }
+
+  criarBtn.disabled = true;
+  criarBtn.textContent = 'Criando...';
+  erroMsg.classList.remove('show');
+  try{
+    const resp = await fetch('/api/criar-clinica', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ nomeClinica, nomeAdmin, email, senha })
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      erroMsg.textContent = data.erro || 'Não foi possível criar a clínica.';
+      erroMsg.classList.add('show');
+      criarBtn.disabled = false;
+      criarBtn.textContent = 'Criar minha clínica';
+      return;
+    }
+    window.location.href = '/perfil-clinica.html';
+  }catch(e){
+    erroMsg.textContent = 'Não foi possível conectar ao servidor. Verifique sua internet.';
+    erroMsg.classList.add('show');
+    criarBtn.disabled = false;
+    criarBtn.textContent = 'Criar minha clínica';
+  }
+}
+
+criarBtn.onclick = tentarCriar;
+</script>
+</body>
+</html>

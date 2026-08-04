@@ -1,0 +1,2825 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Prontuário — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="voice-dictation.js"></script>
+<script src="wake-lock.js"></script>
+<script src="shared-data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+  document.head.appendChild(s);
+"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B;
+    --blue-med:#2E75B6;
+    --blue-head:#D6E7F3;
+    --blue-light:#EFF6FB;
+    --line:#9BBBD4;
+    --line-light:#C9DCEC;
+    --ink:#1A1A1A;
+    --muted:#5B6B7A;
+    --green:#2E8B57;
+    --red:#C0392B;
+    --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-tap-highlight-color: transparent;
+  }
+  header.topbar{
+    background:#fff;
+    border-bottom:3px solid var(--blue-dark);
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .logo-box{
+    width:56px;height:56px;border:1.5px dashed var(--line);
+    border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:9px;color:#9BAAB8;text-align:center;line-height:1.1;flex-shrink:0;
+  }
+  header.topbar h1{font-size:18px;margin:0;color:var(--blue-dark);font-weight:700;}
+  header.topbar p{margin:2px 0 0;font-size:12px;color:var(--muted);font-style:italic;}
+
+  nav.steps{
+    display:flex;
+    overflow-x:auto;
+    background:#fff;
+    border-bottom:1px solid var(--line-light);
+    position:sticky;
+    top:86px;
+    z-index:19;
+    -webkit-overflow-scrolling:touch;
+  }
+  nav.steps button{
+    flex:0 0 auto;
+    padding:12px 16px;
+    font-size:13px;
+    font-weight:700;
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    border-bottom:3px solid transparent;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  nav.steps button.active{
+    color:var(--blue-dark);
+    border-bottom-color:var(--blue-dark);
+  }
+
+  main{
+    max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto;
+    padding:18px 14px 100px;
+  }
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .section-title{
+    background:var(--blue-dark);
+    color:#fff;
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:0.5px;
+    padding:10px 14px;
+    border-radius:6px;
+    margin:18px 0 12px;
+    text-transform:uppercase;
+  }
+  .section-title:first-child{margin-top:0;}
+
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:13px;
+    font-weight:700;
+    margin-bottom:5px;
+    color:var(--ink);
+  }
+  .field input[type=text], .field input[type=date], .field textarea{
+    width:100%;
+    padding:12px 10px;
+    font-size:16px;
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    font-family:inherit;
+  }
+  .field textarea{resize:vertical;}
+  .field input:focus, .field textarea:focus{
+    outline:none;
+    border-color:var(--blue-dark);
+    box-shadow:0 0 0 3px var(--blue-head);
+  }
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:140px;}
+
+  .add-row-btn{
+    margin-top:8px; padding:9px 14px; border:1.5px dashed var(--line);
+    background:#fff; border-radius:8px; color:var(--blue-dark); font-weight:700; font-size:13px; cursor:pointer; text-align:center;
+  }
+
+  .med-cat-label{font-size:12px;font-weight:700;color:var(--blue-dark);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.3px;}
+  .med-chip-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px 8px;
+    margin-bottom:6px;
+  }
+  @media(min-width:560px){ .med-chip-grid{grid-template-columns:1fr 1fr 1fr;} }
+  .med-chip{
+    padding:8px 10px;border-radius:8px;border:1.5px solid var(--line);background:var(--blue-light);
+    color:var(--blue-dark);font-size:12px;font-weight:600;line-height:1.3;cursor:pointer;user-select:none;
+    text-align:left;
+  }
+  .med-chip:active{background:var(--blue-dark);color:#fff;}
+
+  .odo-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; margin-bottom:10px;}
+  .odo-row{display:flex; align-items:center; gap:4px; margin:0 auto 6px; width:max-content;}
+  .odo-divider{width:1px; align-self:stretch; background:var(--line-light); margin:0 6px;}
+  .odo-tooth{
+    flex-shrink:0; width:32px; height:32px; border-radius:8px; border:1.5px solid var(--line);
+    background:#fff; color:var(--blue-dark); font-size:12px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none;
+  }
+  .odo-tooth.documented{ background:var(--blue-dark); border-color:var(--blue-dark); color:#fff; }
+  .odo-tooth.pending{ background:#FBEAEA; border-color:#C0392B; color:#C0392B; }
+  .odo-tooth.deciduous{ border-color:#C9A227; color:#8A6D1B; background:#FEF8E4; }
+  .odo-tooth.deciduous.documented{ background:#C9A227; border-color:#C9A227; color:#fff; }
+  .odo-tooth.deciduous.pending{ background:#FBEAEA; border-color:#C0392B; color:#C0392B; }
+  .odo-label{font-size:10.5px; font-weight:700; color:var(--muted); text-align:center; text-transform:uppercase; letter-spacing:.4px; margin:6px 0 5px;}
+  .odo-sep{border-top:1px dashed var(--line-light); margin:10px 0;}
+  .odo-legend{display:flex; gap:14px; flex-wrap:wrap; justify-content:center; font-size:11px; color:var(--muted); margin-bottom:14px;}
+  .odo-legend span{display:inline-flex; align-items:center; gap:4px;}
+  .odo-legend i{width:12px; height:12px; border-radius:3px; display:inline-block;}
+
+  .photo-field{margin-bottom:16px;}
+  .photo-box{
+    position:relative;
+    width:120px; height:120px;
+    border-radius:12px;
+    border:2px dashed var(--line);
+    background:var(--blue-light);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    overflow:hidden;
+  }
+  .photo-placeholder{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    color:var(--blue-dark); font-size:12px; font-weight:600; text-align:center; padding:8px;
+  }
+  .photo-icon{font-size:26px;}
+  .photo-preview{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-input{
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    opacity:0; cursor:pointer;
+  }
+  .photo-remove{
+    position:absolute; bottom:0; left:0; right:0;
+    background:rgba(192,57,43,0.9); color:#fff; text-align:center;
+    font-size:11px; font-weight:700; padding:5px 0; cursor:pointer; z-index:2;
+  }
+
+  table.tx-table{width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;}
+  table.tx-table th{
+    background:var(--blue-head); color:var(--blue-dark); font-weight:700;
+    padding:8px 6px; border:1px solid var(--line-light); text-align:left;
+  }
+  table.tx-table td{border:1px solid var(--line-light); padding:0;}
+  table.tx-table input{
+    width:100%; border:none; padding:8px 6px; font-size:13px; font-family:inherit; background:transparent;
+  }
+  table.tx-table input:focus{outline:2px solid var(--blue-dark); outline-offset:-2px;}
+  table.tx-table tr:nth-child(even) td{background:var(--blue-light);}
+  table.tx-table td.remove-cell{width:34px; text-align:center; cursor:pointer; color:var(--red); font-weight:900; font-size:15px;}
+
+  .gallery-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:10px;
+    margin-bottom:10px;
+  }
+  @media(min-width:600px){.gallery-grid{grid-template-columns:repeat(4, 1fr);}}
+  .gallery-thumb{
+    position:relative;
+    width:100%;
+    aspect-ratio:1/1;
+    border-radius:10px;
+    overflow:hidden;
+    border:1.5px solid var(--line-light);
+    background:var(--blue-light);
+  }
+  .gallery-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .gallery-thumb .remove-x{
+    position:absolute; top:4px; right:4px;
+    width:22px; height:22px; border-radius:50%;
+    background:rgba(192,57,43,0.92); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:900; cursor:pointer; z-index:2;
+  }
+  .gallery-add{
+    width:100%;
+    aspect-ratio:1/1;
+    border-radius:10px;
+    border:1.5px dashed var(--line);
+    background:var(--blue-light);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:4px;
+    color:var(--blue-dark); font-size:11px; font-weight:600; text-align:center;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+  }
+  .gallery-add .add-icon{font-size:24px;}
+  .gallery-add input{
+    position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;
+  }
+
+  footer.bottombar{
+    position:fixed; bottom:0; left:0; right:0;
+    background:#fff; border-top:1.5px solid var(--line-light);
+    padding:10px 14px; display:flex; gap:10px; justify-content:space-between;
+    z-index:20;
+  }
+  footer.bottombar button{
+    flex:1; padding:13px 0; border-radius:8px; font-size:14px; font-weight:700; border:none; cursor:pointer;
+  }
+  .btn-prev{background:#fff; border:1.5px solid var(--line); color:var(--muted);}
+  .btn-next{background:var(--blue-dark); color:#fff;}
+
+  .toast{
+    position:fixed; top:96px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px;
+    opacity:0; transition:all .25s; z-index:50; pointer-events:none; text-align:center; max-width:90%;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+<link rel="stylesheet" href="theme.css">
+<script src="nav-home.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo-box">LOGO</div>
+  <div>
+    <h1>Prontuário Odontológico</h1>
+    <p id="patientSubtitle">Nome do paciente</p>
+  </div>
+</header>
+
+<nav class="steps" id="stepsNav"></nav>
+<div style="max-width:760px;margin:10px auto 0;padding:0 14px;">
+  <span id="voltarListaBtn" style="display:none;font-size:13px;font-weight:700;color:var(--blue-dark);cursor:pointer;">← Voltar para pacientes</span>
+</div>
+
+<main id="main"></main>
+
+<footer class="bottombar">
+  <button class="btn-prev" id="btnPrev">Voltar</button>
+  <button class="btn-next" id="btnNext">Avançar</button>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ ESTADO ============
+function makeRecord(){
+  return { id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+    data:'', dente:'', procedimento:'', finalizado:false,
+    imagens:[], radiografias:[], obs:'', consultaVinculadaId:'' };
+}
+const state = {
+  clinic: { logo:'', nome:'', dentista:'', cro:'', rg:'', endereco:'', cidade:'', cnpj:'', telefone:'', email:'' },
+  patient: { foto:'', nome:'', nasc:'', sexo:'', idade:'', rg:'', cpf:'', telefone:'', endereco:'', obs:'', responsavel:'' },
+  records: [ makeRecord(), makeRecord(), makeRecord() ],
+  meds: [
+    { nome:'', dosagem:'', posologia:'' }
+  ],
+  posOp: { texto:
+`## Cuidados imediatos e gerais
+- **Repouso:** Descanse bastante nos primeiros dias, evitando esforço físico e falando pouco.
+- **Compressa fria:** Aplique gelo no local nas primeiras 24 horas para diminuir o inchaço e a dor. Faça isso em períodos de 15 minutos, alternando com pausas.
+- **Posição:** Mantenha a cabeça sempre mais elevada que o corpo, principalmente ao deitar, para evitar o sangramento.
+
+## Alimentação e hidratação
+- **Alimentos:** Prefira alimentos líquidos e pastosos, como caldos frios, sorvetes, açaí e frutas batidas.
+- **Evite:** Nos primeiros dois dias, evite alimentos quentes, duros, crocantes e ácidos. Não beba bebidas alcoólicas ou com canudinho nem cuspa.
+- **Dieta:** Após os 03 dias, comece com alimentos mornos e brandos, mas evite condimentos.
+
+**Higienização:** Com uma gaze embebida em agua molhe a ferida até tirar qualquer sujidade, sem esfregaço que possa ocasionar no rompimento dos pontos.
+
+Em caso de alterações entre em contato com meu telefone {{TELEFONE_CLINICA}}.` },
+  atestado: { texto:
+`Atesto, para os devidos fins, que o(a) paciente acima identificado(a) esteve sob meus cuidados odontológicos nesta data, necessitando de afastamento de suas atividades por **_____** dia(s), a partir desta data.` },
+  termo: { texto:
+`Certifico, para os devidos fins, que o(a) paciente acima identificado(a) compareceu a esta clínica nesta data, no período das **_____** às **_____** horas, para atendimento odontológico.` },
+  documentos: {}, // tipos de documento personalizados: { tipoId: { texto:'' } }
+  images: { clinicas: [], radiografias: [] }, // galeria geral de imagens do paciente (não ligada a um registro específico)
+  documentosEmitidos: [] // histórico de documentos gerados: [{id, tipo, titulo, dataEmissao}]
+};
+
+// Chaves do state que pertencem à FICHA de um paciente específico (tudo, exceto "clinic",
+// que agora é compartilhado por todas as fichas).
+const FICHA_KEYS = Object.keys(state).filter(k => k !== 'clinic');
+const FICHA_TEMPLATE_VAZIA = JSON.parse(JSON.stringify(
+  FICHA_KEYS.reduce((acc,k) => { acc[k] = state[k]; return acc; }, {})
+));
+
+const STEPS = ['Paciente','Imagens','Prontuário','Documentos'];
+let currentStep = 0;
+let modoAtual = 'lista'; // 'lista' = lista de pacientes | 'ficha' = editando o prontuário de um paciente
+let fichaAtivaPacienteId = null;
+const MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+// ============ MEDICAMENTOS PRÉ-DEFINIDOS (botões de preenchimento rápido) ============
+const PRESET_MEDS = [
+  { categoria:'Uso Interno', nome:'Amoxicilina (500mg)', dosagem:'21 cápsulas', posologia:'Tomar 01 cápsula, de 08 em 08 horas, durante 07 dias.' },
+  { categoria:'Uso Interno', nome:'Amoxicilina 875mg + Clavulanato de potássio 125mg', dosagem:'14 comprimidos', posologia:'Tomar 1 comprimido de 12 em 12 horas durante 7 dias.' },
+  { categoria:'Uso Interno', nome:'Amoxicilina (suspensão)', dosagem:'01 frasco', posologia:'Tomar ___ ml, de 08 em 08 horas, durante 07 dias.' },
+  { categoria:'Uso Interno', nome:'Azitromicina (500mg)', dosagem:'03 comprimidos', posologia:'Tomar 01 comprimido, de 24 em 24 horas, durante 03 dias.' },
+  { categoria:'Uso Interno', nome:'Cefalexina (500mg)', dosagem:'24 cápsulas', posologia:'Tomar 01 cápsula, a cada 06 horas, durante 03 dias. Tomar por mais 04 dias 01 cápsula a cada 08 horas.' },
+  { categoria:'Uso Interno', nome:'Metronidazol (400mg)', dosagem:'21 comprimidos', posologia:'Tomar 01 comprimido, de 08 em 08 horas, durante 07 dias.' },
+  { categoria:'Uso Interno', nome:'Nimesulida (100mg)', dosagem:'10 comprimidos', posologia:'Tomar 01 comprimido, de 12 em 12 horas, durante 05 dias.' },
+  { categoria:'Uso Interno', nome:'Flancox (400mg)', dosagem:'10 comprimidos', posologia:'Tomar 01 comprimido de 12 em 12 horas durante 5 dias.' },
+  { categoria:'Uso Interno', nome:'Decadron (4mg)', dosagem:'1 caixa', posologia:'Tomar 1 comprimido de 12 em 12 horas, durante 3 dias.' },
+  { categoria:'Uso Interno', nome:'Spiduffen (600mg)', dosagem:'1 caixa', posologia:'Tomar 01 envelope de 08 em 08 horas durante 03 dias.' },
+  { categoria:'Uso Interno', nome:'Diclofenaco (50mg)', dosagem:'1 caixa', posologia:'Tomar 01 comprimido, de 08 em 08 horas, durante 04 dias.' },
+  { categoria:'Uso Interno', nome:'Diclofenaco (suspensão)', dosagem:'1 frasco', posologia:'Tomar 20 gotas, de 08 em 08 horas, durante 07 dias.' },
+  { categoria:'Uso Interno', nome:'Ibuprofeno (600mg)', dosagem:'1 caixa', posologia:'Tomar 01 comprimido de 06 em 06 horas, durante 05 dias.' },
+  { categoria:'Uso Interno', nome:'Tylex (30mg)', dosagem:'12 comprimidos', posologia:'Tomar 01 comprimido a cada 06 horas, durante 03 dias.' },
+  { categoria:'Uso Interno', nome:'Novalgina (1g)', dosagem:'01 caixa', posologia:'Tomar 01 comprimido de 08 em 08 horas por 5 dias.' },
+  { categoria:'Uso Interno', nome:'Alivium Infantil (50mg/ml)', dosagem:'01 frasco', posologia:'Tomar 20 gotas de 8 em 8 horas, durante 07 dias.' },
+  { categoria:'Uso Interno', nome:'Paracetamol (750mg)', dosagem:'20 comprimidos', posologia:'Tomar 01 comprimido, de 06 em 06 horas, durante 05 dias.' },
+  { categoria:'Uso Interno', nome:'Toragesic (10mg)', dosagem:'1 frasco', posologia:'Tomar 01 comprimido sub lingual a cada 12 horas.' },
+  { categoria:'Uso Interno', nome:'Lisador (gotas)', dosagem:'1 frasco', posologia:'Tomar 35 gotas, de 06 em 06 horas, durante 05 dias.' },
+  { categoria:'Uso Interno', nome:'Patz SL (hemitartarato de zolpidem 5mg)', dosagem:'01 frasco', posologia:'Tomar 1 comprimido 15 minutos antes da cirurgia.' },
+  { categoria:'Uso Interno', nome:'Miosan CAF® (Cloridrato de ciclobenzaprina e cafeína 35mg)', dosagem:'1 caixa', posologia:'Tomar 01 comprimido de 12 em 12 horas, durante 3 dias.' },
+  { categoria:'Uso Interno', nome:'Nistatina (suspensão)', dosagem:'01 frasco', posologia:'Aplicar na prótese após higienização da mesma, e tomar 4 ml ao dia, durante 10 dias. Bochechar antes de engolir o remédio.' },
+  { categoria:'Uso Interno', nome:'Bismu-jet', dosagem:'1 caixa', posologia:'Aplicar sobre o local de 3 a 6 vezes ao dia.' },
+  { categoria:'Uso Injetável', nome:'Diclofenaco (75mg)', dosagem:'04 ampolas', posologia:'Tomar 01 ampola, intramuscular, de 12 em 12 horas, durante 02 dias.' },
+  { categoria:'Uso Externo', nome:'Periogard (Solução de Gluconato de Clorexidina 0,12%)', dosagem:'01 frasco', posologia:'Bochechar 01 tampa, após a escovação, duas vezes ao dia (pela manhã e a noite), durante 07 dias.' },
+  { categoria:'Uso Tópico', nome:'Dacktarin gel', dosagem:'1 tubo', posologia:'Aplicar sobre a lesão 4 vezes ao dia durante 07 dias.' },
+  { categoria:'Uso Tópico', nome:'Oncilom (OraBase)', dosagem:'1 tubo', posologia:'Aplicar sobre a lesão 4 vezes ao dia durante 07 dias.' },
+  { categoria:'Uso Tópico', nome:'Terramicina (Pomada Tópica 30mg)', dosagem:'1 tubo', posologia:'Aplicar sobre a lesão 4 vezes ao dia durante 07 dias.' },
+  { categoria:'Uso Tópico', nome:'Gingilone (10g)', dosagem:'1 bisnaga', posologia:'Aplicar sobre a lesão 3 vezes ao dia durante 07 dias.' }
+];
+
+// ============ PERSISTÊNCIA (servidor, múltiplas fichas por paciente) ============
+const CLINICA_PERFIL_KEY = 'clinica_perfil_v1';
+const INDICE_STORAGE_KEY = 'ficha_prontuario_indice_v1';
+function chaveFicha(pacienteId){ return 'ficha_prontuario_paciente_' + pacienteId; }
+
+async function carregarClinica(){
+  const saved = await ClinicaStorage.load(CLINICA_PERFIL_KEY);
+  if(saved) Object.assign(state.clinic, saved);
+}
+
+async function carregarIndiceFichas(){
+  const saved = await ClinicaStorage.load(INDICE_STORAGE_KEY);
+  return Array.isArray(saved) ? saved : [];
+}
+function salvarIndiceFichas(lista){ ClinicaStorage.save(INDICE_STORAGE_KEY, lista); }
+async function registrarFichaNoIndice(pacienteId){
+  const lista = await carregarIndiceFichas();
+  const existente = lista.find(f => f.pacienteId === pacienteId);
+  if(existente){ existente.atualizadoEm = Date.now(); }
+  else { lista.push({ pacienteId, criadoEm: Date.now(), atualizadoEm: Date.now() }); }
+  salvarIndiceFichas(lista);
+}
+
+function extrairDadosFicha(){
+  const dados = {};
+  FICHA_KEYS.forEach(k => { dados[k] = state[k]; });
+  return dados;
+}
+
+function saveProgress(){
+  if(modoAtual === 'ficha' && fichaAtivaPacienteId){
+    ClinicaStorage.save(chaveFicha(fichaAtivaPacienteId), extrairDadosFicha());
+  }
+}
+let _saveTimer = null;
+function saveProgressDebounced(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveProgress, 400);
+}
+
+async function abrirFicha(pacienteId){
+  fichaAtivaPacienteId = pacienteId;
+  const salvo = await ClinicaStorage.load(chaveFicha(pacienteId));
+  const dadosFicha = salvo || JSON.parse(JSON.stringify(FICHA_TEMPLATE_VAZIA));
+  FICHA_KEYS.forEach(k => { state[k] = dadosFicha[k] !== undefined ? dadosFicha[k] : FICHA_TEMPLATE_VAZIA[k]; });
+
+  // Compatibilidade com sessões salvas antes de imagens/radiografias/observações virarem por registro
+  if(Array.isArray(state.records)){
+    state.records = state.records.map(r => Object.assign(makeRecord(), r, {
+      imagens: Array.isArray(r.imagens) ? r.imagens : [],
+      radiografias: Array.isArray(r.radiografias) ? r.radiografias : [],
+      obs: r.obs || ''
+    }));
+  }
+
+  if(!salvo){
+    const pac = clinicaFindPacienteById(pacienteId);
+    if(pac){
+      state.patient.nome = pac.nome || '';
+      state.patient.nasc = pac.nasc || '';
+      state.patient.telefone = pac.telefone || '';
+      state.patient.cpf = pac.cpf || '';
+      state.patient.rg = pac.rg || '';
+      state.patient.endereco = pac.endereco || '';
+    }
+    await registrarFichaNoIndice(pacienteId);
+  }
+
+  modoAtual = 'ficha';
+  currentStep = 0;
+  document.getElementById('stepsNav').style.display = '';
+  document.querySelector('footer.bottombar') && (document.querySelector('footer.bottombar').style.display = '');
+  const vb = document.getElementById('voltarListaBtn'); if(vb) vb.style.display = '';
+  renderPanel(0);
+  iniciarTelaSempreAtivaAutomaticamente();
+}
+
+function mostrarListaFichas(){
+  modoAtual = 'lista';
+  fichaAtivaPacienteId = null;
+  document.getElementById('stepsNav').style.display = 'none';
+  const fb = document.querySelector('footer.bottombar'); if(fb) fb.style.display = 'none';
+  const vb = document.getElementById('voltarListaBtn'); if(vb) vb.style.display = 'none';
+  renderListaFichas();
+  pararTelaSempreAtiva();
+}
+
+let filtroListaFichas = '';
+async function renderListaFichas(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Pacientes')));
+  main.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
+    document.createTextNode('Escolha um paciente para abrir o prontuário dele, ou crie um novo. Para cadastrar um paciente novo, use a tela inicial do sistema.')));
+
+  const searchInput = el('input', { type:'text', placeholder:'Buscar paciente...', value: filtroListaFichas,
+    style:'width:100%;padding:12px 10px;font-size:15px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;margin-bottom:14px;' });
+  searchInput.oninput = (e) => { filtroListaFichas = e.target.value; renderListaInterna(); };
+  main.appendChild(searchInput);
+
+  const listWrap = el('div', {});
+  main.appendChild(listWrap);
+
+  async function renderListaInterna(){
+    listWrap.innerHTML = '';
+    const pacientes = clinicaGetPacientes();
+    const indice = await carregarIndiceFichas();
+    const termo = filtroListaFichas.trim().toLowerCase();
+    const filtrados = pacientes.filter(p => !termo || (p.nome||'').toLowerCase().includes(termo));
+
+    if(!filtrados.length){
+      listWrap.appendChild(el('div', { class:'empty-hint', style:'text-align:center;padding:20px;border-radius:10px;' }, document.createTextNode(
+        pacientes.length ? 'Nenhum paciente encontrado.' : 'Nenhum paciente cadastrado ainda. Cadastre na tela inicial do sistema.'
+      )));
+      return;
+    }
+
+    filtrados.forEach(p => {
+      const registro = indice.find(f => f.pacienteId === p.id);
+      const card = el('div', { class:'card', style:'margin-bottom:12px;' });
+      const top = el('div', { class:'card-top' });
+      const info = el('div', {});
+      info.appendChild(el('div', { class:'card-title' }, document.createTextNode(p.nome)));
+      info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(
+        registro ? ('Prontuário atualizado em ' + new Date(registro.atualizadoEm).toLocaleDateString('pt-BR')) : 'Ainda sem prontuário'
+      )));
+      top.appendChild(info);
+      card.appendChild(top);
+      const btn = el('div', { class:'add-row-btn', style:'margin-top:10px;text-align:center;' },
+        document.createTextNode(registro ? 'Abrir prontuário' : '+ Criar prontuário'));
+      btn.onclick = () => abrirFicha(p.id);
+      card.appendChild(btn);
+      listWrap.appendChild(card);
+    });
+  }
+  await renderListaInterna();
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+// ============ IMPORTAR DADOS A PARTIR DE PDF (gerado pela ficha "Dados do Paciente" separada) ============
+const PDF_DATA_TAG = 'FICHA_ANAMNESE_DATA:';
+function encodePdfData(obj){
+  try{
+    const json = JSON.stringify(obj);
+    return btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }catch(e){ return null; }
+}
+function decodePdfData(code){
+  try{
+    let b64 = String(code).trim().replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length % 4) b64 += '=';
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  }catch(e){ return null; }
+}
+function extractDataFromPDFBytes(bytes){
+  // O PDF gerado pelo jsPDF grava metadados (Keywords) como texto simples,
+  // então dá para extrair direto dos bytes, sem precisar de nenhuma biblioteca extra.
+  let raw = '';
+  const chunk = 0x8000;
+  for(let i=0;i<bytes.length;i+=chunk){
+    raw += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  const m = raw.match(/\/Keywords\s*\(([^)]*)\)/);
+  if(!m) return null;
+  const kwIdx = m[1].indexOf(PDF_DATA_TAG);
+  if(kwIdx === -1) return null;
+  const codeMatch = m[1].slice(kwIdx + PDF_DATA_TAG.length).match(/[A-Za-z0-9_-]+/);
+  if(!codeMatch) return null;
+  return decodePdfData(codeMatch[0]);
+}
+function importFullProntuarioPDF(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const bytes = new Uint8Array(reader.result);
+      const incoming = extractDataFromPDFBytes(bytes);
+      if(!incoming || typeof incoming !== 'object'){
+        alert('Não foi possível encontrar dados neste PDF. Confirme se ele foi gerado pelo botão "Gerar PDF do prontuário completo" desta mesma ficha.');
+        return;
+      }
+      if(incoming.clinic && typeof incoming.clinic === 'object') Object.assign(state.clinic, incoming.clinic);
+      if(incoming.patient && typeof incoming.patient === 'object') Object.assign(state.patient, incoming.patient);
+      if(Array.isArray(incoming.records) && incoming.records.length){
+        state.records = incoming.records.map(r => Object.assign(makeRecord(), r, {
+          imagens: Array.isArray(r.imagens) ? r.imagens : [],
+          radiografias: Array.isArray(r.radiografias) ? r.radiografias : [],
+          obs: r.obs || ''
+        }));
+      }
+      if(Array.isArray(incoming.meds) && incoming.meds.length){
+        state.meds = incoming.meds;
+      }
+      saveProgress();
+      refreshPanel();
+      toast('Prontuário importado com sucesso! Pode continuar de onde parou.');
+    }catch(err){
+      alert('Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function importDataFromPDFFile(kind, file, targetLabel){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const bytes = new Uint8Array(reader.result);
+      const incoming = extractDataFromPDFBytes(bytes);
+      if(!incoming || typeof incoming !== 'object'){
+        alert('Não foi possível encontrar dados neste PDF. Confirme se ele foi gerado pela ficha de "'+targetLabel+'".');
+        return;
+      }
+      const target = state[kind];
+      Object.keys(target).forEach(k => {
+        if(incoming[k] !== undefined && incoming[k] !== ''){ target[k] = incoming[k]; }
+      });
+      refreshPanel();
+      toast('Dados de "'+targetLabel+'" importados com sucesso!');
+    }catch(err){
+      alert('Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function importPdfIcon(kind, targetLabel){
+  const btn = el('div', {
+    title:'Importar dados de um PDF gerado pela ficha de "'+targetLabel+'"',
+    style:'position:relative;overflow:hidden;flex-shrink:0;width:44px;height:44px;border-radius:10px;'+
+      'border:1.5px dashed var(--blue-dark);background:var(--blue-light);color:var(--blue-dark);'+
+      'display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;'
+  }, document.createTextNode('📥'));
+  const input = el('input', {
+    type:'file', accept:'.pdf,application/pdf',
+    style:'position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;'
+  });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    importDataFromPDFFile(kind, file, targetLabel);
+  };
+  btn.appendChild(input);
+  return btn;
+}
+
+// ============ HELPERS DE RENDER ============
+function formatDateBR(str){ if(!str) return ''; const [y,m,d]=String(str).split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
+
+function el(tag, attrs={}, children=[]){
+  const e = document.createElement(tag);
+  for(const k in attrs){
+    if(k === 'class') e.className = attrs[k];
+    else if(k === 'html') e.innerHTML = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c => { if(c) e.appendChild(c); });
+  return e;
+}
+function maskCPF(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
+function maskTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 5) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length > 0) v = v.replace(/(\d{0,2})/,'($1');
+  return v.trim();
+}
+function maskRG(v){
+  let letraFinal = '';
+  if(/[Xx]$/.test(v.replace(/[^\dXx]/g,''))){
+    const limpoComX = v.replace(/[^\dXx]/g,'').slice(0,9);
+    if(/[Xx]$/.test(limpoComX)){ letraFinal = 'X'; v = limpoComX.slice(0,-1); }
+  }
+  v = v.replace(/\D/g,'').slice(0,9);
+  v = v.replace(/(\d{2})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  if(letraFinal) v = (v.endsWith('-') ? v : v + '-') + letraFinal;
+  return v;
+}
+function mascaraParaCampo(key){
+  const k = key.toLowerCase();
+  if(k==='cpf') return maskCPF;
+  if(k==='rg') return maskRG;
+  if(k.includes('telefone') || k==='whatsapp' || k==='celular') return maskTelefone;
+  return null;
+}
+
+function textField(label, store, key, opts={}){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode(label)));
+  const mascara = opts.mask===false ? null : mascaraParaCampo(key);
+  const input = el('input', { type: opts.type||'text', value: store[key]||'' });
+  input.oninput = (e) => { if(mascara){ e.target.value = mascara(e.target.value); } store[key] = e.target.value; saveProgressDebounced(); };
+  f.appendChild((opts.type && opts.type !== 'text') ? input : comDitado(input));
+  return f;
+}
+function textareaField(label, store, key, rows){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode(label)));
+  const ta = el('textarea', { rows: rows||4 }, document.createTextNode(store[key]||''));
+  ta.oninput = (e) => { store[key] = e.target.value; saveProgressDebounced(); };
+  f.appendChild(comDitado(ta));
+  return f;
+}
+
+function loadFixedImageDataURL(file, callback){
+  const maxDim = 1400;
+  function fromBitmap(bitmap){
+    const canvas = document.createElement('canvas');
+    let w = bitmap.width, h = bitmap.height;
+    if(w > maxDim || h > maxDim){
+      const scale = maxDim / Math.max(w, h);
+      w = Math.round(w * scale); h = Math.round(h * scale);
+    }
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    callback(canvas.toDataURL('image/jpeg', 0.9));
+  }
+  if(window.createImageBitmap){
+    createImageBitmap(file, { imageOrientation: 'from-image' }).then(fromBitmap).catch(() => fallbackViaImageEl());
+  } else { fallbackViaImageEl(); }
+  function fallbackViaImageEl(){
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if(w > maxDim || h > maxDim){
+          const scale = maxDim / Math.max(w, h);
+          w = Math.round(w * scale); h = Math.round(h * scale);
+        }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// Tabela editável genérica (linhas de objeto, com botão de adicionar e remover)
+function editableTable(headers, keys, rows, addLabel, placeholders){
+  const wrap = el('div');
+  const table = el('table', { class:'tx-table' });
+  const thead = el('tr');
+  headers.forEach(h => thead.appendChild(el('th', {}, document.createTextNode(h))));
+  thead.appendChild(el('th', { style:'width:34px;' }));
+  table.appendChild(thead);
+
+  function renderRows(){
+    table.querySelectorAll('tr:not(:first-child)').forEach(tr => tr.remove());
+    rows.forEach((row, ri) => {
+      const tr = el('tr');
+      keys.forEach((key, ci) => {
+        const td = el('td');
+        const input = el('input', { type:'text', value: row[key]||'', placeholder: (placeholders&&placeholders[ci])||'' });
+        input.oninput = (e) => { row[key] = e.target.value; saveProgressDebounced(); };
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+      const removeTd = el('td', { class:'remove-cell' }, document.createTextNode('✕'));
+      removeTd.onclick = () => { rows.splice(ri,1); saveProgressDebounced(); renderRows(); };
+      tr.appendChild(removeTd);
+      table.appendChild(tr);
+    });
+  }
+  renderRows();
+  wrap.appendChild(table);
+
+  const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode(addLabel));
+  addBtn.onclick = () => {
+    const blank = {}; keys.forEach(k => blank[k] = '');
+    rows.push(blank);
+    saveProgressDebounced();
+    renderRows();
+  };
+  wrap.appendChild(addBtn);
+  return wrap;
+}
+
+function galleryField(label, arr, onChange){
+  const wrap = el('div', { class:'field' });
+  wrap.appendChild(el('label', {}, document.createTextNode(label)));
+  const grid = el('div', { class:'gallery-grid' });
+  arr.forEach((dataUrl, idx) => {
+    const thumb = el('div', { class:'gallery-thumb' });
+    thumb.appendChild(el('img', { src: dataUrl }));
+    const removeX = el('div', { class:'remove-x' }, document.createTextNode('✕'));
+    removeX.onclick = (e) => { e.stopPropagation(); arr.splice(idx,1); onChange(); };
+    thumb.appendChild(removeX);
+    grid.appendChild(thumb);
+  });
+  const addTile = el('div', { class:'gallery-add' }, [
+    el('div', { class:'add-icon' }, document.createTextNode('📷')),
+    el('div', {}, document.createTextNode('Tirar foto'))
+  ]);
+  const input = el('input', { type:'file', accept:'image/*', capture:'environment' });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file, (fixedDataUrl) => { arr.push(fixedDataUrl); onChange(); });
+  };
+  addTile.appendChild(input);
+  grid.appendChild(addTile);
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+function logoField(store, label){
+  const wrap = el('div', { class:'field photo-field' });
+  wrap.appendChild(el('label', {}, document.createTextNode(label || 'Logo da clínica (opcional)')));
+  const box = el('div', { class:'photo-box' });
+  if(store.logo){
+    box.appendChild(el('img', { src: store.logo, class:'photo-preview' }));
+    const removeBtn = el('div', { class:'photo-remove' }, document.createTextNode('✕ Remover logo'));
+    removeBtn.onclick = (e) => { e.stopPropagation(); store.logo=''; refreshPanel(); };
+    box.appendChild(removeBtn);
+  } else {
+    box.appendChild(el('div', { class:'photo-placeholder' }, [
+      el('div', { class:'photo-icon' }, document.createTextNode('🖼️')),
+      el('div', {}, document.createTextNode('Tocar para enviar logo'))
+    ]));
+  }
+  const input = el('input', { type:'file', accept:'image/*', class:'photo-input' });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file, (fixedDataUrl) => { store.logo = fixedDataUrl; saveProgress(); refreshPanel(); });
+  };
+  box.appendChild(input);
+  wrap.appendChild(box);
+  return wrap;
+}
+
+// ============ ABA 1 — CLÍNICA ============
+function renderClinic(container){
+  const headerRow = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:12px;' });
+  const titleBar = el('div', { class:'section-title', style:'flex:1;margin:0;' }, document.createTextNode('Dados da clínica / dentista'));
+  headerRow.appendChild(titleBar);
+  headerRow.appendChild(importPdfIcon('clinic', 'Dados da Clínica'));
+  container.appendChild(headerRow);
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:10px;' },
+    document.createTextNode('Esses dados aparecem no cabeçalho e rodapé de todos os PDFs gerados (prontuário, receituário e pós-operatório).')));
+  container.appendChild(logoField(state.clinic, 'Logo da clínica (opcional, aparece nos PDFs)'));
+  container.appendChild(textField('Nome da clínica (ex: Odontologia - Dr. Fulano)', state.clinic, 'nome'));
+  const row1 = el('div', { class:'row' });
+  row1.appendChild(textField('Nome do dentista responsável', state.clinic, 'dentista'));
+  row1.appendChild(textField('CRO', state.clinic, 'cro'));
+  row1.appendChild(textField('RG do dentista', state.clinic, 'rg'));
+  container.appendChild(row1);
+  container.appendChild(textField('Endereço da clínica (com CEP)', state.clinic, 'endereco'));
+  const row2 = el('div', { class:'row' });
+  row2.appendChild(textField('Cidade – UF (ex: Umuarama – PR)', state.clinic, 'cidade'));
+  row2.appendChild(textField('Telefone', state.clinic, 'telefone'));
+  container.appendChild(row2);
+}
+
+function photoField(store){
+  const wrap = el('div', { class:'field photo-field' });
+  wrap.appendChild(el('label', {}, document.createTextNode('Foto do paciente (opcional)')));
+  const box = el('div', { class:'photo-box' });
+  if(store.foto){
+    box.appendChild(el('img', { src: store.foto, class:'photo-preview' }));
+    const removeBtn = el('div', { class:'photo-remove' }, document.createTextNode('✕ Remover foto'));
+    removeBtn.onclick = (e) => { e.stopPropagation(); store.foto=''; refreshPanel(); };
+    box.appendChild(removeBtn);
+  } else {
+    box.appendChild(el('div', { class:'photo-placeholder' }, [
+      el('div', { class:'photo-icon' }, document.createTextNode('📷')),
+      el('div', {}, document.createTextNode('Tocar para tirar foto'))
+    ]));
+  }
+  const input = el('input', { type:'file', accept:'image/*', capture:'user', class:'photo-input' });
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    loadFixedImageDataURL(file, (fixedDataUrl) => { store.foto = fixedDataUrl; saveProgress(); refreshPanel(); });
+  };
+  box.appendChild(input);
+  wrap.appendChild(box);
+  return wrap;
+}
+
+// ============ ABA 2 — PACIENTE ============
+function renderPatient(container){
+  const headerRow = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:12px;' });
+  const titleBar = el('div', { class:'section-title', style:'flex:1;margin:0;' }, document.createTextNode('Dados do paciente'));
+  headerRow.appendChild(titleBar);
+  headerRow.appendChild(importPdfIcon('patient', 'Dados do Paciente'));
+  container.appendChild(headerRow);
+
+  container.appendChild(photoField(state.patient));
+  container.appendChild(textField('Nome', state.patient, 'nome'));
+  const row1 = el('div', { class:'row' });
+  row1.appendChild(textField('Data de nascimento', state.patient, 'nasc', {type:'date'}));
+  row1.appendChild(textField('Sexo', state.patient, 'sexo'));
+  row1.appendChild(textField('Idade', state.patient, 'idade'));
+  container.appendChild(row1);
+  const row2 = el('div', { class:'row' });
+  row2.appendChild(textField('RG', state.patient, 'rg'));
+  row2.appendChild(textField('CPF', state.patient, 'cpf'));
+  row2.appendChild(textField('Telefone', state.patient, 'telefone'));
+  container.appendChild(row2);
+  container.appendChild(textField('Endereço', state.patient, 'endereco'));
+  container.appendChild(textField('Observações', state.patient, 'obs'));
+  container.appendChild(textField('Responsável legal', state.patient, 'responsavel'));
+
+  if(typeof clinicaUpsertPaciente === 'function'){
+    const syncBtn = el('div', { class:'add-row-btn', style:'text-align:center;' }, document.createTextNode('🔄 Sincronizar este paciente com o cadastro compartilhado'));
+    syncBtn.onclick = () => {
+      if(!(state.patient.nome||'').trim()){ alert('Preencha ao menos o nome do paciente.'); return; }
+      clinicaUpsertPaciente({
+        nome: state.patient.nome, nasc: state.patient.nasc, telefone: state.patient.telefone,
+        cpf: state.patient.cpf, rg: state.patient.rg, endereco: state.patient.endereco
+      });
+      toast('Paciente sincronizado com o cadastro compartilhado!');
+    };
+    container.appendChild(syncBtn);
+  }
+}
+
+// ============ ABA 3 — PRONTUÁRIO ============
+// ============ ABA 3 — PRONTUÁRIO (inclui imagens, radiografias e observações por registro) ============
+let recordExpanded = {};
+let perguntaFinalizacao = {};
+function recordCard(r, idx){
+  const isOpen = !!recordExpanded[r.id];
+  const souAdmin = !!(window._clinicaMe && window._clinicaMe.papel === 'admin');
+  const card = el('div', { id:'record-'+r.id, style:'border:1.5px solid '+(r.finalizado?'#2E8B57':'var(--line-light)')+'; border-radius:10px; padding:12px; margin-bottom:14px; background:'+(r.finalizado?'#F3FBF5':'#fff')+';' });
+
+  const headerRow = el('div', { style:'display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;' });
+  headerRow.appendChild(el('div', { style:'font-weight:700; color:var(--blue-dark); font-size:13px;' },
+    document.createTextNode('Registro ' + (idx+1) + (r.dente ? (' — Dente ' + r.dente) : ''))));
+  if(!r.finalizado){
+    const removeBtn = el('div', { style:'color:var(--red); font-weight:900; cursor:pointer; font-size:16px; padding:0 4px;' }, document.createTextNode('✕'));
+    removeBtn.onclick = () => {
+      state.records.splice(idx,1);
+      delete recordExpanded[r.id];
+      saveProgressDebounced();
+      refreshPanel();
+    };
+    headerRow.appendChild(removeBtn);
+  }
+  card.appendChild(headerRow);
+
+  if(r.finalizado){
+    // ---- Registro finalizado: só leitura, exceto se for o admin da clínica ----
+    card.appendChild(el('div', { style:'background:#2E8B57;color:#fff;font-size:11.5px;font-weight:700;padding:6px 10px;border-radius:6px;display:inline-block;margin-bottom:10px;' },
+      document.createTextNode('✓ Atendimento finalizado e arquivado no histórico')));
+    const resumo = el('div', { style:'font-size:13px;line-height:1.7;' });
+    resumo.appendChild(el('div', {}, document.createTextNode('Data: ' + (formatDateBR(r.data)||'—'))));
+    resumo.appendChild(el('div', {}, document.createTextNode('Dente: ' + (r.dente||'—'))));
+    resumo.appendChild(el('div', {}, document.createTextNode('Procedimento: ' + (r.procedimento||'—'))));
+    if(r.obs) resumo.appendChild(el('div', { style:'margin-top:6px;' }, document.createTextNode('Obs.: ' + r.obs)));
+    card.appendChild(resumo);
+    if((r.imagens&&r.imagens.length) || (r.radiografias&&r.radiografias.length)){
+      const toggle = el('div', { style:'cursor:pointer;color:var(--blue-dark);font-size:12.5px;font-weight:700;margin-top:8px;' },
+        document.createTextNode((isOpen?'▾':'▸')+' Ver imagens deste atendimento'));
+      toggle.onclick = () => { recordExpanded[r.id] = !isOpen; refreshPanel(); };
+      card.appendChild(toggle);
+      if(isOpen){
+        const extra = el('div', { style:'margin-top:10px;' });
+        if(r.imagens&&r.imagens.length) extra.appendChild(galleryFieldSomenteLeitura('Imagens clínicas', r.imagens));
+        if(r.radiografias&&r.radiografias.length) extra.appendChild(galleryFieldSomenteLeitura('Radiografias', r.radiografias));
+        card.appendChild(extra);
+      }
+    }
+    if(souAdmin){
+      const desbloquearBtn = el('div', { style:'margin-top:12px;font-size:12px;font-weight:700;color:var(--red);cursor:pointer;text-decoration:underline;' },
+        document.createTextNode('🔓 Desbloquear para editar (admin)'));
+      desbloquearBtn.onclick = () => {
+        if(!confirm('Desbloquear este registro pra edição? Ele deixa de ficar marcado como "finalizado" até ser salvo de novo.')) return;
+        r.finalizado = false;
+        saveProgressDebounced(); refreshPanel();
+      };
+      card.appendChild(desbloquearBtn);
+    } else {
+      card.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:10px;' },
+        document.createTextNode('Só o administrador da clínica pode desbloquear um registro já finalizado.')));
+    }
+    return card;
+  }
+
+  // ---- Registro ainda em edição (não finalizado) ----
+  const row1 = el('div', { class:'row' });
+  row1.appendChild(textField('Data', r, 'data', {type:'date'}));
+  row1.appendChild(textField('Dente', r, 'dente'));
+  card.appendChild(row1);
+  card.appendChild(textField('Procedimento', r, 'procedimento'));
+
+  // ---- Vincular a uma consulta confirmada no Agendamento (só assim a comissão do profissional conta) ----
+  const vinculoWrap = el('div', { style:'margin:6px 0 10px;' });
+  card.appendChild(vinculoWrap);
+  renderVinculoConsulta(vinculoWrap, r);
+
+  const toggle = el('div', { style:'cursor:pointer;color:var(--blue-dark);font-size:12.5px;font-weight:700;margin-top:2px;display:flex;align-items:center;gap:4px;' }, [
+    el('span', {}, document.createTextNode(isOpen ? '▾' : '▸')),
+    el('span', {}, document.createTextNode('Imagens, radiografias e observações' +
+      (( (r.imagens&&r.imagens.length) || (r.radiografias&&r.radiografias.length) || (r.obs&&r.obs.trim()) ) ? ' •' : '')))
+  ]);
+  toggle.onclick = () => { recordExpanded[r.id] = !isOpen; refreshPanel(); };
+  card.appendChild(toggle);
+
+  if(isOpen){
+    const extra = el('div', { style:'margin-top:10px;padding-top:10px;border-top:1px solid var(--line-light);' });
+    extra.appendChild(galleryField('Imagens clínicas deste registro', r.imagens, refreshPanel));
+    extra.appendChild(galleryField('Radiografias deste registro', r.radiografias, refreshPanel));
+    extra.appendChild(textareaField('Observações deste registro', r, 'obs', 3));
+    card.appendChild(extra);
+  }
+
+  if(perguntaFinalizacao[r.id]){
+    const escolhaWrap = el('div', { style:'margin-top:12px;padding:12px;background:#FFF8EC;border:1.5px solid var(--amber);border-radius:10px;' });
+    escolhaWrap.appendChild(el('div', { style:'font-size:12.5px;font-weight:700;margin-bottom:10px;' },
+      document.createTextNode('Esse atendimento finaliza o procedimento, ou vai precisar de outra sessão?')));
+    const finalizarBtn = el('div', { class:'add-row-btn', style:'background:var(--green);color:#fff;border:none;margin-bottom:8px;' },
+      document.createTextNode('✓ Finalizar procedimento (comissão passa a contar)'));
+    finalizarBtn.onclick = async () => {
+      r.finalizado = true;
+      r.procedimentoConcluido = true;
+      await marcarPercentualDevido(r, true);
+      delete perguntaFinalizacao[r.id];
+      saveProgress();
+      refreshPanel();
+      toast('Procedimento finalizado! A comissão do profissional já conta no Financeiro.');
+    };
+    const outraSessaoBtn = el('div', { class:'add-row-btn', style:'background:#fff;border:1.5px solid var(--line);color:var(--ink);' },
+      document.createTextNode('📅 Vai precisar de outra sessão'));
+    outraSessaoBtn.onclick = async () => {
+      r.finalizado = true;
+      r.procedimentoConcluido = false;
+      await marcarPercentualDevido(r, false);
+      delete perguntaFinalizacao[r.id];
+      saveProgress();
+      refreshPanel();
+      toast('Registro salvo. O procedimento continua em aberto até a próxima sessão.');
+    };
+    escolhaWrap.appendChild(finalizarBtn);
+    escolhaWrap.appendChild(outraSessaoBtn);
+    if(fichaAtivaPacienteId){
+      const agendarProximaLink = el('a', {
+        href: 'agendamento.html?paciente='+encodeURIComponent(fichaAtivaPacienteId),
+        style:'display:block;text-align:center;margin-top:8px;font-size:12px;color:var(--blue-dark);font-weight:700;text-decoration:underline;'
+      }, document.createTextNode('Ir para o Agendamento e marcar a próxima sessão →'));
+      escolhaWrap.appendChild(agendarProximaLink);
+    }
+    card.appendChild(escolhaWrap);
+  } else {
+    const salvarBtn = el('div', { class:'add-row-btn', style:'margin-top:12px;background:var(--green);color:#fff;border:none;' },
+      document.createTextNode('💾 Salvar registro do atendimento'));
+    salvarBtn.onclick = () => {
+      if(!(r.data||r.procedimento||r.dente)){
+        alert('Preencha ao menos a data, o dente ou o procedimento antes de salvar.');
+        return;
+      }
+      perguntaFinalizacao[r.id] = true;
+      refreshPanel();
+    };
+    card.appendChild(salvarBtn);
+  }
+
+  return card;
+}
+
+// Galeria simples, somente leitura (usada em registros já finalizados)
+function galleryFieldSomenteLeitura(label, arr){
+  const wrap = el('div', { style:'margin-bottom:10px;' });
+  wrap.appendChild(el('label', { style:'display:block;font-size:12px;font-weight:700;margin-bottom:6px;' }, document.createTextNode(label)));
+  const grid = el('div', { class:'gallery-grid' });
+  (arr||[]).forEach(src => grid.appendChild(el('img', { src, style:'width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;' })));
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+// Marca (ou desmarca) na consulta vinculada do Agendamento que o percentual do profissional
+// já pode contar no Financeiro — só acontece quando o profissional finaliza o procedimento aqui.
+async function marcarPercentualDevido(r, devido){
+  if(!r.consultaVinculadaId) return;
+  let dados;
+  try{ dados = await ClinicaStorage.load(CHAVE_AGENDAMENTO_PRONTUARIO); }catch(e){ return; }
+  const consulta = dados && (dados.consultas||[]).find(c => c.id === r.consultaVinculadaId);
+  if(!consulta) return;
+  consulta.percentualDevido = devido;
+  await ClinicaStorage.save(CHAVE_AGENDAMENTO_PRONTUARIO, dados);
+}
+
+// Vincula este registro a uma consulta confirmada do Agendamento — é isso que faz a comissão
+// do profissional realmente contar no Financeiro (em vez de contar só por estar "Confirmado" na Agenda).
+const CHAVE_AGENDAMENTO_PRONTUARIO = 'controle_agendamento_progresso_v1';
+async function renderVinculoConsulta(container, r){
+  container.innerHTML = '';
+  if(r.consultaVinculadaId){
+    let dados;
+    try{ dados = await ClinicaStorage.load(CHAVE_AGENDAMENTO_PRONTUARIO); }catch(e){ dados = null; }
+    const consulta = dados && (dados.consultas||[]).find(c => c.id === r.consultaVinculadaId);
+    const linha = el('div', { style:'background:#EAF6EE;border-radius:8px;padding:8px 10px;font-size:12px;color:#2E8B57;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px;' });
+    linha.appendChild(el('span', {}, document.createTextNode(
+      '✓ Serviço realizado confirmado' + (consulta ? (' — consulta de '+formatDateBR(consulta.data)+' às '+(consulta.horaInicio||'')) : '')
+    )));
+    const desvincularBtn = el('span', { style:'cursor:pointer;text-decoration:underline;' }, document.createTextNode('Desvincular'));
+    desvincularBtn.onclick = async () => {
+      if(dados && consulta){ consulta.servicoRealizado = false; await ClinicaStorage.save(CHAVE_AGENDAMENTO_PRONTUARIO, dados); }
+      r.consultaVinculadaId = '';
+      saveProgressDebounced();
+      renderVinculoConsulta(container, r);
+    };
+    linha.appendChild(desvincularBtn);
+    container.appendChild(linha);
+    return;
+  }
+
+  let dados;
+  try{ dados = await ClinicaStorage.load(CHAVE_AGENDAMENTO_PRONTUARIO); }catch(e){ dados = null; }
+  const consultas = (dados && dados.consultas) || [];
+  const disponiveis = consultas.filter(c =>
+    c.status === 'confirmado' && !c.servicoRealizado &&
+    (c.pacienteId === fichaAtivaPacienteId || (c.paciente||'').trim().toLowerCase() === (state.patient.nome||'').trim().toLowerCase())
+  );
+  if(!disponiveis.length){
+    container.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:0;' },
+      document.createTextNode('Nenhuma consulta confirmada pendente de vínculo para este paciente. Sem vincular, a comissão do profissional não conta no Financeiro.')));
+    return;
+  }
+  container.appendChild(el('label', { style:'display:block;font-size:12px;font-weight:700;color:var(--amber);margin-bottom:4px;' },
+    document.createTextNode('⚠ Vincular a uma consulta (confirma o serviço realizado, pra comissão contar)')));
+  const sel = el('select', { style:'width:100%;padding:9px;font-size:13px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  sel.appendChild(el('option', { value:'' }, document.createTextNode('— Selecione a consulta —')));
+  disponiveis.forEach(c => {
+    sel.appendChild(el('option', { value:c.id }, document.createTextNode(
+      formatDateBR(c.data) + ' às ' + (c.horaInicio||'') + (c.procedimento?(' — '+c.procedimento):'')
+    )));
+  });
+  sel.onchange = async (e) => {
+    if(!e.target.value) return;
+    const consulta = consultas.find(c => c.id === e.target.value);
+    if(consulta){
+      consulta.servicoRealizado = true;
+      await ClinicaStorage.save(CHAVE_AGENDAMENTO_PRONTUARIO, dados);
+    }
+    r.consultaVinculadaId = e.target.value;
+    saveProgressDebounced();
+    renderVinculoConsulta(container, r);
+  };
+  container.appendChild(sel);
+}
+
+// ---- Odontograma clicável ----
+function toothStatus(num){
+  const recs = state.records.filter(r => String(r.dente).trim() === String(num));
+  if(!recs.length) return 'default';
+  const hasContent = recs.some(r => (r.procedimento||'').trim());
+  return hasContent ? 'documented' : 'pending';
+}
+function openRecordForTooth(num){
+  let rec = state.records.find(r => String(r.dente).trim() === String(num) && !(r.procedimento||'').trim());
+  if(!rec){
+    rec = makeRecord();
+    rec.dente = String(num);
+    state.records.push(rec);
+  }
+  recordExpanded[rec.id] = true;
+  saveProgressDebounced();
+  refreshPanel();
+  setTimeout(() => {
+    const target = document.getElementById('record-'+rec.id);
+    if(target) target.scrollIntoView({ behavior:'smooth', block:'start' });
+  }, 60);
+}
+function odoToothChip(num, deciduous){
+  const status = toothStatus(num);
+  const cls = 'odo-tooth' + (deciduous ? ' deciduous' : '') + (status !== 'default' ? ' '+status : '');
+  const chip = el('div', { class: cls }, document.createTextNode(String(num)));
+  chip.onclick = () => openRecordForTooth(num);
+  return chip;
+}
+function odoRow(leftArr, rightArr, deciduous){
+  const row = el('div', { class:'odo-row' });
+  leftArr.forEach(n => row.appendChild(odoToothChip(n, deciduous)));
+  row.appendChild(el('div', { class:'odo-divider' }));
+  rightArr.forEach(n => row.appendChild(odoToothChip(n, deciduous)));
+  return row;
+}
+function renderOdontogramBlock(container){
+  container.appendChild(el('div', { class:'odo-legend' }, [
+    el('span', {}, [el('i', { style:'background:#fff;border:1.5px solid var(--line);' }), document.createTextNode('Sem registro')]),
+    el('span', {}, [el('i', { style:'background:#FBEAEA;border:1.5px solid #C0392B;' }), document.createTextNode('Registro em aberto')]),
+    el('span', {}, [el('i', { style:'background:var(--blue-dark);' }), document.createTextNode('Documentado')]),
+  ]));
+  const wrap = el('div', { class:'odo-wrap' });
+  wrap.appendChild(odoRow([18,17,16,15,14,13,12,11],[21,22,23,24,25,26,27,28], false));
+  wrap.appendChild(odoRow([48,47,46,45,44,43,42,41],[31,32,33,34,35,36,37,38], false));
+  wrap.appendChild(el('div', { class:'odo-sep' }));
+  wrap.appendChild(odoRow([55,54,53,52,51],[61,62,63,64,65], true));
+  wrap.appendChild(odoRow([85,84,83,82,81],[71,72,73,74,75], true));
+  container.appendChild(wrap);
+}
+
+function renderImagensGerais(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Imagens do paciente')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:10px;' },
+    document.createTextNode('Fotos e radiografias gerais do paciente, não ligadas a um registro de evolução específico. Para anexar imagens a um atendimento específico, use "Imagens, radiografias e observações" dentro do registro, na aba Prontuário.')));
+  container.appendChild(galleryField('Fotos clínicas', state.images.clinicas, refreshPanel));
+
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Radiografias')));
+  container.appendChild(galleryField('Radiografias', state.images.radiografias, refreshPanel));
+}
+
+function renderProntuario(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Prontuário')));
+
+  const importWrap = el('div', { style:'margin-bottom:14px;position:relative;' });
+  importWrap.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:0;margin-bottom:6px;' },
+    document.createTextNode('Já tem um prontuário deste paciente gerado antes nesta ficha? Importe o PDF para continuar de onde parou.')));
+  const importBtn = el('div', { class:'add-row-btn',
+    style:'background:var(--blue-light);border-color:var(--blue-dark);color:var(--blue-dark);text-align:center;position:relative;overflow:hidden;' },
+    document.createTextNode('📥 Importar Prontuário (PDF)'));
+  const importInput = el('input', {
+    type:'file', accept:'.pdf,application/pdf',
+    style:'position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;'
+  });
+  importInput.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    importFullProntuarioPDF(file);
+  };
+  importBtn.appendChild(importInput);
+  importWrap.appendChild(importBtn);
+  container.appendChild(importWrap);
+
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:0;margin-bottom:10px;' },
+    document.createTextNode('Toque no número do dente no odontograma para abrir os campos de preenchimento, ou adicione um registro manualmente abaixo.')));
+  renderOdontogramBlock(container);
+
+  container.appendChild(el('div', { class:'section-title', style:'margin-top:6px;' }, document.createTextNode('Registros')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:12px;' },
+    document.createTextNode('Toque em "Imagens, radiografias e observações" para anexar fotos e notas daquele dente/procedimento específico.')));
+
+  state.records.forEach((r, idx) => container.appendChild(recordCard(r, idx)));
+
+  const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Adicionar registro'));
+  addBtn.onclick = () => {
+    state.records.push(makeRecord());
+    saveProgressDebounced();
+    refreshPanel();
+  };
+  container.appendChild(addBtn);
+
+  const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:22px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
+    document.createTextNode('Gerar PDF do prontuário completo'));
+  pdfBtn.onclick = generatePDF;
+  container.appendChild(pdfBtn);
+
+  const newBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:transparent;border:1.5px solid #C0392B;color:#C0392B;text-align:center;font-size:13px;padding:11px;' },
+    document.createTextNode('Iniciar novo prontuário (limpar dados deste paciente)'));
+  newBtn.onclick = () => {
+    if(confirm('Isso vai apagar todos os dados preenchidos deste prontuário e começar do zero. Deseja continuar?')){
+      const pacienteId = fichaAtivaPacienteId;
+      ClinicaStorage.save(chaveFicha(pacienteId), null);
+      abrirFicha(pacienteId);
+    }
+  };
+  container.appendChild(newBtn);
+}
+
+// ============ ABA 5 — RECEITUÁRIO ============
+let medCatOpen = { 'Uso Interno': true };
+let docOpen = { receituario:false, documentos:false };
+let historicoDocsAberto = false;
+let documentoAtivo = 'atestado'; // 'atestado' | 'posop' | 'termo' | id de um tipo personalizado
+let gerenciarTiposDoc = false;
+let gerenciarCatalogoMeds = false;
+
+// ============ CATÁLOGOS COMPARTILHADOS (medicamentos e modelos de documentos) ============
+// Diferente da ficha do paciente: isso é da CLÍNICA inteira, vale para todos os pacientes.
+let medCatalogo = [];
+let modelosPosop = [];
+let modelosAtestado = [];
+let modelosTermo = [];
+let tiposDocumentoCustom = []; // [{id, nome}]
+
+function novoModeloId(){ return 'md' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+async function carregarCatalogosCompartilhados(){
+  const catalogoSalvo = await ClinicaStorage.load('catalogo_medicamentos_v1');
+  if(Array.isArray(catalogoSalvo) && catalogoSalvo.length){
+    medCatalogo = catalogoSalvo;
+  } else {
+    // Primeira vez: começa com a lista pré-definida, mas já fica editável dali pra frente
+    medCatalogo = PRESET_MEDS.map(m => Object.assign({ id: novoModeloId() }, m));
+    ClinicaStorage.save('catalogo_medicamentos_v1', medCatalogo);
+  }
+
+  async function carregarOuSemear(chave, textoPadrao){
+    const salvo = await ClinicaStorage.load(chave);
+    if(Array.isArray(salvo) && salvo.length) return salvo;
+    const inicial = [{ id:'padrao', nome:'Padrão', texto: textoPadrao }];
+    ClinicaStorage.save(chave, inicial);
+    return inicial;
+  }
+  modelosPosop = await carregarOuSemear('modelos_posop_v1', FICHA_TEMPLATE_VAZIA.posOp.texto);
+  modelosAtestado = await carregarOuSemear('modelos_atestado_v1', FICHA_TEMPLATE_VAZIA.atestado.texto);
+  modelosTermo = await carregarOuSemear('modelos_termo_v1', FICHA_TEMPLATE_VAZIA.termo.texto);
+
+  const tiposSalvos = await ClinicaStorage.load('tipos_documento_custom_v1');
+  tiposDocumentoCustom = Array.isArray(tiposSalvos) ? tiposSalvos : [];
+  for(const t of tiposDocumentoCustom){
+    const salvo = await ClinicaStorage.load('modelos_' + t.id + '_v1');
+    _modelosCustomCache[t.id] = Array.isArray(salvo) && salvo.length ? salvo : [{ id:'padrao', nome:'Padrão', texto:'' }];
+  }
+}
+function salvarCatalogoMeds(){ ClinicaStorage.save('catalogo_medicamentos_v1', medCatalogo); }
+function salvarModelos(tipo, lista){ ClinicaStorage.save('modelos_' + tipo + '_v1', lista); }
+function salvarTiposDocumentoCustom(){ ClinicaStorage.save('tipos_documento_custom_v1', tiposDocumentoCustom); }
+
+// Devolve a lista de modelos (em memória) de um tipo de documento — precisa ser carregada
+// via loadModelosDoTipo antes de exibir, para tipos personalizados criados na hora.
+let _modelosCustomCache = {};
+async function carregarModelosDoTipo(tipoId){
+  if(tipoId === 'posop') return modelosPosop;
+  if(tipoId === 'atestado') return modelosAtestado;
+  if(tipoId === 'termo') return modelosTermo;
+  if(_modelosCustomCache[tipoId]) return _modelosCustomCache[tipoId];
+  const salvo = await ClinicaStorage.load('modelos_' + tipoId + '_v1');
+  const lista = Array.isArray(salvo) && salvo.length ? salvo : [{ id:'padrao', nome:'Padrão', texto:'' }];
+  _modelosCustomCache[tipoId] = lista;
+  return lista;
+}
+function getModeloTextoStore(tipoId){
+  if(tipoId === 'posop') return state.posOp;
+  if(tipoId === 'atestado') return state.atestado;
+  if(tipoId === 'termo') return state.termo;
+  if(!state.documentos[tipoId]) state.documentos[tipoId] = { texto:'' };
+  return state.documentos[tipoId];
+}
+
+// Monta o seletor de modelos + botões de salvar/excluir, usado em Recomendações, Atestado e Termo
+function renderModeloPicker(container, tipo, listaModelos, store){
+  const wrap = el('div', { style:'margin-bottom:10px;' });
+  const row = el('div', { class:'row', style:'align-items:flex-end;' });
+
+  const field = el('div', { class:'field', style:'flex:1;' });
+  field.appendChild(el('label', {}, document.createTextNode('Modelo salvo')));
+  const select = el('select', { style:'width:100%;padding:11px 10px;font-size:15px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  select.appendChild(el('option', { value:'' }, document.createTextNode('— não usar nenhum modelo —')));
+  listaModelos.forEach(m => select.appendChild(el('option', { value:m.id }, document.createTextNode(m.nome))));
+  select.onchange = (e) => {
+    const modelo = listaModelos.find(m => m.id === e.target.value);
+    if(modelo){ store.texto = modelo.texto; saveProgressDebounced(); refreshPanel(); }
+  };
+  field.appendChild(select);
+  row.appendChild(field);
+  wrap.appendChild(row);
+
+  const btnRow = el('div', { class:'row', style:'margin-top:6px;' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'flex:1;margin-top:0;font-size:12.5px;padding:10px;' },
+    document.createTextNode('💾 Salvar texto atual como novo modelo'));
+  salvarBtn.onclick = () => {
+    const nome = prompt('Dê um nome para este modelo (ex: "Extração simples", "Atestado padrão"):');
+    if(!nome || !nome.trim()) return;
+    listaModelos.push({ id: novoModeloId(), nome: nome.trim(), texto: store.texto });
+    salvarModelos(tipo, listaModelos);
+    toast('Modelo salvo!');
+    refreshPanel();
+  };
+  btnRow.appendChild(salvarBtn);
+
+  const excluirBtn = el('div', { class:'add-row-btn', style:'flex:1;margin-top:0;font-size:12.5px;padding:10px;background:transparent;border:1.5px solid #C0392B;color:#C0392B;' },
+    document.createTextNode('🗑 Excluir um modelo salvo'));
+  excluirBtn.onclick = () => {
+    if(!listaModelos.length){ alert('Não há modelos salvos para excluir.'); return; }
+    const nomes = listaModelos.map((m,i) => (i+1)+') '+m.nome).join('\n');
+    const escolha = prompt('Qual modelo excluir? Digite o número:\n\n' + nomes);
+    const idx = parseInt(escolha,10) - 1;
+    if(isNaN(idx) || idx<0 || idx>=listaModelos.length) return;
+    if(!confirm('Excluir o modelo "'+listaModelos[idx].nome+'"? Isso não muda o texto já usado nas fichas, só remove da lista de modelos.')) return;
+    listaModelos.splice(idx,1);
+    salvarModelos(tipo, listaModelos);
+    toast('Modelo excluído.');
+    refreshPanel();
+  };
+  btnRow.appendChild(excluirBtn);
+  wrap.appendChild(btnRow);
+
+  container.appendChild(wrap);
+}
+function renderReceituario(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Documentos')));
+
+  if(state.documentosEmitidos && state.documentosEmitidos.length){
+    const histWrap = el('div', { style:'margin-bottom:16px;' });
+    const histToggle = el('div', { style:'cursor:pointer;color:var(--blue-dark);font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:4px;margin-bottom:8px;' }, [
+      el('span', {}, document.createTextNode(historicoDocsAberto ? '▾' : '▸')),
+      el('span', {}, document.createTextNode('Histórico de documentos emitidos (' + state.documentosEmitidos.length + ')'))
+    ]);
+    histToggle.onclick = () => { historicoDocsAberto = !historicoDocsAberto; refreshPanel(); };
+    histWrap.appendChild(histToggle);
+    if(historicoDocsAberto){
+      state.documentosEmitidos.forEach(doc2 => {
+        const dataFmt = new Date(doc2.dataEmissao).toLocaleDateString('pt-BR') + ' às ' + new Date(doc2.dataEmissao).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        const item = el('div', { class:'card', style:'padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;' });
+        item.appendChild(el('div', {}, [
+          el('div', { style:'font-weight:700;font-size:13px;' }, document.createTextNode(doc2.titulo)),
+          el('div', { style:'font-size:11px;color:var(--muted);' }, document.createTextNode(dataFmt))
+        ]));
+        const delBtn = el('span', { style:'color:var(--red);cursor:pointer;font-size:12px;font-weight:700;' }, document.createTextNode('✕'));
+        delBtn.onclick = () => {
+          if(!confirm('Remover este registro do histórico?')) return;
+          state.documentosEmitidos = state.documentosEmitidos.filter(d=>d.id!==doc2.id);
+          saveProgress(); refreshPanel();
+        };
+        item.appendChild(delBtn);
+        histWrap.appendChild(item);
+      });
+    }
+    container.appendChild(histWrap);
+  }
+
+  // ---- Dois botões principais ----
+  const btnRow = el('div', { class:'row', style:'margin-bottom:6px;' });
+  const rxToggleBtn = el('div', { class:'add-row-btn',
+    style:'margin-top:0;flex:1;text-align:center;font-size:14px;padding:13px;'+
+      (docOpen.receituario ? 'background:#1F5C8B;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
+    document.createTextNode('Receituário'));
+  rxToggleBtn.onclick = () => { docOpen.receituario = !docOpen.receituario; refreshPanel(); };
+  const documentosToggleBtn = el('div', { class:'add-row-btn',
+    style:'margin-top:0;flex:1;text-align:center;font-size:14px;padding:13px;'+
+      (docOpen.documentos ? 'background:#1F5C8B;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
+    document.createTextNode('Documentos'));
+  documentosToggleBtn.onclick = () => { docOpen.documentos = !docOpen.documentos; refreshPanel(); };
+  btnRow.appendChild(rxToggleBtn);
+  btnRow.appendChild(documentosToggleBtn);
+  container.appendChild(btnRow);
+
+  // ---- Conteúdo do Receituário (só aparece se o botão estiver ativo) ----
+  if(docOpen.receituario){
+    const tituloRow = el('div', { style:'display:flex;align-items:center;justify-content:space-between;margin:18px 0 4px;' });
+    tituloRow.appendChild(el('div', { style:'font-size:14px;font-weight:700;color:var(--blue-dark);' }, document.createTextNode('Medicamentos')));
+    const gerenciarBtn = el('span', { style:'font-size:12px;font-weight:700;color:var(--blue-dark);cursor:pointer;' },
+      document.createTextNode(gerenciarCatalogoMeds ? '✓ Concluir edição do catálogo' : '✎ Gerenciar catálogo'));
+    gerenciarBtn.onclick = () => { gerenciarCatalogoMeds = !gerenciarCatalogoMeds; refreshPanel(); };
+    tituloRow.appendChild(gerenciarBtn);
+    container.appendChild(tituloRow);
+    container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:0;margin-bottom:10px;' },
+      document.createTextNode(gerenciarCatalogoMeds
+        ? 'Toque no ✕ para remover um medicamento do catálogo da clínica, ou adicione um novo abaixo.'
+        : 'Toque no nome de uma categoria para expandir, depois toque num medicamento para adicioná-lo à lista deste paciente.')));
+
+    if(gerenciarCatalogoMeds){
+      const novoMed = { categoria:'', nome:'', dosagem:'', posologia:'' };
+      const form = el('div', { class:'card-form' });
+      const catInput = el('input', { type:'text', placeholder:'Categoria (ex: Antibiótico)', list:'categoriasMedList',
+        style:'width:100%;padding:10px;font-size:14px;border:1px solid var(--line-light);border-radius:6px;margin-bottom:8px;font-family:inherit;' });
+      catInput.oninput = (e) => { novoMed.categoria = e.target.value; };
+      form.appendChild(catInput);
+      const datalist = el('datalist', { id:'categoriasMedList' });
+      [...new Set(medCatalogo.map(m=>m.categoria))].forEach(c => datalist.appendChild(el('option', { value:c })));
+      form.appendChild(datalist);
+      ['nome','dosagem','posologia'].forEach(campo => {
+        const placeholders = { nome:'Nome do medicamento', dosagem:'Dosagem (ex: 500mg)', posologia:'Posologia (ex: de 8 em 8h por 7 dias)' };
+        const inp = el('input', { type:'text', placeholder: placeholders[campo],
+          style:'width:100%;padding:10px;font-size:14px;border:1px solid var(--line-light);border-radius:6px;margin-bottom:8px;font-family:inherit;' });
+        inp.oninput = (e) => { novoMed[campo] = e.target.value; };
+        form.appendChild(inp);
+      });
+      const addBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;' }, document.createTextNode('+ Adicionar ao catálogo'));
+      addBtn.onclick = () => {
+        if(!novoMed.categoria.trim() || !novoMed.nome.trim()){ alert('Informe ao menos a categoria e o nome do medicamento.'); return; }
+        medCatalogo.push(Object.assign({ id: novoModeloId() }, novoMed));
+        salvarCatalogoMeds();
+        toast('Medicamento adicionado ao catálogo!');
+        refreshPanel();
+      };
+      form.appendChild(addBtn);
+      container.appendChild(form);
+    }
+
+    const cats = [...new Set(medCatalogo.map(m => m.categoria))];
+    cats.forEach(cat => {
+      const isOpen = !!medCatOpen[cat];
+      const catHeader = el('div', { class:'med-cat-label', style:'cursor:pointer;display:flex;align-items:center;justify-content:space-between;' }, [
+        el('span', {}, document.createTextNode(cat + ' (' + medCatalogo.filter(m=>m.categoria===cat).length + ')')),
+        el('span', {}, document.createTextNode(isOpen ? '▾' : '▸'))
+      ]);
+      catHeader.onclick = () => { medCatOpen[cat] = !isOpen; refreshPanel(); };
+      container.appendChild(catHeader);
+      if(!isOpen) return;
+      const grid = el('div', { class:'med-chip-grid' });
+      medCatalogo.filter(m => m.categoria === cat).forEach(m => {
+        if(gerenciarCatalogoMeds){
+          const chip = el('div', { class:'med-chip', style:'display:flex;align-items:center;gap:6px;' }, [
+            el('span', {}, document.createTextNode(m.nome))
+          ]);
+          const delX = el('span', { style:'color:#C0392B;font-weight:900;cursor:pointer;' }, document.createTextNode('✕'));
+          delX.onclick = (e) => {
+            e.stopPropagation();
+            if(!confirm('Remover "'+m.nome+'" do catálogo da clínica?')) return;
+            medCatalogo = medCatalogo.filter(x => x.id !== m.id);
+            salvarCatalogoMeds();
+            refreshPanel();
+          };
+          chip.appendChild(delX);
+          grid.appendChild(chip);
+        } else {
+          const chip = el('div', { class:'med-chip' }, document.createTextNode(m.nome));
+          chip.onclick = () => {
+            state.meds.push({ nome:m.nome, dosagem:m.dosagem, posologia:m.posologia, categoria:m.categoria });
+            saveProgressDebounced();
+            refreshPanel();
+            toast(m.nome + ' adicionado à lista');
+          };
+          grid.appendChild(chip);
+        }
+      });
+      container.appendChild(grid);
+    });
+
+    container.appendChild(editableTable(
+      ['Medicamento','Dosagem','Posologia'],
+      ['nome','dosagem','posologia'],
+      state.meds,
+      '+ Adicionar medicamento manualmente',
+      ['ex: Amoxicilina 500mg','ex: 1 cápsula','ex: de 8 em 8h por 7 dias']
+    ));
+
+    const rxBtn = el('div', { class:'add-row-btn',
+      style:'margin-top:10px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:14px;padding:13px;' },
+      document.createTextNode('📄 Gerar Receituário (PDF)'));
+    rxBtn.onclick = generateReceituarioPDF;
+    container.appendChild(rxBtn);
+  }
+
+  // ---- Conteúdo de Documentos (Atestado, Recomendações, Termo + tipos personalizados) ----
+  if(docOpen.documentos){
+    const tiposFixos = [
+      { id:'atestado', nome:'Atestado' },
+      { id:'posop', nome:'Recomendações pós-cirúrgicas' },
+      { id:'termo', nome:'Termo de Comparecimento' }
+    ];
+    const todosTipos = tiposFixos.concat(tiposDocumentoCustom);
+
+    const tituloRow = el('div', { style:'display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;' });
+    tituloRow.appendChild(el('div', { style:'font-size:14px;font-weight:700;color:var(--blue-dark);' }, document.createTextNode('Documentos')));
+    const gerenciarTiposBtn = el('span', { style:'font-size:12px;font-weight:700;color:var(--blue-dark);cursor:pointer;' },
+      document.createTextNode(gerenciarTiposDoc ? '✓ Concluir' : '⚙ Gerenciar tipos de documento'));
+    gerenciarTiposBtn.onclick = () => { gerenciarTiposDoc = !gerenciarTiposDoc; refreshPanel(); };
+    tituloRow.appendChild(gerenciarTiposBtn);
+    container.appendChild(tituloRow);
+
+    if(gerenciarTiposDoc){
+      container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:10px;' },
+        document.createTextNode('Crie outros tipos de documento (ex: "Orçamento", "Declaração"). Atestado, Recomendações e Termo já vêm prontos e não podem ser excluídos.')));
+
+      tiposDocumentoCustom.forEach(t => {
+        const row = el('div', { class:'pac-card', style:'margin-bottom:8px;' });
+        row.appendChild(el('div', { class:'pac-name' }, document.createTextNode(t.nome)));
+        const delX = el('span', { class:'pac-del' }, document.createTextNode('✕ Excluir'));
+        delX.onclick = () => {
+          if(!confirm('Excluir o tipo de documento "'+t.nome+'"? Os modelos salvos dele também serão perdidos.')) return;
+          tiposDocumentoCustom = tiposDocumentoCustom.filter(x => x.id !== t.id);
+          salvarTiposDocumentoCustom();
+          delete _modelosCustomCache[t.id];
+          if(documentoAtivo === t.id) documentoAtivo = 'atestado';
+          refreshPanel();
+        };
+        row.appendChild(delX);
+        container.appendChild(row);
+      });
+
+      const novoTipo = { nome:'' };
+      const form = el('div', { class:'card-form' });
+      const inp = el('input', { type:'text', placeholder:'Nome do novo tipo de documento (ex: Orçamento)',
+        style:'width:100%;padding:10px;font-size:14px;border:1px solid var(--line-light);border-radius:6px;margin-bottom:8px;font-family:inherit;' });
+      inp.oninput = (e) => { novoTipo.nome = e.target.value; };
+      form.appendChild(inp);
+      const addTipoBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;' }, document.createTextNode('+ Criar tipo de documento'));
+      addTipoBtn.onclick = () => {
+        if(!novoTipo.nome.trim()){ alert('Dê um nome para o novo tipo de documento.'); return; }
+        const id = novoModeloId();
+        tiposDocumentoCustom.push({ id, nome: novoTipo.nome.trim() });
+        salvarTiposDocumentoCustom();
+        _modelosCustomCache[id] = [{ id:'padrao', nome:'Padrão', texto:'' }];
+        ClinicaStorage.save('modelos_' + id + '_v1', _modelosCustomCache[id]);
+        documentoAtivo = id;
+        toast('Tipo de documento criado!');
+        refreshPanel();
+      };
+      form.appendChild(addTipoBtn);
+      container.appendChild(form);
+    } else {
+      // ---- Sub-abas: Atestado | Recomendações | Termo | (personalizados) ----
+      const subRow = el('div', { class:'row', style:'flex-wrap:wrap;margin-bottom:14px;' });
+      todosTipos.forEach(t => {
+        const ativo = documentoAtivo === t.id;
+        const chip = el('div', { class:'add-row-btn', style:'margin-top:0;flex:1;min-width:120px;text-align:center;font-size:12.5px;padding:10px;'+
+          (ativo ? 'background:#1F5C8B;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
+          document.createTextNode(t.nome));
+        chip.onclick = () => { documentoAtivo = t.id; refreshPanel(); };
+        subRow.appendChild(chip);
+      });
+      container.appendChild(subRow);
+
+      const tipoAtual = todosTipos.find(t => t.id === documentoAtivo) || todosTipos[0];
+      const store = getModeloTextoStore(tipoAtual.id);
+      const listaModelos = tipoAtual.id==='posop' ? modelosPosop : tipoAtual.id==='atestado' ? modelosAtestado : tipoAtual.id==='termo' ? modelosTermo : (_modelosCustomCache[tipoAtual.id] || []);
+
+      container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:0;margin-bottom:10px;' },
+        document.createTextNode('Revise/edite o texto abaixo antes de emitir o PDF. O nome e o CPF do paciente são preenchidos automaticamente.')));
+      renderModeloPicker(container, tipoAtual.id, listaModelos, store);
+      container.appendChild(textareaField('Texto do documento', store, 'texto', tipoAtual.id==='posop' ? 14 : 8));
+      container.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:-8px;' },
+        document.createTextNode('Dica de formatação: linhas com "## " viram título de seção; linhas com "- " viram item de lista; texto entre **duplo asterisco** sai em negrito.'+(tipoAtual.id==='posop'?' O texto {{TELEFONE_CLINICA}} é substituído automaticamente pelo telefone cadastrado na aba Clínica.':''))));
+
+      const emitBtn = el('div', { class:'add-row-btn',
+        style:'margin-top:6px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:14px;padding:13px;' },
+        document.createTextNode('✅ Emitir ' + tipoAtual.nome + ' (PDF)'));
+      emitBtn.onclick = () => {
+        if(tipoAtual.id === 'posop') generatePosOpPDF();
+        else if(tipoAtual.id === 'atestado') generateAtestadoPDF();
+        else if(tipoAtual.id === 'termo') generateTermoPDF();
+        else generateDocumentoGenericoPDF(tipoAtual.nome, store.texto);
+      };
+      container.appendChild(emitBtn);
+    }
+  }
+}
+
+// ============ NAVEGAÇÃO ============
+function renderNav(){
+  const nav = document.getElementById('stepsNav');
+  nav.innerHTML = '';
+  STEPS.forEach((label, i) => {
+    const btn = el('button', { class: i===currentStep?'active':'' }, document.createTextNode((i+1)+'. '+label));
+    btn.onclick = () => { currentStep = i; renderPanel(i); };
+    nav.appendChild(btn);
+  });
+}
+function renderPanel(stepIndex, opts={}){
+  currentStep = stepIndex;
+  renderNav();
+  const main = document.getElementById('main');
+  const scrollY = window.scrollY;
+  main.innerHTML = '';
+  const renderers = [renderPatient, renderImagensGerais, renderProntuario, renderReceituario];
+  renderers[stepIndex](main);
+  const subtitleParts = [state.clinic.nome, state.patient.nome].filter(Boolean);
+  document.getElementById('patientSubtitle').textContent = subtitleParts.length ? subtitleParts.join(' — ') : 'Nome da clínica / paciente';
+  document.getElementById('btnPrev').style.visibility = stepIndex===0 ? 'hidden' : 'visible';
+  document.getElementById('btnNext').textContent = stepIndex===STEPS.length-1 ? 'Concluir' : 'Avançar';
+  if(opts.keepScroll){ window.scrollTo(0, scrollY); } else { window.scrollTo(0,0); }
+}
+function refreshPanel(){
+  saveProgress();
+  renderPanel(currentStep, { keepScroll:true });
+}
+document.getElementById('voltarListaBtn').onclick = () => mostrarListaFichas();
+document.getElementById('btnPrev').onclick = () => { if(currentStep>0) renderPanel(currentStep-1); };
+document.getElementById('btnNext').onclick = () => {
+  if(currentStep < STEPS.length-1) renderPanel(currentStep+1);
+  else generatePDF();
+};
+
+// ============ GERAÇÃO DE PDF ============
+// Registra no histórico do prontuário que um documento foi emitido (receita, atestado, termo etc.)
+function registrarDocumentoEmitido(tipo, titulo){
+  if(!Array.isArray(state.documentosEmitidos)) state.documentosEmitidos = [];
+  state.documentosEmitidos.unshift({
+    id: 'doc' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+    tipo, titulo, dataEmissao: Date.now()
+  });
+  saveProgress();
+}
+
+function generateReceituarioPDF(){
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    alert('Biblioteca de PDF não carregada. Verifique a conexão e tente novamente.');
+    return;
+  }
+  const medRows = state.meds.filter(m => (m.nome||'').trim());
+  if(!medRows.length){
+    alert('Adicione ao menos um medicamento antes de gerar o receituário.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 62;
+  const contentW = pageW - marginX*2;
+  const BLUE = window._clinicaCorPrimariaRGB||[31,92,139], BLUE_SOFT = window.clarearCor(BLUE,0.35), INK = [35,35,40], MUTED = [95,110,125];
+  const F = 'times';
+  let y = 82;
+
+  function drawPageBorder(){
+    const bgLeve = window._clinicaCorSecundariaRGB ? window.clarearCor(window._clinicaCorSecundariaRGB, 0.96) : [252,253,255];
+    doc.setFillColor(...bgLeve);
+    doc.rect(0, 0, pageW, pageH, 'F');
+    desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+    doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
+    doc.roundedRect(24, 24, pageW-48, pageH-48, 8, 8, 'D');
+    doc.setLineWidth(0.5);
+    doc.roundedRect(30, 30, pageW-60, pageH-60, 6, 6, 'D');
+  }
+  function ensureSpace(needed){
+    if(y + needed > pageH - 96){ doc.addPage(); drawPageBorder(); y = 82; }
+  }
+  drawPageBorder();
+
+  // ---------- Cabeçalho: logo + nome da clínica + CRO ----------
+  const logoSize = 58;
+  let headerTextX = marginX;
+  if(state.clinic.logo){
+    try{
+      const fmt = state.clinic.logo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.clinic.logo, fmt, marginX, y-36, logoSize, logoSize);
+      headerTextX = marginX + logoSize + 16;
+    }catch(e){}
+  }
+  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : 'Prescrição Odontológica');
+  doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
+  doc.text(headerTitle, headerTextX, y);
+  if(state.clinic.cro){
+    y += 17;
+    doc.setFont(F,'bold'); doc.setFontSize(10); doc.setTextColor(...BLUE_SOFT);
+    doc.text('CRO ' + state.clinic.cro, headerTextX, y);
+  }
+  y += 24;
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.6);
+  doc.line(marginX, y, marginX+contentW, y);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.5);
+  doc.line(marginX, y+3, marginX+contentW, y+3);
+  y += 32;
+
+  // ---------- Faixa de título ----------
+  const title = 'PRESCRIÇÃO MEDICAMENTOSA';
+  doc.setFont(F,'bold'); doc.setFontSize(13);
+  const titleW = doc.getTextWidth(title);
+  const bannerW = titleW + 48, bannerH = 26;
+  doc.setFillColor(...BLUE);
+  doc.roundedRect(pageW/2 - bannerW/2, y - bannerH + 7, bannerW, bannerH, 5, 5, 'F');
+  doc.setTextColor(255,255,255);
+  doc.text(title, pageW/2, y, { align:'center' });
+  y += 34;
+
+  // ---------- Dados do paciente ----------
+  doc.setFont(F,'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+  const pacLabel = 'Paciente: ';
+  doc.text(pacLabel, marginX, y);
+  const pacLabelW = doc.getTextWidth(pacLabel);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text((state.patient.nome || '_____________________________') + '.', marginX+pacLabelW, y);
+  y += 17;
+  doc.setFont(F,'bold'); doc.setTextColor(...BLUE);
+  doc.text('CPF: ', marginX, y);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text(state.patient.cpf || '_______________', marginX+doc.getTextWidth('CPF: '), y);
+  y += 17;
+  if(state.clinic.cidade){ doc.setFont(F,'normal'); doc.setTextColor(...MUTED); doc.text(state.clinic.cidade, marginX, y); y += 17; }
+  y += 20;
+
+  // ---------- Título "PRESCRIÇÕES:" ----------
+  doc.setFont(F,'bold'); doc.setFontSize(13); doc.setTextColor(...BLUE);
+  doc.text('PRESCRIÇÕES:', pageW/2, y, { align:'center' });
+  y += 8;
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
+  doc.line(pageW/2-60, y, pageW/2+60, y);
+  y += 26;
+
+  // ---------- Itens agrupados por categoria ----------
+  const CATEGORY_ORDER = ['Uso Interno','Uso Injetável','Uso Externo','Uso Tópico'];
+  let counter = 1;
+  CATEGORY_ORDER.forEach(cat => {
+    const items = medRows.filter(m => (m.categoria||'Uso Interno') === cat);
+    if(!items.length) return;
+    ensureSpace(32);
+    doc.setFont(F,'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+    doc.text(cat + ':', marginX, y);
+    y += 20;
+    items.forEach(m => {
+      ensureSpace(55);
+      const numLabel = counter + '- ';
+      doc.setFont(F,'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+      doc.text(numLabel, marginX, y);
+      const numW = doc.getTextWidth(numLabel);
+      doc.text(m.nome, marginX+numW, y);
+      const nomeW = doc.getTextWidth(m.nome);
+      doc.setFont(F,'normal'); doc.setFontSize(10.5); doc.setTextColor(...INK);
+      const dosText = m.dosagem||'';
+      const dosW = doc.getTextWidth(dosText);
+      doc.text(dosText, marginX+contentW-dosW, y);
+      const lineStartX = marginX+numW+nomeW+6;
+      const lineEndX = marginX+contentW-dosW-6;
+      if(lineEndX > lineStartX){
+        doc.setLineDashPattern([1,1.4], 0);
+        doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
+        doc.line(lineStartX, y-2, lineEndX, y-2);
+        doc.setLineDashPattern([], 0);
+      }
+      y += 16;
+      doc.setFont(F,'normal'); doc.setFontSize(10.5); doc.setTextColor(...INK);
+      const posoLines = doc.splitTextToSize(m.posologia || '', contentW-20);
+      posoLines.forEach(l => {
+        ensureSpace(15);
+        doc.text(l, marginX+20, y);
+        y += 14;
+      });
+      y += 14;
+      counter++;
+    });
+    y += 6;
+  });
+
+  // ---------- Data por extenso ----------
+  y += 26;
+  ensureSpace(30);
+  const hoje = new Date();
+  const cidadeSimples = state.clinic.cidade ? state.clinic.cidade.split('–')[0].split('-')[0].trim() : '';
+  const dataExtenso = (cidadeSimples ? (cidadeSimples+' ') : '') + hoje.getDate() + ' de ' + MESES_PT[hoje.getMonth()] + ' de ' + hoje.getFullYear() + '.';
+  doc.setFont(F,'italic'); doc.setFontSize(10.5); doc.setTextColor(...MUTED);
+  doc.text(dataExtenso, pageW-marginX, y, { align:'right' });
+
+  // ---------- Assinatura / identificação do dentista ----------
+  y += 62;
+  ensureSpace(90);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
+  doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
+  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  y += 15;
+  doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+  doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
+  y += 14;
+  doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
+  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
+
+  // ---------- Rodapé: clínica e endereço ----------
+  y += 34;
+  ensureSpace(50);
+  doc.setDrawColor(...BLUE); doc.setLineWidth(0.6);
+  doc.line(marginX, y-14, marginX+contentW, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(10.5); doc.setTextColor(...BLUE);
+  if(state.clinic.nome){ doc.text(state.clinic.nome, pageW/2, y, { align:'center' }); y += 14; }
+  // Evita duplicar a cidade caso o campo "Endereço" já a contenha (ex: quando o endereço foi colado já com cidade/UF no final)
+  let enderecoTexto = (state.clinic.endereco || '').trim();
+  if(state.clinic.cidade){
+    const cidadeCore = state.clinic.cidade.split('–')[0].split('-')[0].trim();
+    const jaContemCidade = cidadeCore && enderecoTexto.toLowerCase().indexOf(cidadeCore.toLowerCase()) !== -1;
+    if(!jaContemCidade){
+      enderecoTexto = [enderecoTexto, state.clinic.cidade].filter(Boolean).join(' — ');
+    }
+  }
+  if(enderecoTexto){
+    doc.setFont(F,'italic'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+    const enderecoLines = doc.splitTextToSize(enderecoTexto, contentW-40);
+    enderecoLines.forEach(l => {
+      ensureSpace(16);
+      doc.text(l, pageW/2, y, { align:'center' });
+      y += 14;
+    });
+  }
+
+  const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  registrarDocumentoEmitido('Receituário', 'Receituário — ' + (state.patient.nome||'paciente'));
+  doc.save('receituario_' + safeName + '.pdf');
+  toast('Receituário gerado com sucesso!');
+}
+
+// ============ TEXTO RICO LEVE (## título / - marcador / **negrito**) ============
+function parseRichSegments(line){
+  const segments = [];
+  let lastIndex = 0;
+  const re = /\*\*(.+?)\*\*/g;
+  let m;
+  while((m = re.exec(line))){
+    if(m.index > lastIndex) segments.push({ text: line.slice(lastIndex, m.index), bold:false });
+    segments.push({ text: m[1], bold:true });
+    lastIndex = re.lastIndex;
+  }
+  if(lastIndex < line.length) segments.push({ text: line.slice(lastIndex), bold:false });
+  return segments;
+}
+function segmentsToWords(segments){
+  const words = [];
+  segments.forEach(seg => {
+    seg.text.split(/(\s+)/).forEach(tok => {
+      if(tok === '') return;
+      if(/^\s+$/.test(tok)) words.push({ space:true });
+      else words.push({ text: tok, bold: seg.bold });
+    });
+  });
+  return words;
+}
+// Renderiza um bloco de texto com marcação leve inteira (múltiplas linhas de origem),
+// desenhando títulos de seção, marcadores e parágrafos, com paginação automática.
+function drawRichBlock(doc, text, x, y0, maxW, opts){
+  const { titleColor, inkColor, bulletColor, lineH=14, sectionGap=8, paraGap=10, fontSize=10, titleFontSize=10.5,
+          pageBottom, addPage, marginTop, pageBorderFn, fontFamily='helvetica' } = opts;
+  let y = y0;
+  function ensureSpace(needed){
+    if(y + needed > pageBottom){
+      addPage();
+      if(pageBorderFn) pageBorderFn();
+      y = marginTop;
+    }
+  }
+  const rawLines = (text||'').split(/\n/);
+  let i = 0;
+  while(i < rawLines.length){
+    const raw = rawLines[i];
+    const line = raw.trim();
+    if(line === ''){ y += paraGap*0.4; i++; continue; }
+    if(line.startsWith('## ')){
+      ensureSpace(lineH+sectionGap);
+      doc.setFont(fontFamily,'bold'); doc.setFontSize(titleFontSize); doc.setTextColor(...(titleColor||inkColor));
+      doc.text(line.slice(3).trim(), x, y);
+      y += lineH + 4;
+    } else if(line.startsWith('- ')){
+      ensureSpace(lineH);
+      doc.setFont(fontFamily,'normal'); doc.setFontSize(fontSize); doc.setTextColor(...(bulletColor||inkColor));
+      doc.text('•', x, y);
+      const newY = drawRichParagraphSafe(doc, line.slice(2).trim(), x+12, y, maxW-12, lineH, fontSize, inkColor, ensureSpace, fontFamily);
+      y = newY;
+    } else {
+      ensureSpace(lineH);
+      const newY = drawRichParagraphSafe(doc, line, x, y, maxW, lineH, fontSize, inkColor, ensureSpace, fontFamily);
+      y = newY + paraGap*0.3;
+    }
+    i++;
+  }
+  return y;
+}
+// Versão da drawRichParagraph com paginação automática linha a linha
+function drawRichParagraphSafe(doc, line, x, y, maxW, lineH, fontSize, inkColor, ensureSpace, fontFamily='helvetica'){
+  const words = segmentsToWords(parseRichSegments(line));
+  let cx = x, cy = y;
+  doc.setFont(fontFamily,'normal'); doc.setFontSize(fontSize); doc.setTextColor(...inkColor);
+  const spaceW = doc.getTextWidth(' ');
+  words.forEach(w => {
+    if(w.space){ cx += spaceW; return; }
+    doc.setFont(fontFamily, w.bold ? 'bold' : 'normal');
+    const wW = doc.getTextWidth(w.text);
+    if(cx > x && cx + wW > x + maxW){
+      cx = x; cy += lineH;
+      ensureSpace(lineH);
+    }
+    doc.text(w.text, cx, cy);
+    cx += wW;
+  });
+  return cy + lineH;
+}
+
+
+// Gera o PDF de um tipo de documento PERSONALIZADO (criado em "Gerenciar tipos de documento"),
+// reaproveitando o mesmo layout elegante do Atestado/Termo, mas com título e texto genéricos.
+function generateDocumentoGenericoPDF(tituloDoc, textoBody){
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    alert('Biblioteca de PDF não carregada. Verifique a conexão e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 62;
+  const contentW = pageW - marginX*2;
+  const BLUE = window._clinicaCorPrimariaRGB||[31,92,139], BLUE_SOFT = window.clarearCor(BLUE,0.35), INK = [35,35,40], MUTED = [95,110,125];
+  const F = 'times';
+  let y = 82;
+
+  function drawPageBorder(){
+    const bgLeve = window._clinicaCorSecundariaRGB ? window.clarearCor(window._clinicaCorSecundariaRGB, 0.96) : [252,253,255];
+    doc.setFillColor(...bgLeve);
+    doc.rect(0, 0, pageW, pageH, 'F');
+    desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+    doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
+    doc.roundedRect(24, 24, pageW-48, pageH-48, 8, 8, 'D');
+    doc.setLineWidth(0.5);
+    doc.roundedRect(30, 30, pageW-60, pageH-60, 6, 6, 'D');
+  }
+  function ensureSpace(needed){
+    if(y + needed > pageH - 96){ doc.addPage(); drawPageBorder(); y = 82; }
+  }
+  drawPageBorder();
+
+  const logoSize = 58;
+  let headerTextX = marginX;
+  if(state.clinic.logo){
+    try{
+      const fmt = state.clinic.logo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.clinic.logo, fmt, marginX, y-36, logoSize, logoSize);
+      headerTextX = marginX + logoSize + 16;
+    }catch(e){}
+  }
+  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : tituloDoc);
+  doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
+  doc.text(headerTitle, headerTextX, y);
+  if(state.clinic.cro){
+    y += 17;
+    doc.setFont(F,'bold'); doc.setFontSize(10); doc.setTextColor(...BLUE_SOFT);
+    doc.text('CRO ' + state.clinic.cro, headerTextX, y);
+  }
+  y += 24;
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.6);
+  doc.line(marginX, y, marginX+contentW, y);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.5);
+  doc.line(marginX, y+3, marginX+contentW, y+3);
+  y += 32;
+
+  const title = tituloDoc.toUpperCase();
+  doc.setFont(F,'bold'); doc.setFontSize(13);
+  const titleW = doc.getTextWidth(title);
+  const bannerW = titleW + 48, bannerH = 26;
+  doc.setFillColor(...BLUE);
+  doc.roundedRect(pageW/2 - bannerW/2, y - bannerH + 7, bannerW, bannerH, 5, 5, 'F');
+  doc.setTextColor(255,255,255);
+  doc.text(title, pageW/2, y, { align:'center' });
+  y += 34;
+
+  doc.setFont(F,'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+  const pacLabel = 'Paciente: ';
+  doc.text(pacLabel, marginX, y);
+  const pacLabelW = doc.getTextWidth(pacLabel);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text((state.patient.nome || '_____________________________') + '.', marginX+pacLabelW, y);
+  y += 17;
+  doc.setFont(F,'bold'); doc.setTextColor(...BLUE);
+  doc.text('CPF: ', marginX, y);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text(state.patient.cpf || '_______________', marginX+doc.getTextWidth('CPF: '), y);
+  y += 17;
+  if(state.clinic.cidade){ doc.setFont(F,'normal'); doc.setTextColor(...MUTED); doc.text(state.clinic.cidade, marginX, y); y += 17; }
+  y += 22;
+
+  y = drawRichBlock(doc, textoBody || '', marginX, y, contentW, {
+    inkColor: INK,
+    titleColor: BLUE,
+    bulletColor: BLUE_SOFT,
+    fontFamily: F,
+    lineH: 16,
+    sectionGap: 6,
+    paraGap: 10,
+    fontSize: 11.5,
+    titleFontSize: 12,
+    pageBottom: pageH - 96,
+    addPage: () => doc.addPage(),
+    marginTop: 82,
+    pageBorderFn: drawPageBorder
+  });
+
+  y += 30;
+  ensureSpace(30);
+  const hoje = new Date();
+  const cidadeSimples = state.clinic.cidade ? state.clinic.cidade.split('–')[0].split('-')[0].trim() : '';
+  const dataExtenso = (cidadeSimples ? (cidadeSimples+' ') : '') + hoje.getDate() + ' de ' + MESES_PT[hoje.getMonth()] + ' de ' + hoje.getFullYear() + '.';
+  doc.setFont(F,'italic'); doc.setFontSize(10.5); doc.setTextColor(...MUTED);
+  doc.text(dataExtenso, pageW-marginX, y, { align:'right' });
+
+  y += 56;
+  ensureSpace(90);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
+  doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
+  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  y += 15;
+  doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+  doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
+  y += 14;
+  doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
+  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
+
+  y += 34;
+  ensureSpace(50);
+  doc.setDrawColor(...BLUE); doc.setLineWidth(0.6);
+  doc.line(marginX, y-14, marginX+contentW, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(10.5); doc.setTextColor(...BLUE);
+  if(state.clinic.nome){ doc.text(state.clinic.nome, pageW/2, y, { align:'center' }); y += 14; }
+  let enderecoTexto = (state.clinic.endereco || '').trim();
+  if(state.clinic.cidade){
+    const cidadeCore = state.clinic.cidade.split('–')[0].split('-')[0].trim();
+    const jaContemCidade = cidadeCore && enderecoTexto.toLowerCase().indexOf(cidadeCore.toLowerCase()) !== -1;
+    if(!jaContemCidade){
+      enderecoTexto = [enderecoTexto, state.clinic.cidade].filter(Boolean).join(' — ');
+    }
+  }
+  if(enderecoTexto){
+    doc.setFont(F,'italic'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+    const enderecoLines = doc.splitTextToSize(enderecoTexto, contentW-40);
+    enderecoLines.forEach(l => {
+      ensureSpace(16);
+      doc.text(l, pageW/2, y, { align:'center' });
+      y += 14;
+    });
+  }
+
+  const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  const safeTitulo = tituloDoc.trim().toLowerCase().replace(/\s+/g,'_');
+  registrarDocumentoEmitido(tituloDoc, tituloDoc + ' — ' + (state.patient.nome||'paciente'));
+  doc.save(safeTitulo + '_' + safeName + '.pdf');
+  toast(tituloDoc + ' gerado com sucesso!');
+}
+
+function generateAtestadoPDF(){
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    alert('Biblioteca de PDF não carregada. Verifique a conexão e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 62;
+  const contentW = pageW - marginX*2;
+  const BLUE = window._clinicaCorPrimariaRGB||[31,92,139], BLUE_SOFT = window.clarearCor(BLUE,0.35), INK = [35,35,40], MUTED = [95,110,125];
+  const F = 'times';
+  let y = 82;
+
+  function drawPageBorder(){
+    const bgLeve = window._clinicaCorSecundariaRGB ? window.clarearCor(window._clinicaCorSecundariaRGB, 0.96) : [252,253,255];
+    doc.setFillColor(...bgLeve);
+    doc.rect(0, 0, pageW, pageH, 'F');
+    desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+    doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
+    doc.roundedRect(24, 24, pageW-48, pageH-48, 8, 8, 'D');
+    doc.setLineWidth(0.5);
+    doc.roundedRect(30, 30, pageW-60, pageH-60, 6, 6, 'D');
+  }
+  function ensureSpace(needed){
+    if(y + needed > pageH - 96){ doc.addPage(); drawPageBorder(); y = 82; }
+  }
+  drawPageBorder();
+
+  // ---------- Cabeçalho: logo + nome da clínica + CRO ----------
+  const logoSize = 58;
+  let headerTextX = marginX;
+  if(state.clinic.logo){
+    try{
+      const fmt = state.clinic.logo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.clinic.logo, fmt, marginX, y-36, logoSize, logoSize);
+      headerTextX = marginX + logoSize + 16;
+    }catch(e){}
+  }
+  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : 'Atestado Odontológico');
+  doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
+  doc.text(headerTitle, headerTextX, y);
+  if(state.clinic.cro){
+    y += 17;
+    doc.setFont(F,'bold'); doc.setFontSize(10); doc.setTextColor(...BLUE_SOFT);
+    doc.text('CRO ' + state.clinic.cro, headerTextX, y);
+  }
+  y += 24;
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.6);
+  doc.line(marginX, y, marginX+contentW, y);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.5);
+  doc.line(marginX, y+3, marginX+contentW, y+3);
+  y += 32;
+
+  // ---------- Faixa de título ----------
+  const title = 'ATESTADO';
+  doc.setFont(F,'bold'); doc.setFontSize(13);
+  const titleW = doc.getTextWidth(title);
+  const bannerW = titleW + 48, bannerH = 26;
+  doc.setFillColor(...BLUE);
+  doc.roundedRect(pageW/2 - bannerW/2, y - bannerH + 7, bannerW, bannerH, 5, 5, 'F');
+  doc.setTextColor(255,255,255);
+  doc.text(title, pageW/2, y, { align:'center' });
+  y += 34;
+
+  // ---------- Dados do paciente ----------
+  doc.setFont(F,'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+  const pacLabel = 'Paciente: ';
+  doc.text(pacLabel, marginX, y);
+  const pacLabelW = doc.getTextWidth(pacLabel);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text((state.patient.nome || '_____________________________') + '.', marginX+pacLabelW, y);
+  y += 17;
+  doc.setFont(F,'bold'); doc.setTextColor(...BLUE);
+  doc.text('CPF: ', marginX, y);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text(state.patient.cpf || '_______________', marginX+doc.getTextWidth('CPF: '), y);
+  y += 17;
+  if(state.clinic.cidade){ doc.setFont(F,'normal'); doc.setTextColor(...MUTED); doc.text(state.clinic.cidade, marginX, y); y += 17; }
+  y += 22;
+
+  // ---------- Corpo do atestado ----------
+  y = drawRichBlock(doc, state.atestado.texto || '', marginX, y, contentW, {
+    inkColor: INK,
+    titleColor: BLUE,
+    bulletColor: BLUE_SOFT,
+    fontFamily: F,
+    lineH: 16,
+    sectionGap: 6,
+    paraGap: 10,
+    fontSize: 11.5,
+    titleFontSize: 12,
+    pageBottom: pageH - 96,
+    addPage: () => doc.addPage(),
+    marginTop: 82,
+    pageBorderFn: drawPageBorder
+  });
+
+  // ---------- Data por extenso ----------
+  y += 30;
+  ensureSpace(30);
+  const hoje = new Date();
+  const cidadeSimples = state.clinic.cidade ? state.clinic.cidade.split('–')[0].split('-')[0].trim() : '';
+  const dataExtenso = (cidadeSimples ? (cidadeSimples+' ') : '') + hoje.getDate() + ' de ' + MESES_PT[hoje.getMonth()] + ' de ' + hoje.getFullYear() + '.';
+  doc.setFont(F,'italic'); doc.setFontSize(10.5); doc.setTextColor(...MUTED);
+  doc.text(dataExtenso, pageW-marginX, y, { align:'right' });
+
+  // ---------- Assinatura / identificação do dentista ----------
+  y += 56;
+  ensureSpace(90);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
+  doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
+  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  y += 15;
+  doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+  doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
+  y += 14;
+  doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
+  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
+
+  // ---------- Rodapé: clínica e endereço ----------
+  y += 34;
+  ensureSpace(50);
+  doc.setDrawColor(...BLUE); doc.setLineWidth(0.6);
+  doc.line(marginX, y-14, marginX+contentW, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(10.5); doc.setTextColor(...BLUE);
+  if(state.clinic.nome){ doc.text(state.clinic.nome, pageW/2, y, { align:'center' }); y += 14; }
+  let enderecoTexto = (state.clinic.endereco || '').trim();
+  if(state.clinic.cidade){
+    const cidadeCore = state.clinic.cidade.split('–')[0].split('-')[0].trim();
+    const jaContemCidade = cidadeCore && enderecoTexto.toLowerCase().indexOf(cidadeCore.toLowerCase()) !== -1;
+    if(!jaContemCidade){
+      enderecoTexto = [enderecoTexto, state.clinic.cidade].filter(Boolean).join(' — ');
+    }
+  }
+  if(enderecoTexto){
+    doc.setFont(F,'italic'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+    const enderecoLines = doc.splitTextToSize(enderecoTexto, contentW-40);
+    enderecoLines.forEach(l => {
+      ensureSpace(16);
+      doc.text(l, pageW/2, y, { align:'center' });
+      y += 14;
+    });
+  }
+
+  const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  registrarDocumentoEmitido('Atestado', 'Atestado — ' + (state.patient.nome||'paciente'));
+  doc.save('atestado_' + safeName + '.pdf');
+  toast('Atestado gerado com sucesso!');
+}
+
+function generateTermoPDF(){
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    alert('Biblioteca de PDF não carregada. Verifique a conexão e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 62;
+  const contentW = pageW - marginX*2;
+  const BLUE = window._clinicaCorPrimariaRGB||[31,92,139], BLUE_SOFT = window.clarearCor(BLUE,0.35), INK = [35,35,40], MUTED = [95,110,125];
+  const F = 'times';
+  let y = 82;
+
+  function drawPageBorder(){
+    const bgLeve = window._clinicaCorSecundariaRGB ? window.clarearCor(window._clinicaCorSecundariaRGB, 0.96) : [252,253,255];
+    doc.setFillColor(...bgLeve);
+    doc.rect(0, 0, pageW, pageH, 'F');
+    desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+    doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
+    doc.roundedRect(24, 24, pageW-48, pageH-48, 8, 8, 'D');
+    doc.setLineWidth(0.5);
+    doc.roundedRect(30, 30, pageW-60, pageH-60, 6, 6, 'D');
+  }
+  function ensureSpace(needed){
+    if(y + needed > pageH - 96){ doc.addPage(); drawPageBorder(); y = 82; }
+  }
+  drawPageBorder();
+
+  // ---------- Cabeçalho: logo + nome da clínica + CRO ----------
+  const logoSize = 58;
+  let headerTextX = marginX;
+  if(state.clinic.logo){
+    try{
+      const fmt = state.clinic.logo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.clinic.logo, fmt, marginX, y-36, logoSize, logoSize);
+      headerTextX = marginX + logoSize + 16;
+    }catch(e){}
+  }
+  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : 'Termo de Comparecimento');
+  doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
+  doc.text(headerTitle, headerTextX, y);
+  if(state.clinic.cro){
+    y += 17;
+    doc.setFont(F,'bold'); doc.setFontSize(10); doc.setTextColor(...BLUE_SOFT);
+    doc.text('CRO ' + state.clinic.cro, headerTextX, y);
+  }
+  y += 24;
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.6);
+  doc.line(marginX, y, marginX+contentW, y);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.5);
+  doc.line(marginX, y+3, marginX+contentW, y+3);
+  y += 32;
+
+  // ---------- Faixa de título ----------
+  const title = 'TERMO DE COMPARECIMENTO';
+  doc.setFont(F,'bold'); doc.setFontSize(13);
+  const titleW = doc.getTextWidth(title);
+  const bannerW = titleW + 48, bannerH = 26;
+  doc.setFillColor(...BLUE);
+  doc.roundedRect(pageW/2 - bannerW/2, y - bannerH + 7, bannerW, bannerH, 5, 5, 'F');
+  doc.setTextColor(255,255,255);
+  doc.text(title, pageW/2, y, { align:'center' });
+  y += 34;
+
+  // ---------- Dados do paciente ----------
+  doc.setFont(F,'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+  const pacLabel = 'Paciente: ';
+  doc.text(pacLabel, marginX, y);
+  const pacLabelW = doc.getTextWidth(pacLabel);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text((state.patient.nome || '_____________________________') + '.', marginX+pacLabelW, y);
+  y += 17;
+  doc.setFont(F,'bold'); doc.setTextColor(...BLUE);
+  doc.text('CPF: ', marginX, y);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text(state.patient.cpf || '_______________', marginX+doc.getTextWidth('CPF: '), y);
+  y += 17;
+  if(state.clinic.cidade){ doc.setFont(F,'normal'); doc.setTextColor(...MUTED); doc.text(state.clinic.cidade, marginX, y); y += 17; }
+  y += 22;
+
+  // ---------- Corpo do termo ----------
+  y = drawRichBlock(doc, state.termo.texto || '', marginX, y, contentW, {
+    inkColor: INK,
+    titleColor: BLUE,
+    bulletColor: BLUE_SOFT,
+    fontFamily: F,
+    lineH: 16,
+    sectionGap: 6,
+    paraGap: 10,
+    fontSize: 11.5,
+    titleFontSize: 12,
+    pageBottom: pageH - 96,
+    addPage: () => doc.addPage(),
+    marginTop: 82,
+    pageBorderFn: drawPageBorder
+  });
+
+  // ---------- Data por extenso ----------
+  y += 30;
+  ensureSpace(30);
+  const hoje = new Date();
+  const cidadeSimples = state.clinic.cidade ? state.clinic.cidade.split('–')[0].split('-')[0].trim() : '';
+  const dataExtenso = (cidadeSimples ? (cidadeSimples+' ') : '') + hoje.getDate() + ' de ' + MESES_PT[hoje.getMonth()] + ' de ' + hoje.getFullYear() + '.';
+  doc.setFont(F,'italic'); doc.setFontSize(10.5); doc.setTextColor(...MUTED);
+  doc.text(dataExtenso, pageW-marginX, y, { align:'right' });
+
+  // ---------- Assinatura / identificação do dentista ----------
+  y += 56;
+  ensureSpace(90);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
+  doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
+  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  y += 15;
+  doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+  doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
+  y += 14;
+  doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
+  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
+
+  // ---------- Rodapé: clínica e endereço ----------
+  y += 34;
+  ensureSpace(50);
+  doc.setDrawColor(...BLUE); doc.setLineWidth(0.6);
+  doc.line(marginX, y-14, marginX+contentW, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(10.5); doc.setTextColor(...BLUE);
+  if(state.clinic.nome){ doc.text(state.clinic.nome, pageW/2, y, { align:'center' }); y += 14; }
+  let enderecoTexto2 = (state.clinic.endereco || '').trim();
+  if(state.clinic.cidade){
+    const cidadeCore = state.clinic.cidade.split('–')[0].split('-')[0].trim();
+    const jaContemCidade = cidadeCore && enderecoTexto2.toLowerCase().indexOf(cidadeCore.toLowerCase()) !== -1;
+    if(!jaContemCidade){
+      enderecoTexto2 = [enderecoTexto2, state.clinic.cidade].filter(Boolean).join(' — ');
+    }
+  }
+  if(enderecoTexto2){
+    doc.setFont(F,'italic'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+    const enderecoLines = doc.splitTextToSize(enderecoTexto2, contentW-40);
+    enderecoLines.forEach(l => {
+      ensureSpace(16);
+      doc.text(l, pageW/2, y, { align:'center' });
+      y += 14;
+    });
+  }
+
+  const safeName2 = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  registrarDocumentoEmitido('Termo de Comparecimento', 'Termo de Comparecimento — ' + (state.patient.nome||'paciente'));
+  doc.save('termo_comparecimento_' + safeName2 + '.pdf');
+  toast('Termo de Comparecimento gerado com sucesso!');
+}
+
+function generatePosOpPDF(){
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    alert('Biblioteca de PDF não carregada. Verifique a conexão e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 62;
+  const contentW = pageW - marginX*2;
+  const BLUE = window._clinicaCorPrimariaRGB||[31,92,139], BLUE_SOFT = window.clarearCor(BLUE,0.35), INK = [35,35,40], MUTED = [95,110,125];
+  const F = 'times';
+  let y = 82;
+
+  function drawPageBorder(){
+    const bgLeve = window._clinicaCorSecundariaRGB ? window.clarearCor(window._clinicaCorSecundariaRGB, 0.96) : [252,253,255];
+    doc.setFillColor(...bgLeve);
+    doc.rect(0, 0, pageW, pageH, 'F');
+    desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+    doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
+    doc.roundedRect(24, 24, pageW-48, pageH-48, 8, 8, 'D');
+    doc.setLineWidth(0.5);
+    doc.roundedRect(30, 30, pageW-60, pageH-60, 6, 6, 'D');
+  }
+  function ensureSpace(needed){
+    if(y + needed > pageH - 96){ doc.addPage(); drawPageBorder(); y = 82; }
+  }
+  drawPageBorder();
+
+  // ---------- Cabeçalho: logo + nome da clínica + CRO ----------
+  const logoSize = 58;
+  let headerTextX = marginX;
+  if(state.clinic.logo){
+    try{
+      const fmt = state.clinic.logo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.clinic.logo, fmt, marginX, y-36, logoSize, logoSize);
+      headerTextX = marginX + logoSize + 16;
+    }catch(e){}
+  }
+  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : 'Recomendações Pós-operatórias');
+  doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
+  doc.text(headerTitle, headerTextX, y);
+  if(state.clinic.cro){
+    y += 17;
+    doc.setFont(F,'bold'); doc.setFontSize(10); doc.setTextColor(...BLUE_SOFT);
+    doc.text('CRO ' + state.clinic.cro, headerTextX, y);
+  }
+  y += 24;
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.6);
+  doc.line(marginX, y, marginX+contentW, y);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.5);
+  doc.line(marginX, y+3, marginX+contentW, y+3);
+  y += 32;
+
+  // ---------- Faixa de título ----------
+  const title = 'RECOMENDAÇÕES:';
+  doc.setFont(F,'bold'); doc.setFontSize(13);
+  const titleW = doc.getTextWidth(title);
+  const bannerW = titleW + 48, bannerH = 26;
+  doc.setFillColor(...BLUE);
+  doc.roundedRect(pageW/2 - bannerW/2, y - bannerH + 7, bannerW, bannerH, 5, 5, 'F');
+  doc.setTextColor(255,255,255);
+  doc.text(title, pageW/2, y, { align:'center' });
+  y += 34;
+
+  // ---------- Dados do paciente ----------
+  doc.setFont(F,'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+  const pacLabel = 'Paciente: ';
+  doc.text(pacLabel, marginX, y);
+  const pacLabelW = doc.getTextWidth(pacLabel);
+  doc.setFont(F,'normal'); doc.setTextColor(...INK);
+  doc.text(state.patient.nome || '_____________________________', marginX+pacLabelW, y);
+  y += 17;
+  if(state.clinic.cidade){
+    doc.setFont(F,'normal'); doc.setFontSize(11); doc.setTextColor(...MUTED);
+    doc.text(state.clinic.cidade, marginX, y);
+    y += 17;
+  }
+  y += 18;
+
+  // ---------- Corpo: seções, marcadores e negrito ----------
+  const telefoneClinica = (state.clinic.telefone||'').trim() || '_______________';
+  let textoPosOp = (state.posOp.texto || '').replace(/\{\{TELEFONE_CLINICA\}\}/g, telefoneClinica);
+  // Também substitui qualquer número de telefone já digitado manualmente no texto (formatos comuns de celular BR),
+  // garantindo que o telefone exibido seja sempre o cadastrado na aba Clínica, mesmo em textos salvos anteriormente.
+  if((state.clinic.telefone||'').trim()){
+    textoPosOp = textoPosOp.replace(/\(?\d{2}\)?[\s.-]?9\d{3,4}[\s.-]?\d{4}/g, telefoneClinica);
+  }
+  y = drawRichBlock(doc, textoPosOp, marginX, y, contentW, {
+    inkColor: INK,
+    titleColor: BLUE,
+    bulletColor: BLUE_SOFT,
+    fontFamily: F,
+    lineH: 14,
+    sectionGap: 6,
+    paraGap: 10,
+    fontSize: 10.5,
+    titleFontSize: 11,
+    pageBottom: pageH - 96,
+    addPage: () => doc.addPage(),
+    marginTop: 82,
+    pageBorderFn: drawPageBorder
+  });
+
+  // ---------- Data por extenso ----------
+  y += 22;
+  ensureSpace(30);
+  const hoje = new Date();
+  const cidadeSimples = state.clinic.cidade ? state.clinic.cidade.split('–')[0].split('-')[0].trim() : '';
+  const dataExtenso = (cidadeSimples ? (cidadeSimples+' ') : '') + hoje.getDate() + ' de ' + MESES_PT[hoje.getMonth()] + ' de ' + hoje.getFullYear() + '.';
+  doc.setFont(F,'italic'); doc.setFontSize(10.5); doc.setTextColor(...MUTED);
+  doc.text(dataExtenso, pageW-marginX, y, { align:'right' });
+
+  // ---------- Assinatura / identificação do dentista ----------
+  y += 56;
+  ensureSpace(90);
+  doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
+  doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
+  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  y += 15;
+  doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+  doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
+  y += 14;
+  doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
+  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
+
+  // ---------- Rodapé: clínica e endereço ----------
+  y += 34;
+  ensureSpace(50);
+  doc.setDrawColor(...BLUE); doc.setLineWidth(0.6);
+  doc.line(marginX, y-14, marginX+contentW, y-14);
+  doc.setFont(F,'bold'); doc.setFontSize(10.5); doc.setTextColor(...BLUE);
+  if(state.clinic.nome){ doc.text(state.clinic.nome, pageW/2, y, { align:'center' }); y += 14; }
+  let enderecoTexto = (state.clinic.endereco || '').trim();
+  if(state.clinic.cidade){
+    const cidadeCore = state.clinic.cidade.split('–')[0].split('-')[0].trim();
+    const jaContemCidade = cidadeCore && enderecoTexto.toLowerCase().indexOf(cidadeCore.toLowerCase()) !== -1;
+    if(!jaContemCidade){
+      enderecoTexto = [enderecoTexto, state.clinic.cidade].filter(Boolean).join(' — ');
+    }
+  }
+  if(enderecoTexto){
+    doc.setFont(F,'italic'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+    const enderecoLines = doc.splitTextToSize(enderecoTexto, contentW-40);
+    enderecoLines.forEach(l => {
+      ensureSpace(16);
+      doc.text(l, pageW/2, y, { align:'center' });
+      y += 14;
+    });
+  }
+
+  const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  registrarDocumentoEmitido('Recomendações Pós-operatórias', 'Recomendações Pós-operatórias — ' + (state.patient.nome||'paciente'));
+  doc.save('pos_operatorio_' + safeName + '.pdf');
+  toast('PDF de pós-operatório gerado com sucesso!');
+}
+
+function generatePDF(){
+  if(typeof clinicaUpsertPaciente === 'function' && (state.patient.nome||'').trim()){
+    clinicaUpsertPaciente({
+      nome: state.patient.nome, nasc: state.patient.nasc, telefone: state.patient.telefone,
+      cpf: state.patient.cpf, rg: state.patient.rg, endereco: state.patient.endereco
+    });
+  }
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    alert('Biblioteca de PDF não carregada. Verifique a conexão e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 40;
+  const contentW = pageW - marginX*2;
+  const BLUE=window._clinicaCorPrimariaRGB||[31,92,139]; const BLUEHEAD=window.clarearCor(BLUE,0.85), BLUELIGHT=window.clarearCor(BLUE,0.93), LINECOL=[155,187,212], INK=[26,26,26], MUTED=[91,107,122];
+  let y = 40;
+
+  function newPage(){ doc.addPage(); y = 40; desenharMarcaDagua(doc, pageW, pageH, state.clinic); }
+  function ensureSpace(needed){ if(y + needed > pageH - 50) newPage(); }
+
+  desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+
+  function sectionTitle(text){
+    ensureSpace(34);
+    doc.setFillColor(...BLUE);
+    doc.rect(marginX, y, contentW, 22, 'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text(text.toUpperCase(), marginX+10, y+15);
+    y += 22+12;
+  }
+  function fieldLine(label, value, x, w){
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...INK);
+    doc.text(label, x, y);
+    const labelW = doc.getTextWidth(label) + 6;
+    doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+    doc.text(String(value||''), x+labelW, y);
+    doc.setDrawColor(...BLUE); doc.setLineWidth(0.7);
+    doc.line(x, y+3, x+w, y+3);
+  }
+  function fieldRowW(totalW, fields){
+    ensureSpace(26);
+    const gap = 14;
+    const totalWeight = fields.reduce((s,f)=>s+(f.weight||1),0);
+    let x = marginX;
+    fields.forEach(f => {
+      const w = (totalW - gap*(fields.length-1)) * (f.weight||1) / totalWeight;
+      fieldLine(f.label, f.value, x, w);
+      x += w + gap;
+    });
+    y += 22;
+  }
+  function fieldRow(fields){ fieldRowW(contentW, fields); }
+  function drawTable(headers, rows, colWidths){
+    ensureSpace(30);
+    const rowH = 16;
+    function drawHeader(){
+      let cx = marginX;
+      headers.forEach((h,i) => {
+        doc.setFillColor(...BLUEHEAD); doc.setDrawColor(...LINECOL);
+        doc.rect(cx, y, colWidths[i], rowH, 'FD');
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...BLUE);
+        doc.text(h, cx+4, y+rowH-5);
+        cx += colWidths[i];
+      });
+      y += rowH;
+    }
+    drawHeader();
+    rows.forEach((row, ri) => {
+      if(y + rowH > pageH - 50){ newPage(); drawHeader(); }
+      let cx = marginX;
+      const rowFill = ri % 2 === 1 ? BLUELIGHT : [255,255,255];
+      row.forEach((val, ci) => {
+        doc.setFillColor(...rowFill); doc.setDrawColor(...LINECOL);
+        doc.rect(cx, y, colWidths[ci], rowH, 'FD');
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...INK);
+        const txt = String(val||'');
+        const clipped = doc.splitTextToSize(txt, colWidths[ci]-6)[0] || '';
+        doc.text(clipped, cx+4, y+rowH-5);
+        cx += colWidths[ci];
+      });
+      y += rowH;
+    });
+    y += 14;
+  }
+
+  // ---------- Cabeçalho ----------
+  const logoSize = 46;
+  let titleX = marginX;
+  if(state.clinic.logo){
+    try{
+      const fmt = state.clinic.logo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.clinic.logo, fmt, marginX, y-30, logoSize, logoSize);
+      titleX = marginX + logoSize + 12;
+    }catch(e){}
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...BLUE);
+  doc.text(state.clinic.nome || 'PRONTUÁRIO', titleX, y);
+  if(state.clinic.nome || state.clinic.dentista || state.clinic.cro){
+    y += 15;
+    doc.setFont('helvetica','italic'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+    const subtitleParts = [state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : '', state.clinic.cro ? ('CRO '+state.clinic.cro) : ''].filter(Boolean);
+    doc.text(subtitleParts.length ? subtitleParts.join(' — ') : 'PRONTUÁRIO', titleX, y);
+  }
+  y += 18;
+  if(state.clinic.logo && y < (40-30+logoSize)){ y = 40-30+logoSize+6; }
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
+  doc.line(marginX, y, marginX+contentW, y);
+  y += 24;
+
+  // ---------- Dados do paciente ----------
+  sectionTitle('Dados do paciente');
+  const hasPhoto = !!state.patient.foto;
+  const photoSize = 86;
+  const textW = hasPhoto ? contentW - photoSize - 14 : contentW;
+  const photoTop = y - 12;
+  const photoBottom = photoTop + photoSize;
+  if(hasPhoto){
+    try{
+      doc.setDrawColor(...LINECOL);
+      doc.rect(marginX+textW+14, photoTop, photoSize, photoSize, 'D');
+      const fmt = state.patient.foto.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(state.patient.foto, fmt, marginX+textW+14, photoTop, photoSize, photoSize);
+    }catch(e){}
+  }
+  function patientFieldRow(fields){
+    const rowW = (hasPhoto && y < photoBottom) ? textW : contentW;
+    fieldRowW(rowW, fields);
+  }
+  patientFieldRow([{label:'Nome:', value:state.patient.nome, weight:3}]);
+  patientFieldRow([{label:'Nascimento:', value:formatDateBR(state.patient.nasc)},{label:'Sexo:', value:state.patient.sexo},{label:'Idade:', value:state.patient.idade}]);
+  patientFieldRow([{label:'RG:', value:state.patient.rg},{label:'CPF:', value:state.patient.cpf},{label:'Telefone:', value:state.patient.telefone}]);
+  if(hasPhoto && y < photoBottom){ y = photoBottom + 8; }
+  fieldRow([{label:'Endereço:', value:state.patient.endereco, weight:3}]);
+  fieldRow([{label:'Obs.:', value:state.patient.obs, weight:3}]);
+  fieldRow([{label:'Responsável legal:', value:state.patient.responsavel, weight:3}]);
+  y += 6;
+
+  // ---------- Prontuário (cada registro com suas imagens/radiografias/observações) ----------
+  sectionTitle('Prontuário');
+  function drawMiniGallery(label, arr){
+    if(!arr || !arr.length) return;
+    ensureSpace(20);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...MUTED);
+    doc.text(label + ':', marginX+14, y);
+    y += 8;
+    const thumbSize = 48, gap = 6;
+    let cx = marginX+14;
+    const maxX = marginX + contentW - thumbSize;
+    arr.forEach((dataUrl) => {
+      if(cx > maxX){ cx = marginX+14; y += thumbSize + gap; }
+      ensureSpace(thumbSize+gap);
+      try{
+        const fmt = dataUrl.includes('image/png') ? 'PNG' : 'JPEG';
+        doc.setDrawColor(...LINECOL);
+        doc.rect(cx, y, thumbSize, thumbSize, 'D');
+        doc.addImage(dataUrl, fmt, cx, y, thumbSize, thumbSize);
+      }catch(e){}
+      cx += thumbSize + gap;
+    });
+    y += thumbSize + 10;
+  }
+  const filledRecords = state.records.filter(r =>
+    r.data || r.dente || r.procedimento ||
+    (r.obs && r.obs.trim()) || (r.imagens && r.imagens.length) || (r.radiografias && r.radiografias.length)
+  );
+  if(!filledRecords.length){
+    doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+    doc.text('Nenhum registro adicionado ainda.', marginX, y+10);
+    y += 26;
+  } else {
+    filledRecords.forEach((r) => {
+      ensureSpace(40);
+      fieldRow([{label:'Data:', value:r.data},{label:'Dente:', value:r.dente}]);
+      if(r.procedimento){
+        ensureSpace(16);
+        doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...INK);
+        const lbl = 'Procedimento: ';
+        doc.text(lbl, marginX, y);
+        const labelW = doc.getTextWidth(lbl);
+        doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+        const lines = doc.splitTextToSize(r.procedimento, contentW-labelW);
+        lines.forEach((l,i)=>{ ensureSpace(14); doc.text(l, marginX+(i===0?labelW:0), y); y+=13; });
+        y += 3;
+      }
+      if(r.obs && r.obs.trim()){
+        ensureSpace(16);
+        doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(...MUTED);
+        const obsLines = doc.splitTextToSize('Obs.: '+r.obs, contentW-14);
+        obsLines.forEach(l=>{ ensureSpace(12); doc.text(l, marginX+14, y); y+=12; });
+        y += 2;
+      }
+      drawMiniGallery('Imagens clínicas', r.imagens);
+      drawMiniGallery('Radiografias', r.radiografias);
+      ensureSpace(10);
+      doc.setDrawColor(...LINECOL); doc.setLineWidth(0.5);
+      doc.line(marginX, y, marginX+contentW, y);
+      y += 14;
+    });
+  }
+
+  // ---------- Receituário ----------
+  sectionTitle('Receituário');
+  const medRows = state.meds
+    .filter(m => m.nome || m.dosagem || m.posologia)
+    .map(m => [m.nome, m.dosagem, m.posologia]);
+  if(medRows.length){
+    const medColW = [contentW*0.35, contentW*0.2, contentW*0.45];
+    drawTable(['Medicamento','Dosagem','Posologia'], medRows, medColW);
+  } else {
+    doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+    doc.text('Nenhum medicamento prescrito.', marginX, y+10);
+    y += 26;
+  }
+
+  const fullData = { clinic: state.clinic, patient: state.patient, records: state.records, meds: state.meds };
+  const fullCode = encodePdfData(fullData);
+  doc.setProperties({
+    title: 'Prontuário - ' + (state.patient.nome || ''),
+    subject: 'ficha_prontuario_completo',
+    creator: 'Ficha de Prontuário Digital',
+    keywords: PDF_DATA_TAG + fullCode
+  });
+
+  const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
+  doc.save('prontuario_' + safeName + '.pdf');
+  toast('PDF do prontuário gerado com sucesso!');
+}
+
+// ============ INICIALIZAÇÃO ============
+(async function iniciarProntuario(){
+  try{
+    await aplicarIdentidadeClinica();
+    const meResp = await fetch('/api/me', { credentials:'same-origin' });
+    window._clinicaMe = meResp.ok ? await meResp.json() : null;
+    await clinicaInitPacientes();
+    await carregarClinica();
+    await carregarCatalogosCompartilhados();
+    document.getElementById('stepsNav').style.display = 'none';
+    const fb0 = document.querySelector('footer.bottombar'); if(fb0) fb0.style.display = 'none';
+
+    const params = new URLSearchParams(window.location.search);
+    const pacienteDaUrl = params.get('paciente');
+    if(pacienteDaUrl && clinicaFindPacienteById(pacienteDaUrl)){
+      await abrirFicha(pacienteDaUrl);
+    } else {
+      mostrarListaFichas();
+    }
+  }catch(err){
+    document.body.innerHTML = '<div style="max-width:600px;margin:40px auto;padding:20px;font-family:Arial,sans-serif;">' +
+      '<h2 style="color:#C0392B;">Não foi possível carregar a ficha</h2>' +
+      '<p>Tente abrir este arquivo diretamente no Chrome ou Safari, com internet ativada.</p></div>';
+  }
+})();
+</script>
+</body>
+</html>

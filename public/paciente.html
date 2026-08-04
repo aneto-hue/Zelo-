@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ficha do Paciente — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="shared-data.js"></script>
+<script src="nav-home.js"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{
+    background:#fff; border-bottom:3px solid var(--blue-dark); padding:18px 20px; position:relative;
+  }
+  header.topbar h1{font-size:22px; margin:0; color:var(--blue-dark); font-weight:800;}
+  header.topbar p{margin:2px 0 0; font-size:12.5px; color:var(--muted);}
+  main{max-width:1600px; width:100%; box-sizing:border-box; margin:0 auto; padding:18px 14px 50px;}
+  .section-title{font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin:22px 0 8px;}
+  .section-title:first-child{margin-top:0;}
+  .card{background:#fff; border:1.5px solid var(--line-light); border-radius:14px; padding:16px; margin-bottom:12px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; margin-bottom:5px;}
+  .field input{width:100%; padding:11px 10px; font-size:15px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit;}
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:130px;}
+  .module-card{
+    display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit;
+    background:#fff; border:1.5px solid var(--line-light); border-radius:14px; padding:16px; margin-bottom:10px;
+  }
+  .module-card .icon{font-size:28px; width:50px; text-align:center;}
+  .module-card .txt{flex:1;}
+  .module-card .name{font-weight:700; color:var(--blue-dark); font-size:15px;}
+  .module-card .desc{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .module-card .arrow{color:var(--line); font-size:18px;}
+  .summary-row{display:flex; gap:10px; margin-bottom:4px;}
+  .summary-card{flex:1; background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:10px; text-align:center;}
+  .summary-num{font-size:17px; font-weight:800; color:var(--blue-dark);}
+  .summary-num.green{color:var(--green);} .summary-num.amber{color:var(--amber);}
+  .summary-label{font-size:9.5px; color:var(--muted); font-weight:700; text-transform:uppercase; margin-top:2px;}
+  .mini-item{padding:9px 0; border-bottom:1px solid var(--line-light); font-size:13px;}
+  .mini-item:last-child{border-bottom:none;}
+  .mini-item .mi-title{font-weight:700; color:var(--ink);}
+  .mini-item .mi-sub{color:var(--muted); font-size:11.5px; margin-top:2px;}
+  .empty-hint{text-align:center; padding:16px; color:var(--muted); font-size:12.5px;}
+  .add-row-btn{margin-top:8px; padding:12px 14px; border:none; border-radius:8px; font-weight:700; font-size:13.5px; cursor:pointer; text-align:center; background:var(--blue-dark); color:#fff;}
+  .toast{position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px; opacity:0; transition:all .25s; z-index:50; pointer-events:none; text-align:center; max-width:90%;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a href="pacientes.html" style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;color:var(--blue-dark);text-decoration:none;margin-bottom:6px;">← Voltar para Pacientes</a>
+  <h1 id="nomeCabecalho">Ficha do Paciente</h1>
+  <p id="subCabecalho">Carregando...</p>
+</header>
+
+<main id="main"><div class="empty-hint">Carregando dados do paciente...</div></main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const PACIENTE_ID = params.get('id');
+
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+}
+function formatDateHora(ts){
+  if(!ts) return '';
+  return new Date(ts).toLocaleDateString('pt-BR');
+}
+function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function formatDateBRISO(str){ if(!str) return ''; const [y,m,d]=str.split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
+
+function maskCPF(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
+function maskTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 5) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length > 0) v = v.replace(/(\d{0,2})/,'($1');
+  return v.trim();
+}
+function maskRG(v){
+  let letraFinal = '';
+  if(/[Xx]$/.test(v.replace(/[^\dXx]/g,''))){
+    const limpoComX = v.replace(/[^\dXx]/g,'').slice(0,9);
+    if(/[Xx]$/.test(limpoComX)){ letraFinal = 'X'; v = limpoComX.slice(0,-1); }
+  }
+  v = v.replace(/\D/g,'').slice(0,9);
+  v = v.replace(/(\d{2})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  if(letraFinal) v = (v.endsWith('-') ? v : v + '-') + letraFinal;
+  return v;
+}
+function maskDataDigitada(v){
+  v = v.replace(/\D/g,'').slice(0,8);
+  if(v.length > 4) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/, '$1/$2/$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,2})/, '$1/$2');
+  return v;
+}
+function dataDigitadaParaISO(v){
+  const partes = v.split('/');
+  if(partes.length !== 3) return '';
+  const [d,m,a] = partes;
+  if(d.length!==2 || m.length!==2 || a.length!==4) return '';
+  return a + '-' + m + '-' + d;
+}
+function isoParaDataDigitada(iso){
+  if(!iso) return '';
+  const [a,m,d] = String(iso).split('-');
+  if(!a||!m||!d) return '';
+  return d + '/' + m + '/' + a;
+}
+function campoDataNascimento(store, key, onSave){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode('Data de nascimento')));
+  const input = el('input', { type:'text', inputmode:'numeric', placeholder:'DD/MM/AAAA', value: isoParaDataDigitada(store[key]||'') });
+  input.oninput = (e) => {
+    e.target.value = maskDataDigitada(e.target.value);
+    const iso = dataDigitadaParaISO(e.target.value);
+    store[key] = iso || (e.target.value === '' ? '' : store[key]);
+  };
+  if(onSave) input.onchange = () => onSave();
+  f.appendChild(input);
+  return f;
+}
+function mascaraParaCampo(key){
+  const k = key.toLowerCase();
+  if(k==='cpf') return maskCPF;
+  if(k==='rg') return maskRG;
+  if(k.includes('telefone') || k==='whatsapp' || k==='celular') return maskTelefone;
+  return null;
+}
+
+function textFieldSimple(label, store, key, onSave){
+  const f = el('div', { class:'field' });
+  f.appendChild(el('label', {}, document.createTextNode(label)));
+  const mascara = mascaraParaCampo(key);
+  const input = el('input', { type:'text', value: store[key]||'' });
+  if(mascara) input.oninput = (e) => { e.target.value = mascara(e.target.value); };
+  input.onchange = (e) => { store[key] = e.target.value; onSave(); };
+  f.appendChild(input);
+  return f;
+}
+
+async function render(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  if(!PACIENTE_ID){
+    main.appendChild(el('div', { class:'card' }, el('div', { class:'empty-hint' }, document.createTextNode('Paciente não informado. Volte à tela inicial e escolha um paciente na lista.'))));
+    return;
+  }
+
+  await clinicaInitPacientes();
+  const paciente = clinicaFindPacienteById(PACIENTE_ID);
+  if(!paciente){
+    main.appendChild(el('div', { class:'card' }, el('div', { class:'empty-hint' }, document.createTextNode('Paciente não encontrado no cadastro.'))));
+    return;
+  }
+
+  document.getElementById('nomeCabecalho').textContent = paciente.nome;
+  document.getElementById('subCabecalho').textContent = 'Ficha central do paciente';
+
+  // ---------- Dados do paciente (edição rápida) ----------
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Dados do paciente')));
+  const dadosCard = el('div', { class:'card' });
+  const salvar = () => { clinicaUpsertPaciente(Object.assign({ id: paciente.id }, paciente)); toast('Dados atualizados!'); };
+
+  const fotoWrap = el('div', { style:'display:flex;align-items:center;gap:14px;margin-bottom:14px;' });
+  const fotoBox = el('div', { style:'width:64px;height:64px;border-radius:50%;overflow:hidden;background:var(--bg);border:1.5px solid var(--line-light);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--muted);' });
+  function atualizarFotoBox(){
+    fotoBox.innerHTML = '';
+    if(paciente.foto){
+      fotoBox.appendChild(el('img', { src: paciente.foto, style:'width:100%;height:100%;object-fit:cover;' }));
+    } else {
+      fotoBox.appendChild(document.createTextNode('📷'));
+    }
+  }
+  atualizarFotoBox();
+  const fotoInput = el('input', { type:'file', accept:'image/*', id:'fotoInputPaciente', style:'display:none;' });
+  fotoInput.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => { paciente.foto = ev.target.result; atualizarFotoBox(); salvar(); };
+    reader.readAsDataURL(file);
+  };
+  const fotoBtn = el('label', { for:'fotoInputPaciente', style:'font-size:12.5px;font-weight:700;color:var(--blue-dark);cursor:pointer;' }, document.createTextNode('📷 Alterar foto'));
+  fotoWrap.appendChild(fotoBox);
+  fotoWrap.appendChild(el('div', {}, [fotoBtn, fotoInput]));
+  dadosCard.appendChild(fotoWrap);
+  const row1 = el('div', { class:'row' });
+  row1.appendChild(textFieldSimple('Nome', paciente, 'nome', salvar));
+  row1.appendChild(textFieldSimple('Telefone', paciente, 'telefone', salvar));
+  dadosCard.appendChild(row1);
+  const row2 = el('div', { class:'row' });
+  row2.appendChild(campoDataNascimento(paciente, 'nasc', salvar));
+  row2.appendChild(textFieldSimple('CPF', paciente, 'cpf', salvar));
+  dadosCard.appendChild(row2);
+  const row2b = el('div', { class:'row' });
+  row2b.appendChild(textFieldSimple('RG', paciente, 'rg', salvar));
+  const sexoField = el('div', { class:'field' });
+  sexoField.appendChild(el('label', {}, document.createTextNode('Sexo')));
+  const sexoSelect = el('select', {});
+  ['', 'Feminino', 'Masculino', 'Outro'].forEach(opt => {
+    const optEl = el('option', { value:opt }, document.createTextNode(opt || 'Não informado'));
+    if((paciente.sexo||'') === opt) optEl.setAttribute('selected','selected');
+    sexoSelect.appendChild(optEl);
+  });
+  sexoSelect.onchange = (e) => { paciente.sexo = e.target.value; salvar(); };
+  sexoField.appendChild(sexoSelect);
+  row2b.appendChild(sexoField);
+  dadosCard.appendChild(row2b);
+  dadosCard.appendChild(textFieldSimple('E-mail', paciente, 'email', salvar));
+  dadosCard.appendChild(textFieldSimple('Endereço', paciente, 'endereco', salvar));
+  main.appendChild(dadosCard);
+
+  // ---------- Ficha de Anamnese ----------
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Ficha de Anamnese')));
+  const indiceAnamnese = (await ClinicaStorage.load('ficha_anamnese_indice_v1')) || [];
+  const regAnamnese = indiceAnamnese.find(f => f.pacienteId === PACIENTE_ID);
+  main.appendChild(el('a', { class:'module-card', href:'anamnese.html?paciente='+encodeURIComponent(PACIENTE_ID) }, [
+    el('div', { class:'icon' }, document.createTextNode('📋')),
+    el('div', { class:'txt' }, [
+      el('div', { class:'name' }, document.createTextNode(regAnamnese ? 'Abrir ficha de anamnese' : 'Criar ficha de anamnese')),
+      el('div', { class:'desc' }, document.createTextNode(regAnamnese ? ('Atualizada em '+formatDateHora(regAnamnese.atualizadoEm)) : 'Este paciente ainda não tem ficha'))
+    ]),
+    el('div', { class:'arrow' }, document.createTextNode('›'))
+  ]));
+
+  // ---------- Prontuário ----------
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Prontuário')));
+  const indiceProntuario = (await ClinicaStorage.load('ficha_prontuario_indice_v1')) || [];
+  const regProntuario = indiceProntuario.find(f => f.pacienteId === PACIENTE_ID);
+  main.appendChild(el('a', { class:'module-card', href:'prontuario.html?paciente='+encodeURIComponent(PACIENTE_ID) }, [
+    el('div', { class:'icon' }, document.createTextNode('🗂️')),
+    el('div', { class:'txt' }, [
+      el('div', { class:'name' }, document.createTextNode(regProntuario ? 'Abrir prontuário' : 'Criar prontuário')),
+      el('div', { class:'desc' }, document.createTextNode(regProntuario ? ('Atualizado em '+formatDateHora(regProntuario.atualizadoEm)) : 'Este paciente ainda não tem prontuário'))
+    ]),
+    el('div', { class:'arrow' }, document.createTextNode('›'))
+  ]));
+
+  // ---------- Agenda ----------
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Agenda')));
+  const dadosAgenda = (await ClinicaStorage.load('controle_agendamento_progresso_v1')) || { consultas:[], profissionais:[] };
+  const consultasPaciente = (dadosAgenda.consultas||[]).filter(c => c.pacienteId === PACIENTE_ID).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  const agendaCard = el('div', { class:'card' });
+  if(!consultasPaciente.length){
+    agendaCard.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhuma consulta encontrada para este paciente.')));
+  } else {
+    consultasPaciente.slice(0,6).forEach(c => {
+      const prof = (dadosAgenda.profissionais||[]).find(p=>p.id===c.profissionalId);
+      const item = el('div', { class:'mini-item' });
+      item.appendChild(el('div', { class:'mi-title' }, document.createTextNode(formatDateBRISO(c.data)+' às '+(c.horaInicio||'--:--'))));
+      item.appendChild(el('div', { class:'mi-sub' }, document.createTextNode([prof?prof.nome:'', c.procedimento, c.status].filter(Boolean).join(' • '))));
+      agendaCard.appendChild(item);
+    });
+  }
+  main.appendChild(agendaCard);
+  const novaConsultaBtn = el('a', { class:'add-row-btn', href:'agendamento.html?paciente='+encodeURIComponent(PACIENTE_ID), style:'display:block;text-decoration:none;' }, document.createTextNode('+ Nova consulta para este paciente'));
+  main.appendChild(novaConsultaBtn);
+
+  // ---------- Financeiro ----------
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Situação financeira')));
+  const dadosFinanceiro = (await ClinicaStorage.load('controle_pagamentos_comissoes_v1')) || { lancamentos:[] };
+  const lancsPaciente = (dadosFinanceiro.lancamentos||[]).filter(l => l.pacienteId === PACIENTE_ID);
+  let totalContratado = 0, totalRecebido = 0, totalPendente = 0;
+  lancsPaciente.forEach(l => (l.parcelas||[]).forEach(p => {
+    totalContratado += p.valor||0;
+    if(p.pago) totalRecebido += p.valor||0; else totalPendente += p.valor||0;
+  }));
+  const finSummary = el('div', { class:'summary-row' });
+  finSummary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num' }, document.createTextNode('R$ '+formatMoney(totalContratado))),
+    el('div', { class:'summary-label' }, document.createTextNode('Total'))
+  ]));
+  finSummary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num green' }, document.createTextNode('R$ '+formatMoney(totalRecebido))),
+    el('div', { class:'summary-label' }, document.createTextNode('Recebido'))
+  ]));
+  finSummary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num amber' }, document.createTextNode('R$ '+formatMoney(totalPendente))),
+    el('div', { class:'summary-label' }, document.createTextNode('Pendente'))
+  ]));
+  main.appendChild(finSummary);
+  if(!lancsPaciente.length){
+    main.appendChild(el('div', { class:'card' }, el('div', { class:'empty-hint' }, document.createTextNode('Nenhum lançamento financeiro para este paciente.'))));
+  }
+  main.appendChild(el('a', { class:'module-card', href:'financeiro.html' }, [
+    el('div', { class:'icon' }, document.createTextNode('💰')),
+    el('div', { class:'txt' }, [
+      el('div', { class:'name' }, document.createTextNode('Ver no Financeiro')),
+      el('div', { class:'desc' }, document.createTextNode('Abrir todos os lançamentos e parcelas'))
+    ]),
+    el('div', { class:'arrow' }, document.createTextNode('›'))
+  ]));
+
+  // ---------- Link do portal do paciente ----------
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Portal do paciente')));
+  const portalBtn = el('div', { class:'add-row-btn', style:'background:var(--green);' }, document.createTextNode('🔗 Gerar link para o paciente preencher os dados'));
+  portalBtn.onclick = async () => {
+    const resp = await fetch('/api/portal/gerar-link', {
+      method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ pacienteId: PACIENTE_ID })
+    });
+    const data = await resp.json();
+    if(!resp.ok){ alert(data.erro || 'Não foi possível gerar o link.'); return; }
+    const linkCompleto = window.location.origin + data.url;
+    try{
+      await navigator.clipboard.writeText(linkCompleto);
+      alert('Link copiado! Envie para o paciente (ex: por WhatsApp):\n\n' + linkCompleto);
+    }catch(e){
+      prompt('Copie o link abaixo e envie para o paciente:', linkCompleto);
+    }
+  };
+  main.appendChild(portalBtn);
+}
+
+aplicarIdentidadeClinica().then(render);
+</script>
+</body>
+</html>

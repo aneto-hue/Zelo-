@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Meus Dados — Zelo</title>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{background:#fff; border-bottom:3px solid var(--blue-dark); padding:14px 16px; text-align:center;}
+  header.topbar h1{font-size:17px; margin:0; color:var(--blue-dark); font-weight:700;}
+  header.topbar p{margin:2px 0 0; font-size:12px; color:var(--muted); font-style:italic;}
+  main{max-width:640px; margin:0 auto; padding:18px 14px 60px;}
+  .section-title{background:var(--blue-dark); color:#fff; font-weight:700; font-size:14px; letter-spacing:.5px; padding:10px 14px; border-radius:6px; margin:18px 0 12px; text-transform:uppercase;}
+  .section-title:first-child{margin-top:0;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; font-weight:700; margin-bottom:5px; color:var(--ink);}
+  .field input[type=text], .field input[type=date]{width:100%; padding:12px 10px; font-size:16px; border:1.5px solid var(--line); border-radius:8px; background:#fff; font-family:inherit;}
+  .field input:focus{outline:none; border-color:var(--blue-dark); box-shadow:0 0 0 3px var(--blue-head);}
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .row > .field{flex:1; min-width:140px;}
+  .q-card{background:#fff; border:1.5px solid var(--line-light); border-radius:10px; padding:14px; margin-bottom:12px;}
+  .q-text{font-size:15px; font-weight:600; margin-bottom:10px; display:block;}
+  .yn-group{display:flex; gap:10px; margin-bottom:8px;}
+  .yn-btn{flex:1; max-width:120px; padding:11px 0; text-align:center; border:1.5px solid var(--line); border-radius:8px; background:#fff; font-size:14px; font-weight:700; color:var(--muted); cursor:pointer; user-select:none;}
+  .yn-btn.sim.selected{background:var(--green); border-color:var(--green); color:#fff;}
+  .yn-btn.nao.selected{background:#888; border-color:#888; color:#fff;}
+  .sub-field{margin-top:8px;}
+  .sub-field input[type=text]{width:100%; padding:9px 8px; font-size:14px; border:1px solid var(--line-light); border-radius:6px; font-family:inherit;}
+  .sub-field label{font-size:12px; color:var(--muted); font-style:italic; display:block; margin-bottom:4px;}
+  .disease-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-bottom:14px;}
+  @media(min-width:600px){.disease-grid{grid-template-columns:repeat(3, 1fr);}}
+  .disease-chip{display:flex; align-items:center; gap:8px; background:var(--blue-light); border:1.5px solid var(--line-light); border-radius:8px; padding:11px 10px; font-size:13px; cursor:pointer; user-select:none;}
+  .disease-chip .box{width:20px; height:20px; border:2px solid var(--line); border-radius:4px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#fff; font-size:14px; color:#fff; font-weight:900;}
+  .disease-chip.checked{background:var(--blue-dark); color:#fff; border-color:var(--blue-dark);}
+  .disease-chip.checked .box{background:#fff; color:var(--blue-dark);}
+  .add-row-btn{margin-top:10px; padding:14px; border:none; border-radius:8px; font-weight:700; font-size:15px; cursor:pointer; text-align:center;}
+  .hint{font-size:12.5px; color:var(--muted); line-height:1.5; margin-bottom:16px;}
+  .success-box{display:none; background:#E4F3EA; border:1.5px solid var(--green); border-radius:10px; padding:16px; margin-top:16px; font-size:13.5px; color:var(--ink); line-height:1.5; text-align:center;}
+  .success-box.show{display:block;}
+  .error-box{display:none; background:#FBEAEA; border:1.5px solid var(--red); border-radius:10px; padding:16px; margin:20px 14px; font-size:13.5px; color:var(--ink); line-height:1.5; text-align:center;}
+  .error-box.show{display:block;}
+  .toast{position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px; opacity:0; transition:all .25s; z-index:50; pointer-events:none; text-align:center; max-width:90%;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .loading{text-align:center; padding:60px 20px; color:var(--muted);}
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1><img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/Tooth/3D/tooth_3d.png" alt="" style="width:26px;height:26px;vertical-align:-8px;margin-right:6px;object-fit:contain;">Meus Dados</h1>
+  <p>Ficha de saúde — preenchimento pelo paciente</p>
+</header>
+
+<main id="main"><div class="loading">Carregando...</div></main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const TOKEN = params.get('token') || '';
+
+const state = {
+  patient: { nome:'', nasc:'', sexo:'', idade:'', rg:'', cpf:'', telefone:'', email:'', endereco:'', obs:'', responsavel:'', respCpf:'' },
+  general: {},
+  diseases: {},
+  oral: {}
+};
+
+const GENERAL_QUESTIONS = [
+  { key:'tratamento', text:'Está ou esteve recentemente em tratamento médico?', sub:[{key:'motivo', label:'Por qual motivo?'}] },
+  { key:'remedio', text:'Está tomando algum remédio?', sub:[{key:'quais', label:'Quais?'}] },
+  { key:'gravida', text:'Está grávida?', sub:[{key:'mes', label:'Qual mês?'}] },
+  { key:'alergiamed', text:'Já teve reação alérgica a algum medicamento?', sub:[{key:'qualalergia', label:'Qual(is)?'}] },
+  { key:'alergiaanest', text:'Já teve reação alérgica à anestesia?' },
+  { key:'sangrar', text:'Quando se machuca costuma sangrar muito?' },
+  { key:'cicatrizar', text:'Demora a cicatrizar?' },
+  { key:'tontura', text:'Costuma sentir tonturas ou desmaios?' },
+];
+const GENERAL_QUESTIONS_2 = [
+  { key:'marcapasso', text:'Usa marca-passo ou válvula cardíaca?' },
+  { key:'trombose', text:'Já teve trombose?' },
+  { key:'fuma', text:'Fuma?' },
+  { key:'alcool', text:'Toma bebida alcoólica frequentemente?' },
+];
+const DISEASES = ['Pressão alta','Problemas cardíacos','Diabetes','Problema nos rins','Tuberculose','Artrite','Asma / Bronquite','Hepatite','Anemia','Problemas nervosos','Depressão','Epilepsia','Problemas respiratórios','Febre reumática','Convulsão','Reumatismo','Sífilis','HIV'];
+const ORAL_QUESTIONS = [
+  { key:'gengiva', text:'Suas gengivas sangram facilmente?', sub:[{key:'escova', label:'Usa escova? / Usa fio dental?'}] },
+  { key:'sensiveis', text:'Tem dentes sensíveis?', sub:[{key:'sensmotivo', label:'Devido ao frio / Ao quente'}] },
+  { key:'range', text:'Range os dentes?', sub:[{key:'mordelabio', label:'Morde os lábios?'}] },
+  { key:'dificuldade', text:'Ao abrir a boca sente dificuldade, dor ou ruído?' },
+  { key:'respira', text:'Respira bem pelo nariz?', sub:[{key:'dorouvido', label:'Dor no ouvido ou na face?'}] },
+  { key:'outroproblema', text:'Existe algum outro problema de saúde geral ou bucal que não foi perguntado e você deseja relatar?', sub:[{key:'qualoutro', label:'Qual?'}] },
+];
+
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+}
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function maskCPF(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
+function maskTelefone(v){
+  v = v.replace(/\D/g,'').slice(0,11);
+  if(v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 5) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else if(v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length > 0) v = v.replace(/(\d{0,2})/,'($1');
+  return v.trim();
+}
+function maskRG(v){
+  let letraFinal = '';
+  if(/[Xx]$/.test(v.replace(/[^\dXx]/g,''))){
+    const limpoComX = v.replace(/[^\dXx]/g,'').slice(0,9);
+    if(/[Xx]$/.test(limpoComX)){ letraFinal = 'X'; v = limpoComX.slice(0,-1); }
+  }
+  v = v.replace(/\D/g,'').slice(0,9);
+  v = v.replace(/(\d{2})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  if(letraFinal) v = (v.endsWith('-') ? v : v + '-') + letraFinal;
+  return v;
+}
+function mascaraParaCampo(key){
+  const k = key.toLowerCase();
+  if(k==='cpf') return maskCPF;
+  if(k==='rg') return maskRG;
+  if(k.includes('telefone') || k==='whatsapp' || k==='celular') return maskTelefone;
+  return null;
+}
+
+function textField(label, store, key, opts={}){
+  const f=el('div',{class:'field'});
+  f.appendChild(el('label',{},document.createTextNode(label)));
+  const mascara = opts.mask===false ? null : mascaraParaCampo(key);
+  const input=el('input',{type:opts.type||'text', value:store[key]||''});
+  input.oninput=(e)=>{ if(mascara){ e.target.value = mascara(e.target.value); } store[key]=e.target.value; };
+  f.appendChild(input);
+  return f;
+}
+function yesNoBlock(store, q){
+  const card=el('div',{class:'q-card'});
+  card.appendChild(el('span',{class:'q-text'},document.createTextNode(q.text)));
+  const grp=el('div',{class:'yn-group'});
+  const simBtn=el('div',{class:'yn-btn sim'+(store[q.key]==='sim'?' selected':'')},document.createTextNode('Sim'));
+  const naoBtn=el('div',{class:'yn-btn nao'+(store[q.key]==='nao'?' selected':'')},document.createTextNode('Não'));
+  simBtn.onclick=()=>{ store[q.key]=store[q.key]==='sim'?'':'sim'; render(); };
+  naoBtn.onclick=()=>{ store[q.key]=store[q.key]==='nao'?'':'nao'; render(); };
+  grp.appendChild(simBtn); grp.appendChild(naoBtn);
+  card.appendChild(grp);
+  if(q.sub){
+    q.sub.forEach(s=>{
+      const wrap=el('div',{class:'sub-field'});
+      wrap.appendChild(el('label',{},document.createTextNode(s.label)));
+      const input=el('input',{type:'text', value:store[s.key]||''});
+      input.oninput=(e)=>{ store[s.key]=e.target.value; };
+      wrap.appendChild(input);
+      card.appendChild(wrap);
+    });
+  } else if(store[q.key]==='sim'){
+    const noteKey=q.key+'_obs';
+    const wrap=el('div',{class:'sub-field'});
+    wrap.appendChild(el('label',{},document.createTextNode('Observações')));
+    const input=el('input',{type:'text', value:store[noteKey]||''});
+    input.oninput=(e)=>{ store[noteKey]=e.target.value; };
+    wrap.appendChild(input);
+    card.appendChild(wrap);
+  }
+  return card;
+}
+
+async function enviarDados(){
+  if(!(state.patient.nome||'').trim()){
+    alert('Preencha ao menos o seu nome antes de enviar.');
+    return;
+  }
+  try{
+    const resp = await fetch('/api/portal/salvar', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ token: TOKEN, patient: state.patient, general: state.general, oral: state.oral, diseases: state.diseases })
+    });
+    if(!resp.ok){
+      const data = await resp.json().catch(()=>({}));
+      alert(data.erro || 'Não foi possível enviar. Tente novamente.');
+      return;
+    }
+    document.getElementById('main').innerHTML = '';
+    document.getElementById('main').appendChild(el('div', { class:'success-box show' },
+      document.createTextNode('✓ Dados enviados com sucesso! A clínica já recebeu suas informações. Pode fechar esta página.')));
+  }catch(e){
+    alert('Não foi possível conectar. Verifique sua internet e tente novamente.');
+  }
+}
+
+function render(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  main.appendChild(el('div',{class:'section-title'},document.createTextNode('Seus dados')));
+  main.appendChild(el('p',{class:'hint'},document.createTextNode('Preencha com calma e toque em "Enviar" ao final. Suas respostas vão direto para a clínica.')));
+
+  main.appendChild(textField('Nome completo', state.patient, 'nome'));
+  const row1=el('div',{class:'row'});
+  row1.appendChild(textField('Data de nascimento', state.patient, 'nasc', {type:'date'}));
+  row1.appendChild(textField('Sexo', state.patient, 'sexo'));
+  row1.appendChild(textField('Idade', state.patient, 'idade'));
+  main.appendChild(row1);
+  const row2=el('div',{class:'row'});
+  row2.appendChild(textField('RG', state.patient, 'rg'));
+  row2.appendChild(textField('CPF', state.patient, 'cpf'));
+  row2.appendChild(textField('Telefone', state.patient, 'telefone'));
+  main.appendChild(row2);
+  main.appendChild(textField('E-mail', state.patient, 'email'));
+  main.appendChild(textField('Endereço', state.patient, 'endereco'));
+  const row3=el('div',{class:'row'});
+  row3.appendChild(textField('Responsável legal (se menor de idade)', state.patient, 'responsavel'));
+  row3.appendChild(textField('CPF do responsável legal', state.patient, 'respCpf'));
+  main.appendChild(row3);
+
+  main.appendChild(el('div',{class:'section-title', style:'margin-top:24px;'},document.createTextNode('Questionário de saúde geral')));
+  GENERAL_QUESTIONS.forEach(q => main.appendChild(yesNoBlock(state.general, q)));
+
+  main.appendChild(el('div',{class:'section-title'},document.createTextNode('Sofre alguma destas doenças?')));
+  const grid=el('div',{class:'disease-grid'});
+  DISEASES.forEach(d=>{
+    const checked=!!state.diseases[d];
+    const chip=el('div',{class:'disease-chip'+(checked?' checked':'')});
+    chip.appendChild(el('div',{class:'box'},document.createTextNode(checked?'✓':'')));
+    chip.appendChild(document.createTextNode(d));
+    chip.onclick=()=>{ state.diseases[d]=!state.diseases[d]; render(); };
+    grid.appendChild(chip);
+  });
+  main.appendChild(grid);
+
+  const otherCard=el('div',{class:'q-card'});
+  otherCard.appendChild(el('span',{class:'q-text'},document.createTextNode('Outras doenças? Quais?')));
+  const otherInput=el('input',{type:'text', value: state.general.outrasdoencas||''});
+  otherInput.style.cssText='width:100%;padding:9px 8px;font-size:14px;border:1px solid var(--line-light);border-radius:6px;font-family:inherit;';
+  otherInput.oninput=(e)=>{ state.general.outrasdoencas=e.target.value; };
+  otherCard.appendChild(otherInput);
+  main.appendChild(otherCard);
+
+  GENERAL_QUESTIONS_2.forEach(q => main.appendChild(yesNoBlock(state.general, q)));
+
+  main.appendChild(el('div',{class:'section-title', style:'margin-top:24px;'},document.createTextNode('Questionário de saúde bucal')));
+  ORAL_QUESTIONS.forEach(q => main.appendChild(yesNoBlock(state.oral, q)));
+
+  const sendBtn=el('div',{class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;margin-top:20px;font-size:16px;'},
+    document.createTextNode('✓ Enviar meus dados para a clínica'));
+  sendBtn.onclick=enviarDados;
+  main.appendChild(sendBtn);
+}
+
+async function iniciar(){
+  const main = document.getElementById('main');
+  if(!TOKEN){
+    main.innerHTML = '';
+    main.appendChild(el('div', { class:'error-box show' },
+      document.createTextNode('Link inválido. Peça um novo link para a clínica.')));
+    return;
+  }
+  try{
+    const resp = await fetch('/api/portal/dados?token=' + encodeURIComponent(TOKEN));
+    const data = await resp.json();
+    if(!resp.ok){
+      main.innerHTML = '';
+      main.appendChild(el('div', { class:'error-box show' }, document.createTextNode(data.erro || 'Link inválido ou expirado.')));
+      return;
+    }
+    if(data.paciente){
+      state.patient.nome = data.paciente.nome || '';
+      state.patient.telefone = data.paciente.telefone || '';
+      state.patient.nasc = data.paciente.nasc || '';
+      state.patient.cpf = data.paciente.cpf || '';
+      state.patient.rg = data.paciente.rg || '';
+      state.patient.endereco = data.paciente.endereco || '';
+      state.patient.email = data.paciente.email || '';
+    }
+    if(data.ficha){
+      if(data.ficha.patient) Object.assign(state.patient, data.ficha.patient);
+      if(data.ficha.general) Object.assign(state.general, data.ficha.general);
+      if(data.ficha.oral) Object.assign(state.oral, data.ficha.oral);
+      if(data.ficha.diseases) Object.assign(state.diseases, data.ficha.diseases);
+    }
+    render();
+  }catch(e){
+    main.innerHTML = '';
+    main.appendChild(el('div', { class:'error-box show' }, document.createTextNode('Não foi possível conectar. Verifique sua internet e tente novamente.')));
+  }
+}
+
+iniciar();
+</script>
+</body>
+</html>
