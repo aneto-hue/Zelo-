@@ -93,8 +93,9 @@ function criarClinica(nome){
     nome,
     criadoEm: Date.now(),
     ativa: true,
-    assinaturaStatus: 'teste', // 'teste' | 'ativa' | 'atrasada' | 'cancelada'
-    assinaturaVencimento: '',  // 'AAAA-MM-DD', controlado manualmente pelo dono do sistema
+    assinaturaStatus: 'pendente', // 'pendente' | 'ativa' | 'atrasada' | 'cancelada'
+    assinaturaVencimento: '',  // 'AAAA-MM-DD'
+    mpPreapprovalId: '', // id da assinatura no Mercado Pago
     observacoes: ''
   };
   clinicas.push(nova);

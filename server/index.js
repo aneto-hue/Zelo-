@@ -143,11 +143,23 @@ const server = http.createServer((req, res) => {
   const superAdminLogado = auth.validarSessaoAdmin(cookies[ADMIN_COOKIE_NOME]);
 
   // Se a clínica do profissional foi desativada pelo dono do sistema, trata como deslogado.
+  let clinicaDoProfLogado = null;
   if(profissionalLogado){
-    const clinicaDoProf = auth.buscarClinica(profissionalLogado.clinicaId);
-    if(!clinicaDoProf || clinicaDoProf.ativa === false){
+    clinicaDoProfLogado = auth.buscarClinica(profissionalLogado.clinicaId);
+    if(!clinicaDoProfLogado || clinicaDoProfLogado.ativa === false){
       profissionalLogado = null;
     }
+  }
+  // Assinatura pendente/atrasada/cancelada: bloqueia as rotas de dados (API de armazenamento),
+  // mas deixa passar login/logout/consulta da própria assinatura, pra clínica conseguir ver
+  // a situação dela e ir pagar.
+  const ROTAS_LIVRES_SEM_ASSINATURA = ['/api/me', '/api/logout', '/api/minha-assinatura'];
+  const STATUS_COM_ACESSO_LIBERADO = ['ativa', 'teste']; // 'teste' é o status antigo, de clínicas
+  // criadas antes dessa cobrança existir — continuam liberadas até o dono do sistema decidir.
+  if(profissionalLogado && clinicaDoProfLogado && !STATUS_COM_ACESSO_LIBERADO.includes(clinicaDoProfLogado.assinaturaStatus)
+     && pathname.startsWith('/api/') && !ROTAS_LIVRES_SEM_ASSINATURA.includes(pathname)){
+    enviarJSON(res, 402, { erro:'assinatura_pendente', assinaturaStatus: clinicaDoProfLogado.assinaturaStatus });
+    return;
   }
 
   // ---------------- CRIAR NOVA CLÍNICA (cadastro self-service) ----------------
@@ -187,10 +199,14 @@ const server = http.createServer((req, res) => {
 
       const token = auth.criarSessao(novoAdmin.id);
       res.setHeader('Set-Cookie', `${COOKIE_NOME}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=${30*24*60*60}; SameSite=Lax`);
+
+      // A clínica fica com acesso bloqueado (status "pendente") até o dono do sistema aprovar
+      // manualmente no Painel do Sistema — evita que qualquer um crie uma clínica e já use de graça.
       enviarJSON(res, 200, { ok:true });
     });
     return;
   }
+
 
   // ---------------- PAINEL DO DONO DO SISTEMA (super-admin, separado das clínicas) ----------------
   if(pathname === '/api/sistema/login' && req.method === 'POST'){
@@ -386,8 +402,17 @@ const server = http.createServer((req, res) => {
     if(!profissionalLogado){ enviarJSON(res, 401, { erro:'Não autenticado' }); return; }
     enviarJSON(res, 200, {
       id: profissionalLogado.id, nome: profissionalLogado.nome, email: profissionalLogado.email, papel: profissionalLogado.papel,
-      modulosPermitidos: Array.isArray(profissionalLogado.modulosPermitidos) ? profissionalLogado.modulosPermitidos : []
+      modulosPermitidos: Array.isArray(profissionalLogado.modulosPermitidos) ? profissionalLogado.modulosPermitidos : [],
+      assinaturaStatus: clinicaDoProfLogado ? clinicaDoProfLogado.assinaturaStatus : 'ativa'
     });
+    return;
+  }
+
+  // Devolve a situação da assinatura da clínica logada, e um novo link de pagamento se precisar
+  if(pathname === '/api/minha-assinatura' && req.method === 'GET'){
+    if(!profissionalLogado){ enviarJSON(res, 401, { erro:'Não autenticado' }); return; }
+    const clinica = clinicaDoProfLogado || auth.buscarClinica(profissionalLogado.clinicaId);
+    enviarJSON(res, 200, { assinaturaStatus: clinica ? clinica.assinaturaStatus : 'ativa' });
     return;
   }
 
