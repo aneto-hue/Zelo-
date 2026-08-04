@@ -154,6 +154,15 @@ function loadProgress(){
     Object.keys(state).forEach(k => { if(saved[k]!==undefined) state[k]=saved[k]; });
   }catch(e){}
 }
+function limparFormulario(pedirConfirmacao){
+  if(pedirConfirmacao && !confirm('Limpar tudo o que foi preenchido neste aparelho? Isso não afeta nenhum PDF que já foi baixado.')) return;
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  state.patient = { nome:'', nasc:'', sexo:'', idade:'', rg:'', cpf:'', telefone:'', email:'', endereco:'', obs:'', responsavel:'', respCpf:'', foto:'' };
+  state.general = {};
+  state.diseases = {};
+  state.oral = {};
+  render();
+}
 
 function toast(msg){
   const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
@@ -422,6 +431,10 @@ function generatePDF(){
   doc.save('dados_paciente_' + safeName + '.pdf');
   document.getElementById('successBox').classList.add('show');
   toast('PDF gerado com sucesso!');
+  // Já limpa os dados guardados neste aparelho (sem mexer no que está na tela agora, pra não
+  // sumir com a mensagem de sucesso) — assim, quando a página for recarregada pro próximo
+  // paciente preencher, já começa em branco.
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
 }
 
 // ============ RENDER ============
@@ -489,8 +502,16 @@ function render(){
   pdfBtn.onclick=generatePDF;
   main.appendChild(pdfBtn);
 
+  const limparBtn=el('div',{class:'add-row-btn', style:'background:#fff;border:1.5px solid var(--line-light);color:var(--muted);margin-top:8px;'},
+    document.createTextNode('🗑️ Limpar formulário'));
+  limparBtn.onclick=()=>limparFormulario(true);
+  main.appendChild(limparBtn);
+
   const successBox=el('div',{id:'successBox', class:'success-box'},
     document.createTextNode('✓ PDF gerado! Agora envie o arquivo baixado para a clínica (WhatsApp, e-mail etc). Ela vai usar o botão "Importar PDF — Dados do Paciente e Saúde" na Ficha de Anamnese para preencher tudo automaticamente.'));
+  const proximoBtn = el('div', { class:'add-row-btn', style:'background:var(--green);color:#fff;margin-top:12px;' }, document.createTextNode('🔄 Preencher para o próximo paciente'));
+  proximoBtn.onclick = () => limparFormulario(false);
+  successBox.appendChild(proximoBtn);
   main.appendChild(successBox);
 }
 
