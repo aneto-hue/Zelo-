@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zelo — Aguardando aprovação</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    font-family:Arial, Helvetica, sans-serif; background:var(--bg,#F4F8FB); padding:20px;
+  }
+  .box{
+    width:100%; max-width:420px; background:#fff; border-radius:18px; padding:32px 26px;
+    text-align:center; box-shadow:0 24px 60px -14px rgba(0,0,0,0.25);
+  }
+  .icone{font-size:44px; margin-bottom:10px;}
+  h1{font-size:20px; margin:0 0 8px; color:#1F5C8B;}
+  p{font-size:13.5px; color:#555; line-height:1.5; margin:0 0 18px;}
+  .btn{
+    display:block; width:100%; padding:13px; border-radius:10px; border:none;
+    background:#1F5C8B; color:#fff; font-size:15px; font-weight:700; cursor:pointer; text-decoration:none;
+    box-sizing:border-box; margin-bottom:10px;
+  }
+  .btn.secundario{background:#fff; color:#1F5C8B; border:1.5px solid #1F5C8B;}
+  .status-badge{display:inline-block; padding:4px 12px; border-radius:999px; font-size:11.5px; font-weight:700; margin-bottom:16px;}
+  .status-pendente{background:#FFF3E0; color:#C98A1F;}
+  .status-atrasada{background:#FBEAEA; color:#C0392B;}
+  .status-cancelada{background:#F0F0F0; color:#666;}
+</style>
+</head>
+<body>
+
+<div class="box">
+  <div class="icone">⏳</div>
+  <h1>Aguardando aprovação</h1>
+  <div id="statusBadge"></div>
+  <p id="mensagem">Carregando informações da sua conta...</p>
+  <a href="/login.html" class="btn secundario" id="sairLink">Sair</a>
+</div>
+
+<script>
+async function sair(){
+  await fetch('/api/logout', { method:'POST', credentials:'same-origin' });
+  window.location.href = '/login.html';
+}
+document.getElementById('sairLink').onclick = (e) => { e.preventDefault(); sair(); };
+
+const STATUS_TEXTO = {
+  pendente: { badge:'Aguardando aprovação', msg:'Sua clínica foi cadastrada com sucesso! Agora é só aguardar a aprovação de quem administra o sistema — assim que for liberado, você já pode acessar normalmente. Se precisar, entre em contato com quem te passou o acesso ao sistema.' },
+  atrasada: { badge:'Acesso suspenso', msg:'O acesso da sua clínica foi temporariamente suspenso. Entre em contato com quem administra o sistema pra regularizar.' },
+  cancelada: { badge:'Acesso cancelado', msg:'O acesso da sua clínica foi cancelado. Entre em contato com quem administra o sistema se isso não fizer sentido pra você.' },
+};
+
+(async function iniciar(){
+  const meResp = await fetch('/api/me', { credentials:'same-origin' });
+  if(meResp.status === 401){ window.location.href = '/login.html'; return; }
+  const me = await meResp.json();
+
+  if(me.assinaturaStatus === 'ativa' || me.assinaturaStatus === 'teste'){
+    window.location.href = '/index.html';
+    return;
+  }
+
+  const info = STATUS_TEXTO[me.assinaturaStatus] || STATUS_TEXTO.pendente;
+  const badge = document.getElementById('statusBadge');
+  badge.innerHTML = '<span class="status-badge status-'+me.assinaturaStatus+'">'+info.badge+'</span>';
+  document.getElementById('mensagem').textContent = info.msg;
+})();
+</script>
+</body>
+</html>

@@ -44,6 +44,7 @@
   .badge.ativa{background:rgba(52,211,153,0.15); color:var(--green);}
   .badge.inativa{background:rgba(255,107,107,0.15); color:var(--red);}
   .badge.status-teste{background:rgba(251,191,36,0.15); color:var(--amber);}
+  .badge.status-pendente{background:rgba(251,191,36,0.15); color:var(--amber);}
   .badge.status-ativa{background:rgba(52,211,153,0.15); color:var(--green);}
   .badge.status-atrasada{background:rgba(251,191,36,0.15); color:var(--amber);}
   .badge.status-cancelada{background:rgba(255,107,107,0.15); color:var(--red);}
@@ -97,7 +98,7 @@ function el(tag, attrs={}, children=[]){
 function formatDate(ts){ return new Date(ts).toLocaleDateString('pt-BR'); }
 function formatDateISO(str){ if(!str) return ''; const [y,m,d]=str.split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
 
-const STATUS_LABELS = { teste:'Em teste', ativa:'Assinatura ativa', atrasada:'Pagamento atrasado', cancelada:'Cancelada' };
+const STATUS_LABELS = { pendente:'Aguardando aprovação', teste:'Em teste', ativa:'Aprovada / Ativa', atrasada:'Suspensa', cancelada:'Cancelada' };
 
 let clinicaExpandida = null;
 let filtro = '';
@@ -124,6 +125,7 @@ async function render(){
   main.innerHTML = '';
 
   const ativas = clinicas.filter(c => c.ativa).length;
+  const pendentes = clinicas.filter(c => c.assinaturaStatus === 'pendente').length;
   const atrasadas = clinicas.filter(c => c.assinaturaStatus === 'atrasada').length;
   const summaryRow = el('div', { class:'summary-row' });
   summaryRow.appendChild(el('div', { class:'summary-card' }, [
@@ -135,10 +137,20 @@ async function render(){
     el('div', { class:'summary-label' }, document.createTextNode('Ativas'))
   ]));
   summaryRow.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num', style:'color:var(--amber);' }, document.createTextNode(String(pendentes))),
+    el('div', { class:'summary-label' }, document.createTextNode('Aguardando aprovação'))
+  ]));
+  summaryRow.appendChild(el('div', { class:'summary-card' }, [
     el('div', { class:'summary-num', style:'color:var(--amber);' }, document.createTextNode(String(atrasadas))),
-    el('div', { class:'summary-label' }, document.createTextNode('Pagamento atrasado'))
+    el('div', { class:'summary-label' }, document.createTextNode('Suspensas'))
   ]));
   main.appendChild(summaryRow);
+
+  if(pendentes > 0){
+    const avisoPendentes = el('div', { style:'background:#FFF3E0;border:1.5px solid var(--amber);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:13px;color:#8A5A0F;' },
+      document.createTextNode('⚠ Você tem ' + pendentes + ' clínica(s) nova(s) aguardando aprovação. Abra cada uma na lista abaixo e mude o "Status da assinatura" pra "Aprovada / Ativa" pra liberar o acesso.'));
+    main.appendChild(avisoPendentes);
+  }
 
   main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Lembretes de retorno (WhatsApp)')));
   const cardWpp = el('div', { class:'clinica-card' });

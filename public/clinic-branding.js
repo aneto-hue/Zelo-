@@ -21,6 +21,24 @@ function clarearCor(rgb, quantidade){
 window.hexParaRgb = hexParaRgb;
 window.clarearCor = clarearCor;
 
+// Se a assinatura da clínica não estiver ativa, o servidor responde 402 pra qualquer chamada de
+// API. Intercepta isso aqui, em um lugar só, pra mandar a pessoa pra tela de pagamento — assim
+// não precisa repetir essa checagem em cada uma das páginas do sistema.
+(function interceptarAssinaturaPendente(){
+  const paginaAtual = window.location.pathname.split('/').pop();
+  const PAGINAS_LIVRES = ['pagamento-pendente.html', 'login.html', 'criar-clinica.html', 'bem-vindo.html', ''];
+  if(PAGINAS_LIVRES.includes(paginaAtual)) return;
+  const fetchOriginal = window.fetch;
+  window.fetch = function(...args){
+    return fetchOriginal.apply(this, args).then(resp => {
+      if(resp.status === 402){
+        window.location.href = 'pagamento-pendente.html';
+      }
+      return resp;
+    });
+  };
+})();
+
 // Desenha uma marca d'água bem sutil na página atual do PDF: a logo da clínica (se tiver)
 // ou o nome dela como texto diagonal. Só desenha se o perfil tiver marcaDagua ativado.
 function desenharMarcaDagua(doc, pageW, pageH, perfil){
