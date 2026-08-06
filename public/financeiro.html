@@ -96,6 +96,16 @@
   }
   .filter-chip.selected{background:var(--blue-dark); border-color:var(--blue-dark); color:#fff;}
 
+  .fin-table{ width:100%; border-collapse:collapse; font-size:13px; background:#fff; border-radius:10px; overflow:hidden; }
+  .fin-table thead th{
+    text-align:left; padding:10px 12px; background:var(--bg,#F4F8FB); color:var(--muted);
+    font-size:11px; text-transform:uppercase; letter-spacing:0.03em; font-weight:700;
+    border-bottom:2px solid var(--line-light); white-space:nowrap;
+  }
+  .fin-table tbody td{ padding:10px 12px; border-bottom:1px solid var(--line-light); white-space:nowrap; }
+  .fin-table-row{ cursor:pointer; transition:background .1s; }
+  .fin-table-row:hover{ background:#F4F8FB; }
+  .fin-table-detail-row td{ background:#FAFBFC; white-space:normal; }
   .parcela-row{
     display:flex; align-items:center; gap:8px; padding:10px; border:1.5px solid var(--line-light); border-radius:8px;
     margin-bottom:8px; background:#fff;
@@ -347,23 +357,61 @@ function renderProfissionalForm(container, prof, onSalvar, onCancelar){
   container.appendChild(form);
 }
 
+let profissionalExpandido = null;
+let novoProfissionalFinAberto = false;
+
 function renderProfissionais(container){
   container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Profissionais e comissões')));
-  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
-    document.createTextNode('Para adicionar, editar ou remover um profissional (nome, cor e forma de pagamento), use o Perfil da Clínica.')));
 
-  const irBtn = el('a', { href:'perfil-clinica.html', class:'add-row-btn', style:'display:block;text-align:center;text-decoration:none;margin-bottom:14px;' },
-    document.createTextNode('Gerenciar profissionais no Perfil da Clínica →'));
-  container.appendChild(irBtn);
+  const explicacao = el('div', { class:'card', style:'background:#F4F8FB;border-color:var(--blue-dark);margin-bottom:14px;' });
+  explicacao.appendChild(el('div', { style:'font-weight:700;font-size:13px;color:var(--blue-dark);margin-bottom:6px;' },
+    document.createTextNode('Sobre o que a % de comissão incide')));
+  explicacao.appendChild(el('p', { style:'font-size:12.5px;color:var(--ink);margin:0;line-height:1.5;' }, document.createTextNode(
+    'A comissão em % é calculada sobre as PARCELAS PAGAS dos contratos que o próprio profissional fechou (quem estava logado quando concluiu a Anamnese) — não sobre o valor total do contrato de uma vez, e não sobre quem atendeu o paciente. '+
+    'Ela é contabilizada no mês em que o pagamento realmente entra, mesmo que o tratamento ainda não tenha sido feito. A diária conta por dia com paciente confirmado na agenda, e o fixo mensal vence sempre no último dia do mês.'
+  )));
+  container.appendChild(explicacao);
 
-  if(!state.profissionais.length){
+  const novoBtn = el('div', { class:'add-row-btn', style:'margin-bottom:14px;' }, document.createTextNode('+ Novo profissional'));
+  novoBtn.onclick = () => { novoProfissionalFinAberto = true; profissionalExpandido = null; refreshPanel(); };
+  container.appendChild(novoBtn);
+
+  if(novoProfissionalFinAberto){
+    const novo = { id:'prof'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), nome:'', cor:'#1F5C8B', pagamento:{percentual:'',diaria:'',fixo:''} };
+    renderCamposProfissionalFinanceiro(container, novo, async () => {
+      state.profissionais.push(novo);
+      await ClinicaStorage.save(CHAVE_PROFISSIONAIS_COMPARTILHADA, state.profissionais);
+      novoProfissionalFinAberto = false;
+      refreshPanel();
+      toast('Profissional adicionado!');
+    }, () => { novoProfissionalFinAberto = false; refreshPanel(); });
+  }
+
+  if(!state.profissionais.length && !novoProfissionalFinAberto){
     container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum profissional cadastrado ainda.')));
     renderRateiosFixos(container);
     return;
   }
 
   state.profissionais.forEach(prof => {
-    const card = el('div', { class:'card' });
+    if(profissionalExpandido === prof.id){
+      renderCamposProfissionalFinanceiro(container, prof, async () => {
+        await ClinicaStorage.save(CHAVE_PROFISSIONAIS_COMPARTILHADA, state.profissionais);
+        profissionalExpandido = null;
+        refreshPanel();
+        toast('Alterações salvas!');
+      }, () => { profissionalExpandido = null; refreshPanel(); }, async () => {
+        if(!confirm('Excluir "'+prof.nome+'"? Isso não apaga lançamentos já feitos, só o cadastro dele.')) return;
+        state.profissionais = state.profissionais.filter(p => p.id !== prof.id);
+        await ClinicaStorage.save(CHAVE_PROFISSIONAIS_COMPARTILHADA, state.profissionais);
+        profissionalExpandido = null;
+        refreshPanel();
+        toast('Profissional excluído.');
+      });
+      return;
+    }
+    const card = el('div', { class:'card', style:'cursor:pointer;' });
+    card.onclick = () => { profissionalExpandido = prof.id; novoProfissionalFinAberto = false; refreshPanel(); };
     const top = el('div', { class:'card-top' });
     const info = el('div', {});
     info.appendChild(el('div', { class:'card-title' }, [
@@ -375,13 +423,76 @@ function renderProfissionais(container){
     if((pg.percentual!==undefined && pg.percentual!=='')) partes.push(pg.percentual+'% comissão');
     if(parseFloat(pg.diaria)>0) partes.push('R$ '+formatMoney(parseFloat(pg.diaria))+'/diária');
     if(parseFloat(pg.fixo)>0) partes.push('R$ '+formatMoney(parseFloat(pg.fixo))+'/fixo mensal');
-    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(partes.length ? partes.join(' + ') : 'Sem forma de pagamento configurada')));
+    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(partes.length ? partes.join(' + ') : 'Sem forma de pagamento configurada — toque pra configurar')));
     top.appendChild(info);
+    top.appendChild(el('span', { style:'color:var(--muted);font-size:18px;' }, document.createTextNode('›')));
     card.appendChild(top);
     container.appendChild(card);
   });
 
   renderRateiosFixos(container);
+}
+
+// Formulário de edição de profissional, direto no Financeiro — escreve na mesma lista
+// compartilhada usada no Perfil da Clínica e no Agendamento, então fica tudo sincronizado.
+function renderCamposProfissionalFinanceiro(container, prof, onSalvar, onCancelar, onExcluir){
+  if(!prof.pagamento) prof.pagamento = { percentual:'', diaria:'', fixo:'' };
+  const form = el('div', { class:'card', style:'border-color:var(--blue-dark);margin-bottom:14px;' });
+
+  const nomeField = el('div', { class:'field' });
+  nomeField.appendChild(el('label', {}, document.createTextNode('Nome')));
+  const nomeInput = el('input', { type:'text', value: prof.nome||'', placeholder:'Ex: Dra. Fernanda' });
+  nomeInput.oninput = (e) => { prof.nome = e.target.value; };
+  nomeField.appendChild(nomeInput);
+  form.appendChild(nomeField);
+
+  form.appendChild(el('div', { style:'font-weight:700;font-size:13px;color:var(--blue-dark);margin:14px 0 6px;' },
+    document.createTextNode('Forma de pagamento')));
+  form.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:0;margin-bottom:10px;' },
+    document.createTextNode('Pode combinar mais de uma (ex: diária + percentual).')));
+
+  function linhaPagamento(label, campo, placeholder, prefixo){
+    const linha = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:10px;' });
+    const cb = el('input', { type:'checkbox' });
+    cb.checked = prof.pagamento[campo] !== undefined && prof.pagamento[campo] !== '';
+    const valInput = el('input', { type:'number', min:'0', step:'0.01', value: prof.pagamento[campo]||'', placeholder,
+      style:'flex:1;padding:9px;font-size:14px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;'+(cb.checked?'':'opacity:0.4;') });
+    valInput.disabled = !cb.checked;
+    cb.onchange = (e) => {
+      valInput.disabled = !e.target.checked;
+      valInput.style.opacity = e.target.checked ? '1' : '0.4';
+      if(!e.target.checked) { prof.pagamento[campo] = ''; valInput.value=''; }
+      else if(!valInput.value){ prof.pagamento[campo] = '0'; valInput.value = '0'; }
+    };
+    valInput.oninput = (e) => { prof.pagamento[campo] = e.target.value; };
+    const labelEl = el('label', { style:'display:flex;align-items:center;gap:6px;width:110px;font-size:13px;font-weight:600;flex-shrink:0;' }, [cb, document.createTextNode(label)]);
+    linha.appendChild(labelEl);
+    if(prefixo) linha.appendChild(el('span', { style:'font-size:13px;color:var(--muted);' }, document.createTextNode(prefixo)));
+    linha.appendChild(valInput);
+    return linha;
+  }
+  form.appendChild(linhaPagamento('% Comissão', 'percentual', 'Ex: 40', null));
+  form.appendChild(linhaPagamento('Diária', 'diaria', 'Ex: 150,00', 'R$'));
+  form.appendChild(linhaPagamento('Fixo mensal', 'fixo', 'Ex: 2000,00', 'R$'));
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' }, document.createTextNode('Salvar'));
+  salvarBtn.onclick = () => {
+    if(!(prof.nome||'').trim()){ alert('Informe o nome.'); return; }
+    onSalvar();
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = onCancelar;
+  btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+
+  if(onExcluir){
+    const excluirBtn = el('div', { style:'text-align:center;margin-top:10px;font-size:12.5px;color:var(--red);cursor:pointer;text-decoration:underline;' },
+      document.createTextNode('🗑 Excluir este profissional'));
+    excluirBtn.onclick = onExcluir;
+    form.appendChild(excluirBtn);
+  }
+  container.appendChild(form);
 }
 
 // ============ RENDER: LANÇAMENTOS ============
@@ -488,6 +599,8 @@ function renderLancamentoExpandido(container, lanc){
   container.appendChild(wrap);
 }
 
+let filtroBuscaLancamento = '';
+
 function renderLancamentos(container){
   container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Lançamentos')));
 
@@ -504,59 +617,86 @@ function renderLancamentos(container){
     return;
   }
 
-  const listWrap = el('div', { style:'margin-top:14px;' });
-  container.appendChild(listWrap);
+  const buscaField = el('div', { class:'field', style:'margin-top:14px;' });
+  buscaField.appendChild(el('label', {}, document.createTextNode('Buscar por paciente')));
+  const buscaInput = el('input', { type:'text', value: filtroBuscaLancamento, placeholder:'Digite o nome do paciente...' });
+  buscaInput.oninput = (e) => { filtroBuscaLancamento = e.target.value; refreshPanel(); };
+  buscaField.appendChild(buscaInput);
+  container.appendChild(buscaField);
 
-  state.lancamentos.forEach(lanc => {
+  const termoBusca = filtroBuscaLancamento.trim().toLowerCase();
+  const listaFiltrada = state.lancamentos.filter(l => !termoBusca || (l.paciente||'').toLowerCase().includes(termoBusca));
+
+  if(!listaFiltrada.length){
+    container.appendChild(el('div', { class:'empty-hint', style:'margin-top:14px;' }, document.createTextNode('Nenhum lançamento encontrado com esse nome.')));
+    return;
+  }
+
+  const tableWrap = el('div', { style:'margin-top:12px;overflow-x:auto;' });
+  const table = el('table', { class:'fin-table' });
+  const thead = el('thead', {}, el('tr', {}, [
+    el('th', {}, document.createTextNode('Paciente')),
+    el('th', {}, document.createTextNode('Profissional')),
+    el('th', {}, document.createTextNode('Valor total')),
+    el('th', {}, document.createTextNode('Parcelas')),
+    el('th', {}, document.createTextNode('Origem')),
+    el('th', {}, document.createTextNode('')),
+  ]));
+  table.appendChild(thead);
+  const tbody = el('tbody', {});
+
+  listaFiltrada.forEach(lanc => {
     const pagas = lanc.parcelas.filter(p=>p.pago).length;
-    const card = el('div', { class:'card' });
-    const top = el('div', { class:'card-top' });
-    const info = el('div', {});
-    info.appendChild(el('div', { class:'card-title' }, document.createTextNode(lanc.paciente)));
     const prof = getProfissional(lanc.profissionalId);
-    info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(
-      'Valor total: R$ '+formatMoney(lanc.valorTotal) + ' • ' + pagas + '/' + lanc.parcelas.length + ' parcela(s) recebida(s)'
-    )));
-    const badges = el('div', { style:'margin-top:6px;' });
-    badges.appendChild(el('span', { class:'badge origem' }, document.createTextNode(lanc.origem==='importado'?'Importado':'Manual')));
-    top.appendChild(info);
-
-    const actions = el('div', { class:'card-actions' });
-    const expandIcon = el('span', { style:'color:var(--blue-dark);' }, document.createTextNode(lancamentoExpandido===lanc.id?'▲':'▼'));
-    expandIcon.onclick = () => { lancamentoExpandido = lancamentoExpandido===lanc.id ? null : lanc.id; refreshPanel(); };
-    const delIcon = el('span', { style:'color:var(--red);' }, document.createTextNode('✕'));
-    delIcon.onclick = () => {
+    const tr = el('tr', { class:'fin-table-row' });
+    tr.onclick = () => { lancamentoExpandido = lancamentoExpandido===lanc.id ? null : lanc.id; refreshPanel(); };
+    tr.appendChild(el('td', { style:'font-weight:600;' }, document.createTextNode(lanc.paciente)));
+    tr.appendChild(el('td', {}, document.createTextNode(prof ? prof.nome : '— não atribuído')));
+    tr.appendChild(el('td', {}, document.createTextNode('R$ '+formatMoney(lanc.valorTotal))));
+    tr.appendChild(el('td', {}, document.createTextNode(pagas+'/'+lanc.parcelas.length+' pagas')));
+    tr.appendChild(el('td', {}, el('span', { class:'badge origem' }, document.createTextNode(lanc.origem==='importado'?'Importado':'Manual'))));
+    const tdAcoes = el('td', { style:'white-space:nowrap;text-align:right;' });
+    const expandIcon = el('span', { style:'color:var(--blue-dark);padding:0 6px;' }, document.createTextNode(lancamentoExpandido===lanc.id?'▲':'▼'));
+    const delIcon = el('span', { style:'color:var(--red);padding:0 6px;' }, document.createTextNode('✕'));
+    delIcon.onclick = (e) => {
+      e.stopPropagation();
       if(confirm('Excluir este lançamento e todas as suas parcelas?')){
         state.lancamentos = state.lancamentos.filter(l=>l.id!==lanc.id);
         saveProgress(); refreshPanel(); toast('Lançamento excluído.');
       }
     };
-    actions.appendChild(expandIcon); actions.appendChild(delIcon);
-    top.appendChild(actions);
-    card.appendChild(top);
-    card.appendChild(badges);
-
-    // Seletor de profissional (sempre visível, para permitir atribuir/corrigir)
-    const profField = el('div', { class:'field', style:'margin-top:10px;margin-bottom:0;' });
-    profField.appendChild(el('label', {}, document.createTextNode('Profissional responsável'
-      + (lanc.profissionalNomeOriginal && !lanc.profissionalId ? ' (sugerido pela ficha: "'+lanc.profissionalNomeOriginal+'" — cadastre-o ou selecione abaixo)' : ''))));
-    const profSelect = el('select', {});
-    profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Não atribuído')));
-    state.profissionais.forEach(p => {
-      const opt = el('option', { value:p.id }, document.createTextNode(p.nome));
-      if(lanc.profissionalId===p.id) opt.setAttribute('selected','selected');
-      profSelect.appendChild(opt);
-    });
-    profSelect.onchange = (e) => { lanc.profissionalId = e.target.value; saveProgress(); };
-    profField.appendChild(profSelect);
-    card.appendChild(profField);
+    tdAcoes.appendChild(expandIcon); tdAcoes.appendChild(delIcon);
+    tr.appendChild(tdAcoes);
+    tbody.appendChild(tr);
 
     if(lancamentoExpandido === lanc.id){
-      renderLancamentoExpandido(card, lanc);
-    }
+      const trDetalhe = el('tr', { class:'fin-table-detail-row' });
+      const tdDetalhe = el('td', { colspan:'6' });
+      const detalheWrap = el('div', { style:'padding:12px 4px;' });
 
-    listWrap.appendChild(card);
+      const profField = el('div', { class:'field', style:'margin-bottom:0;' });
+      profField.appendChild(el('label', {}, document.createTextNode('Profissional responsável'
+        + (lanc.profissionalNomeOriginal && !lanc.profissionalId ? ' (sugerido pela ficha: "'+lanc.profissionalNomeOriginal+'" — cadastre-o ou selecione abaixo)' : ''))));
+      const profSelect = el('select', {});
+      profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Não atribuído')));
+      state.profissionais.forEach(p => {
+        const opt = el('option', { value:p.id }, document.createTextNode(p.nome));
+        if(lanc.profissionalId===p.id) opt.setAttribute('selected','selected');
+        profSelect.appendChild(opt);
+      });
+      profSelect.onchange = (e) => { lanc.profissionalId = e.target.value; saveProgress(); };
+      profField.appendChild(profSelect);
+      detalheWrap.appendChild(profField);
+
+      renderLancamentoExpandido(detalheWrap, lanc);
+      tdDetalhe.appendChild(detalheWrap);
+      trDetalhe.appendChild(tdDetalhe);
+      tbody.appendChild(trDetalhe);
+    }
   });
+  table.appendChild(tbody);
+  tableWrap.appendChild(table);
+  container.appendChild(tableWrap);
 }
 
 // ============ RENDER: PARCELAS E RECEBIMENTOS ============
@@ -577,6 +717,8 @@ function todasParcelasComContexto(){
 
 function renderParcelasRecebimentos(container){
   container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Parcelas e recebimentos')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
+    document.createTextNode('Todas as parcelas de todos os contratos, de todos os tempos (não é filtrado por mês). Para ver por período, use a aba Monitoramento.')));
 
   const todas = todasParcelasComContexto();
   const totalGeral = todas.reduce((s,x)=>s+x.parcela.valor,0);
@@ -586,15 +728,15 @@ function renderParcelasRecebimentos(container){
   const summary = el('div', { class:'summary-grid' });
   summary.appendChild(el('div', { class:'summary-card' }, [
     el('div', { class:'summary-num' }, document.createTextNode('R$ '+formatMoney(totalGeral))),
-    el('div', { class:'summary-label' }, document.createTextNode('Total geral'))
+    el('div', { class:'summary-label' }, document.createTextNode('Total contratado (todo o histórico)'))
   ]));
   summary.appendChild(el('div', { class:'summary-card' }, [
     el('div', { class:'summary-num green' }, document.createTextNode('R$ '+formatMoney(totalRecebido))),
-    el('div', { class:'summary-label' }, document.createTextNode('Recebido'))
+    el('div', { class:'summary-label' }, document.createTextNode('Já recebido (todo o histórico)'))
   ]));
   summary.appendChild(el('div', { class:'summary-card' }, [
     el('div', { class:'summary-num amber' }, document.createTextNode('R$ '+formatMoney(totalPendente))),
-    el('div', { class:'summary-label' }, document.createTextNode('Pendente'))
+    el('div', { class:'summary-label' }, document.createTextNode('Ainda falta receber'))
   ]));
   container.appendChild(summary);
 
@@ -914,7 +1056,11 @@ function renderMonitoramento(container){
 
   const recebidasNoPeriodo = todas.filter(x => x.parcela.pago && x.parcela.dataRecebimento && x.parcela.dataRecebimento >= dataIni && x.parcela.dataRecebimento <= dataFim);
   const totalRecebidoPeriodo = recebidasNoPeriodo.reduce((s,x)=>s+x.parcela.valor,0);
-  const pendentesNoPeriodo = todas.filter(x => !x.parcela.pago && x.parcela.data && x.parcela.data >= dataIni && x.parcela.data <= dataFim);
+
+  const REGEX_DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+  const todasPendentes = todas.filter(x => !x.parcela.pago);
+  const pendentesSemDataValida = todasPendentes.filter(x => !x.parcela.data || !REGEX_DATA_ISO.test(x.parcela.data));
+  const pendentesNoPeriodo = todasPendentes.filter(x => x.parcela.data && REGEX_DATA_ISO.test(x.parcela.data) && x.parcela.data >= dataIni && x.parcela.data <= dataFim);
   const totalPendentePeriodo = pendentesNoPeriodo.reduce((s,x)=>s+x.parcela.valor,0);
 
   const summary = el('div', { class:'summary-grid', style:'margin-top:14px;' });
@@ -927,6 +1073,12 @@ function renderMonitoramento(container){
     el('div', { class:'summary-label' }, document.createTextNode('A vencer — '+labelPeriodo))
   ]));
   container.appendChild(summary);
+
+  if(pendentesSemDataValida.length){
+    const totalSemData = pendentesSemDataValida.reduce((s,x)=>s+x.parcela.valor,0);
+    container.appendChild(el('div', { style:'background:#FFF3E0;border:1.5px solid var(--amber);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:12px;color:#8A5A0F;' },
+      document.createTextNode('⚠ '+pendentesSemDataValida.length+' parcela(s) pendente(s), totalizando R$ '+formatMoney(totalSemData)+', estão sem data de vencimento definida — por isso não entram em nenhum período aqui. Veja e corrija na aba "Parcelas e Recebimentos".')));
+  }
 
   // ---- Por forma de pagamento (dentro do período escolhido) ----
   container.appendChild(el('div', { class:'section-title', style:'margin-top:22px;' }, document.createTextNode('Recebido por forma de pagamento — '+labelPeriodo)));
@@ -1004,21 +1156,27 @@ function calcularComissoes(){
         if(p.pago) recebido += p.valor; else pendente += p.valor;
       });
     });
-    const pct = parseFloat(prof.comissaoPercent)||0;
+    const pct = parseFloat((prof.pagamento && prof.pagamento.percentual) || prof.comissaoPercent) || 0;
 
-    // Consultas confirmadas desse profissional na Agenda (fonte da verdade pra saber quanto pagar).
+    // Percentual: o profissional que FECHOU o contrato (lancamento.profissionalId — geralmente
+    // quem estava logado quando concluiu a Anamnese) ganha a porcentagem dele sobre CADA PARCELA,
+    // conforme ela vai sendo paga mês a mês — independente de o tratamento já ter sido feito ou
+    // não. É uma comissão de venda, não de atendimento clínico.
+    let comissaoPercentual = 0, qtdParcelasPercentual = 0;
+    if(pct > 0){
+      lancsDoProf.forEach(l => {
+        l.parcelas.forEach(p => {
+          if(p.pago){ comissaoPercentual += p.valor * pct/100; qtdParcelasPercentual++; }
+        });
+      });
+    }
+
+    // Diária: conta automaticamente a partir das 19h do dia em que o profissional teve paciente
+    // agendado — soma os dias trabalhados, independente de contrato fechado ou tratamento feito.
     const nomeNorm = (prof.nome||'').trim().toLowerCase();
     const consultasDoProf = agendamentoConsultasCache.filter(c =>
       c.status === 'confirmado' && (c.__profNome || '').trim().toLowerCase() === nomeNorm
     );
-
-    // Percentual: só conta quando o profissional FINALIZA o procedimento no Prontuário
-    // (consulta.percentualDevido = true). Antes disso, mesmo com valor calculado, não entra na conta.
-    const consultasPercentualDevido = consultasDoProf.filter(c => c.percentualDevido && parseFloat(c.valorPercentual) > 0);
-    const comissaoPercentual = consultasPercentualDevido.reduce((s,c) => s + (parseFloat(c.valorPercentual)||0), 0);
-
-    // Diária: conta automaticamente a partir das 19h do dia em que o profissional teve paciente
-    // agendado (não depende de nada ser finalizado no Prontuário — é só o dia + horário passando).
     const consultasDiariaDevida = consultasDoProf.filter(c => {
       const valorDiaria = parseFloat(c.valorDiaria)||0;
       if(valorDiaria <= 0) return false;
@@ -1041,7 +1199,7 @@ function calcularComissoes(){
     return {
       prof, totalContratado, recebido, pendente, comissao: recebido*pct/100, pct,
       comissaoAgendamento, comissaoPercentual, comissaoDiaria, ajusteComissaoManual,
-      qtdConsultasPercentual: consultasPercentualDevido.length, qtdConsultasDiaria: consultasDiariaDevida.length,
+      qtdConsultasPercentual: qtdParcelasPercentual, qtdConsultasDiaria: consultasDiariaDevida.length,
       fixoMensal, fixoConfigurado, mesFechado, ultimoDiaMesAtual,
     };
   });
@@ -1102,7 +1260,7 @@ function renderComissoes(container){
 
     if((pg.percentual!==undefined && pg.percentual!=='')){
       card.appendChild(el('div', { class:'card-sub', style:'margin-top:6px;' }, document.createTextNode(
-        '• Percentual: R$ '+formatMoney(comissaoPercentual)+' ('+qtdConsultasPercentual+' procedimento(s) finalizado(s) no Prontuário)'
+        '• Percentual: R$ '+formatMoney(comissaoPercentual)+' ('+qtdConsultasPercentual+' parcela(s) paga(s) de contrato(s) fechado(s) por este profissional)'
       )));
     }
     if(parseFloat(pg.diaria)>0){

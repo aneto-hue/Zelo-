@@ -1022,11 +1022,8 @@ function recordCard(r, idx){
           justificativa: justificativa.trim()
         });
         r.finalizado = false;
-        // Enquanto a correção não for salva de novo, a comissão desse atendimento para de contar
-        // no Financeiro — evita pagar em cima de um valor que ainda pode mudar.
-        await marcarPercentualDevido(r, false);
         saveProgress(); refreshPanel();
-        toast('Registro desbloqueado — a correção ficou registrada no histórico. A comissão deste atendimento fica pausada até você salvar de novo.');
+        toast('Registro desbloqueado — a correção ficou registrada no histórico.');
       };
       card.appendChild(desbloquearBtn);
     } else {
@@ -1047,11 +1044,6 @@ function recordCard(r, idx){
   const pendentesWrap = el('div', { style:'margin:2px 0 10px;' });
   card.appendChild(pendentesWrap);
   renderProcedimentosPendentesDoOrcamento(pendentesWrap, r);
-
-  // ---- Vincular a uma consulta confirmada no Agendamento (só assim a comissão do profissional conta) ----
-  const vinculoWrap = el('div', { style:'margin:6px 0 10px;' });
-  card.appendChild(vinculoWrap);
-  renderVinculoConsulta(vinculoWrap, r);
 
   const toggle = el('div', { style:'cursor:pointer;color:var(--blue-dark);font-size:12.5px;font-weight:700;margin-top:2px;display:flex;align-items:center;gap:4px;' }, [
     el('span', {}, document.createTextNode(isOpen ? '▾' : '▸')),
@@ -1074,22 +1066,20 @@ function recordCard(r, idx){
     escolhaWrap.appendChild(el('div', { style:'font-size:12.5px;font-weight:700;margin-bottom:10px;' },
       document.createTextNode('Esse atendimento finaliza o procedimento, ou vai precisar de outra sessão?')));
     const finalizarBtn = el('div', { class:'add-row-btn', style:'background:var(--green);color:#fff;border:none;margin-bottom:8px;' },
-      document.createTextNode('✓ Finalizar procedimento (comissão passa a contar)'));
+      document.createTextNode('✓ Finalizar procedimento'));
     finalizarBtn.onclick = async () => {
       r.finalizado = true;
       r.procedimentoConcluido = true;
-      await marcarPercentualDevido(r, true);
       delete perguntaFinalizacao[r.id];
       saveProgress();
       refreshPanel();
-      toast('Procedimento finalizado! A comissão do profissional já conta no Financeiro.');
+      toast('Procedimento finalizado! O dente aparece como concluído no odontograma e no acompanhamento do orçamento.');
     };
     const outraSessaoBtn = el('div', { class:'add-row-btn', style:'background:#fff;border:1.5px solid var(--line);color:var(--ink);' },
       document.createTextNode('📅 Vai precisar de outra sessão'));
     outraSessaoBtn.onclick = async () => {
       r.finalizado = true;
       r.procedimentoConcluido = false;
-      await marcarPercentualDevido(r, false);
       delete perguntaFinalizacao[r.id];
       saveProgress();
       refreshPanel();
@@ -1132,21 +1122,6 @@ function galleryFieldSomenteLeitura(label, arr){
   return wrap;
 }
 
-// Marca (ou desmarca) na consulta vinculada do Agendamento que o percentual do profissional
-// já pode contar no Financeiro — só acontece quando o profissional finaliza o procedimento aqui.
-async function marcarPercentualDevido(r, devido){
-  if(!r.consultaVinculadaId) return;
-  let dados;
-  try{ dados = await ClinicaStorage.load(CHAVE_AGENDAMENTO_PRONTUARIO); }catch(e){ return; }
-  const consulta = dados && (dados.consultas||[]).find(c => c.id === r.consultaVinculadaId);
-  if(!consulta) return;
-  consulta.percentualDevido = devido;
-  await ClinicaStorage.save(CHAVE_AGENDAMENTO_PRONTUARIO, dados);
-}
-
-// Vincula este registro a uma consulta confirmada do Agendamento — é isso que faz a comissão
-// do profissional realmente contar no Financeiro (em vez de contar só por estar "Confirmado" na Agenda).
-const CHAVE_AGENDAMENTO_PRONTUARIO = 'controle_agendamento_progresso_v1';
 // Mostra os itens do orçamento (gerado na Anamnese) que ainda não foram marcados como
 // finalizados em nenhum registro deste paciente — pra escolher rápido em vez de digitar de novo.
 // O campo de procedimento continua livre pra digitar manualmente, isso aqui é só um atalho.
@@ -1193,63 +1168,6 @@ async function renderProcedimentosPendentesDoOrcamento(container, r){
     if(item.dente) r.dente = item.dente;
     saveProgressDebounced();
     refreshPanel();
-  };
-  container.appendChild(sel);
-}
-
-async function renderVinculoConsulta(container, r){
-  container.innerHTML = '';
-  if(r.consultaVinculadaId){
-    let dados;
-    try{ dados = await ClinicaStorage.load(CHAVE_AGENDAMENTO_PRONTUARIO); }catch(e){ dados = null; }
-    const consulta = dados && (dados.consultas||[]).find(c => c.id === r.consultaVinculadaId);
-    const linha = el('div', { style:'background:#EAF6EE;border-radius:8px;padding:8px 10px;font-size:12px;color:#2E8B57;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px;' });
-    linha.appendChild(el('span', {}, document.createTextNode(
-      '✓ Serviço realizado confirmado' + (consulta ? (' — consulta de '+formatDateBR(consulta.data)+' às '+(consulta.horaInicio||'')) : '')
-    )));
-    const desvincularBtn = el('span', { style:'cursor:pointer;text-decoration:underline;' }, document.createTextNode('Desvincular'));
-    desvincularBtn.onclick = async () => {
-      if(dados && consulta){ consulta.servicoRealizado = false; await ClinicaStorage.save(CHAVE_AGENDAMENTO_PRONTUARIO, dados); }
-      r.consultaVinculadaId = '';
-      saveProgressDebounced();
-      renderVinculoConsulta(container, r);
-    };
-    linha.appendChild(desvincularBtn);
-    container.appendChild(linha);
-    return;
-  }
-
-  let dados;
-  try{ dados = await ClinicaStorage.load(CHAVE_AGENDAMENTO_PRONTUARIO); }catch(e){ dados = null; }
-  const consultas = (dados && dados.consultas) || [];
-  const disponiveis = consultas.filter(c =>
-    c.status === 'confirmado' && !c.servicoRealizado &&
-    (c.pacienteId === fichaAtivaPacienteId || (c.paciente||'').trim().toLowerCase() === (state.patient.nome||'').trim().toLowerCase())
-  );
-  if(!disponiveis.length){
-    container.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:0;' },
-      document.createTextNode('Nenhuma consulta confirmada pendente de vínculo para este paciente. Sem vincular, a comissão do profissional não conta no Financeiro.')));
-    return;
-  }
-  container.appendChild(el('label', { style:'display:block;font-size:12px;font-weight:700;color:var(--amber);margin-bottom:4px;' },
-    document.createTextNode('⚠ Vincular a uma consulta (confirma o serviço realizado, pra comissão contar)')));
-  const sel = el('select', { style:'width:100%;padding:9px;font-size:13px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
-  sel.appendChild(el('option', { value:'' }, document.createTextNode('— Selecione a consulta —')));
-  disponiveis.forEach(c => {
-    sel.appendChild(el('option', { value:c.id }, document.createTextNode(
-      formatDateBR(c.data) + ' às ' + (c.horaInicio||'') + (c.procedimento?(' — '+c.procedimento):'')
-    )));
-  });
-  sel.onchange = async (e) => {
-    if(!e.target.value) return;
-    const consulta = consultas.find(c => c.id === e.target.value);
-    if(consulta){
-      consulta.servicoRealizado = true;
-      await ClinicaStorage.save(CHAVE_AGENDAMENTO_PRONTUARIO, dados);
-    }
-    r.consultaVinculadaId = e.target.value;
-    saveProgressDebounced();
-    renderVinculoConsulta(container, r);
   };
   container.appendChild(sel);
 }

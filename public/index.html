@@ -100,6 +100,46 @@
 
   .module-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:14px;}
   @media(min-width:640px){ .module-grid{grid-template-columns:repeat(4,1fr);} }
+
+  .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+  .cal-nav{display:flex;align-items:center;gap:6px;}
+  .cal-nav button{
+    border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; font-size:14px;
+    cursor:pointer; color:var(--ink); font-family:inherit;
+  }
+  .cal-nav button:hover{ background:var(--accent-100); }
+  .cal-grid{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:6px;
+    background:color-mix(in srgb, var(--surface) 55%, white); border-radius:var(--radius-lg); padding:14px;
+  }
+  .cal-weekday{ text-align:center; font-size:11px; font-weight:700; color:var(--txt-muted); text-transform:uppercase; padding-bottom:6px; }
+  .cal-day{
+    min-height:64px; border-radius:10px; padding:6px 6px; background:#fff; cursor:pointer;
+    display:flex; flex-direction:column; gap:4px; transition:box-shadow .12s;
+    border:1.5px solid transparent;
+  }
+  .cal-day:hover{ box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+  .cal-day.outro-mes{ background:transparent; opacity:0.4; cursor:default; }
+  .cal-day.outro-mes:hover{ box-shadow:none; }
+  .cal-day.hoje{ border-color:var(--accent); }
+  .cal-day-num{ font-size:12.5px; font-weight:700; }
+  .cal-day.hoje .cal-day-num{
+    background:var(--accent); color:#fff; width:20px; height:20px; border-radius:999px;
+    display:flex; align-items:center; justify-content:center; font-size:11.5px;
+  }
+  .cal-day-badges{ display:flex; flex-direction:column; gap:2px; }
+  .cal-day-item{
+    font-size:10px; padding:1px 5px; border-radius:5px; background:var(--accent2-100); color:var(--accent2-800);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .cal-day-item.aguardando{ background:var(--accent-100); color:var(--accent-800); font-weight:700; }
+  .cal-day-mais{ font-size:10px; color:var(--txt-muted); padding-left:5px; }
+  @media(max-width:640px){
+    .cal-day{ min-height:44px; }
+    .cal-day-item{ display:none; }
+    .cal-day-badges{ align-items:center; }
+    .cal-day.tem-consulta .cal-day-badges::after{ content:''; width:6px;height:6px;border-radius:999px;background:var(--accent); }
+  }
   .module-card{
     display:flex; flex-direction:column; gap:8px; padding:16px; border-radius:var(--radius-lg);
     background:color-mix(in srgb, var(--surface) 55%, white); box-shadow:var(--shadow-sm); text-decoration:none;
@@ -193,8 +233,15 @@
 
       <section>
         <div id="semAcessoMsg"></div>
-        <h3 class="section-title">Módulos</h3>
-        <div class="module-grid" id="moduleGrid"></div>
+        <div class="cal-header">
+          <h3 class="section-title" id="calTitulo" style="margin-bottom:0;">Agenda do mês</h3>
+          <div class="cal-nav">
+            <button id="calPrevBtn" aria-label="Mês anterior">‹</button>
+            <button id="calHojeBtn">Hoje</button>
+            <button id="calNextBtn" aria-label="Próximo mês">›</button>
+          </div>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
       </section>
 
       <section class="bottom-grid">
@@ -294,9 +341,70 @@ document.getElementById('buscaForm').addEventListener('submit', (e) => {
   window.location.href = 'pacientes.html' + (termo ? ('?busca='+encodeURIComponent(termo)) : '');
 });
 
+// ---- Calendário mensal (substitui a grade de módulos, já coberta pela barra lateral) ----
+let calMes = new Date(); // mês sendo exibido no calendário (dia é ignorado, só mês/ano importam)
+let consultasParaCalendario = [];
+
+function renderCalendario(){
+  const grid = document.getElementById('calGrid');
+  const titulo = document.getElementById('calTitulo');
+  grid.innerHTML = '';
+
+  const ano = calMes.getFullYear(), mes = calMes.getMonth();
+  titulo.textContent = 'Agenda — ' + calMes.toLocaleDateString('pt-BR', { month:'long', year:'numeric' }).replace(/^./, c=>c.toUpperCase());
+
+  const hoje = new Date();
+  const hojeISO = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+
+  ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d => grid.appendChild(el('div', { class:'cal-weekday' }, document.createTextNode(d))));
+
+  const primeiroDiaSemana = new Date(ano, mes, 1).getDay();
+  const totalDiasMes = new Date(ano, mes+1, 0).getDate();
+
+  // Consultas agrupadas por dia (AAAA-MM-DD), ignorando canceladas
+  const porDia = {};
+  consultasParaCalendario.forEach(c => {
+    if(c.status === 'cancelado' || !c.data) return;
+    if(!porDia[c.data]) porDia[c.data] = [];
+    porDia[c.data].push(c);
+  });
+
+  // Preenche os espaços vazios antes do dia 1
+  for(let i=0;i<primeiroDiaSemana;i++){
+    grid.appendChild(el('div', { class:'cal-day outro-mes' }));
+  }
+
+  for(let dia=1; dia<=totalDiasMes; dia++){
+    const dataISO = ano+'-'+String(mes+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+    const consultasDoDia = (porDia[dataISO]||[]).sort((a,b)=>(a.horaInicio||'').localeCompare(b.horaInicio||''));
+    const ehHoje = dataISO === hojeISO;
+
+    const dayCell = el('div', { class:'cal-day'+(ehHoje?' hoje':'')+(consultasDoDia.length?' tem-consulta':'') });
+    dayCell.appendChild(el('div', { class:'cal-day-num' }, document.createTextNode(String(dia))));
+
+    if(consultasDoDia.length){
+      const badges = el('div', { class:'cal-day-badges' });
+      consultasDoDia.slice(0,3).forEach(c => {
+        badges.appendChild(el('div', { class:'cal-day-item'+(c.aguardando?' aguardando':'') },
+          document.createTextNode((c.horaInicio||'')+' '+(c.paciente||''))));
+      });
+      if(consultasDoDia.length > 3){
+        badges.appendChild(el('div', { class:'cal-day-mais' }, document.createTextNode('+'+(consultasDoDia.length-3)+' mais')));
+      }
+      dayCell.appendChild(badges);
+    }
+
+    dayCell.onclick = () => { window.location.href = 'agendamento.html?data='+dataISO; };
+    grid.appendChild(dayCell);
+  }
+}
+
+document.getElementById('calPrevBtn').onclick = () => { calMes = new Date(calMes.getFullYear(), calMes.getMonth()-1, 1); renderCalendario(); };
+document.getElementById('calNextBtn').onclick = () => { calMes = new Date(calMes.getFullYear(), calMes.getMonth()+1, 1); renderCalendario(); };
+document.getElementById('calHojeBtn').onclick = () => { calMes = new Date(); renderCalendario(); };
+
 async function render(){
   const statsRow = document.getElementById('statsRow');
-  const moduleGrid = document.getElementById('moduleGrid');
   const agendaTbody = document.getElementById('agendaTbody');
   const agendaEmpty = document.getElementById('agendaEmpty');
   const pendenciasList = document.getElementById('pendenciasList');
@@ -356,17 +464,9 @@ async function render(){
       document.createTextNode('Você não tem permissão de acesso a esse módulo. Fale com um administrador da clínica se precisar.')));
   }
 
-  // ---- Módulos (respeitando nível de acesso) ----
-  const temAcessoTotal = !me || me.papel === 'admin' || !me.modulosPermitidos || !me.modulosPermitidos.length;
-  const modulosVisiveis = MODULOS.filter(m => !m.modulo || temAcessoTotal || (me.modulosPermitidos||[]).includes(m.modulo));
-  moduleGrid.innerHTML = '';
-  modulosVisiveis.forEach(m => {
-    moduleGrid.appendChild(el('a', { class:'module-card', href:m.href }, [
-      el('div', { class:'badge' }, fotoIcone(m.icon)),
-      el('div', { class:'t' }, document.createTextNode(m.nome)),
-      el('p', { class:'d' }, document.createTextNode(m.desc)),
-    ]));
-  });
+  // ---- Agenda do mês (calendário) ----
+  consultasParaCalendario = todasConsultas;
+  renderCalendario();
 
   // ---- Agenda de hoje ----
   agendaTbody.innerHTML = '';

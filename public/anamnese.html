@@ -3051,7 +3051,7 @@ function generatePDF(){
     .map(r => ({ valor: parseMoney(r[0]), data: converterDataBRparaISO(r[1]), forma: r[2]||'' }));
   const financeiroPayload = {
     paciente: state.patient.nome||'',
-    profissionalNome: state.clinic.dentista || state.clinic.nome || '',
+    profissionalNome: (window._clinicaMe && window._clinicaMe.nome) || state.clinic.dentista || state.clinic.nome || '',
     clinicaNome: state.clinic.nome||'',
     dataContrato: state.contract.dataContrato||'',
     valorTotal: calcTotalTratamentos(),
@@ -3079,8 +3079,26 @@ async function lancarAutomaticamenteNoFinanceiro(payload){
     const dados = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { profissionais:[], rateiosFixos:[], lancamentos:[] };
     if(!Array.isArray(dados.lancamentos)) dados.lancamentos = [];
 
+    // Busca o profissional na lista COMPARTILHADA (Perfil da Clínica), que é sempre a fonte
+    // de verdade mais atual — a cópia dentro do Financeiro só atualiza quando alguém abre e
+    // salva algo lá, então não dá pra confiar só nela pra esse cruzamento automático.
     const nomeAlvo = (payload.profissionalNome||'').trim().toLowerCase();
-    const profEncontrado = nomeAlvo ? (dados.profissionais||[]).find(p => (p.nome||'').trim().toLowerCase() === nomeAlvo) : null;
+    let profEncontrado = null;
+    if(nomeAlvo){
+      try{
+        const profissionaisCompartilhados = await ClinicaStorage.load('clinica_profissionais_agenda_v1') || [];
+        profEncontrado = profissionaisCompartilhados.find(p => (p.nome||'').trim().toLowerCase() === nomeAlvo);
+        // Garante que esse profissional também exista na lista interna do Financeiro, com o
+        // MESMO id, senão o cruzamento por profissionalId nas telas de comissão não bate.
+        if(profEncontrado){
+          if(!Array.isArray(dados.profissionais)) dados.profissionais = [];
+          const jaExiste = dados.profissionais.find(p => p.id === profEncontrado.id);
+          if(!jaExiste){
+            dados.profissionais.push(Object.assign({ comissaoPercent: (profEncontrado.pagamento&&profEncontrado.pagamento.percentual)||'' }, profEncontrado));
+          }
+        }
+      }catch(e){ /* segue sem achar, fica sem profissional atribuído */ }
+    }
 
     const parcelasMontadas = (payload.parcelas||[]).map(p => {
       const ehCartao = /cart[ãa]o/i.test(p.forma||'');
@@ -3299,6 +3317,8 @@ function showFatalError(err){
 (async function iniciarAnamnese(){
   try{
     await aplicarIdentidadeClinica();
+    const meResp = await fetch('/api/me', { credentials:'same-origin' });
+    window._clinicaMe = meResp.ok ? await meResp.json() : null;
     await clinicaInitPacientes();
     await carregarClinica();
     document.getElementById('stepsNav').style.display = 'none';

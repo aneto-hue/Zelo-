@@ -800,7 +800,14 @@ function renderConsultaForm(container, consulta, dataFixa, onSalvar, onCancelar)
 
 // ============ RENDER: AGENDA ============
 let viewMode = 'dia'; // dia | semana | mes | ano
-let currentDate = new Date();
+let currentDate = (() => {
+  const dataDaUrl = new URLSearchParams(window.location.search).get('data');
+  if(dataDaUrl && /^\d{4}-\d{2}-\d{2}$/.test(dataDaUrl)){
+    const [y,m,d] = dataDaUrl.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+  return new Date();
+})();
 let filtroProfissionalId = '';
 let novaConsultaAberta = false;
 let consultaEmEdicao = null;
