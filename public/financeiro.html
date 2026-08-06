@@ -637,6 +637,7 @@ function renderLancamentos(container){
 let filtroStatusParcela = 'todas'; // todas | pagas | pendentes
 let filtroProfissionalParcela = '';
 let parcelaConfirmandoId = null;
+let parcelaAjustandoId = null;
 
 function todasParcelasComContexto(){
   const lista = [];
@@ -730,7 +731,112 @@ function renderParcelasRecebimentos(container){
       toggle.onclick = () => { parcelaConfirmandoId = (parcelaConfirmandoId===p.id) ? null : p.id; refreshPanel(); };
       row.appendChild(toggle);
     }
+    const souAdminFinanceiro = !!(window._clinicaMe && window._clinicaMe.papel === 'admin');
+    if(souAdminFinanceiro){
+      const ajustarBtn = el('div', { class:'parcela-toggle', style:'background:transparent;border:1.5px solid var(--amber);color:var(--amber);' }, document.createTextNode('⚙ Ajustar'));
+      ajustarBtn.onclick = () => { parcelaAjustandoId = (parcelaAjustandoId===p.id) ? null : p.id; parcelaConfirmandoId = null; refreshPanel(); };
+      row.appendChild(ajustarBtn);
+    }
     listWrap.appendChild(row);
+
+    if((p.historicoAjustes||[]).length){
+      const histWrap = el('div', { style:'margin:-4px 0 8px;padding:8px 10px;background:#FFF8EC;border-radius:8px;font-size:11.5px;' });
+      histWrap.appendChild(el('div', { style:'font-weight:700;margin-bottom:4px;' }, document.createTextNode('Ajustes feitos pelo administrador:')));
+      p.historicoAjustes.forEach(h => {
+        histWrap.appendChild(el('div', { style:'margin-bottom:3px;' }, document.createTextNode(
+          '• ' + h.quem + ' em ' + new Date(h.quando).toLocaleString('pt-BR') + ': ' + h.resumo + ' — "' + h.justificativa + '"' +
+          (h.afetaComissao ? ' (afetou a comissão)' : ' (não afetou a comissão)')
+        )));
+      });
+      listWrap.appendChild(histWrap);
+    }
+
+    if(souAdminFinanceiro && parcelaAjustandoId === p.id){
+      const formAj = el('div', { class:'card', style:'margin:-4px 0 10px;border-color:var(--amber);' });
+      formAj.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin:0 0 10px;' },
+        document.createTextNode('Corrige valor, forma ou data desta parcela específica, sem mexer no plano de tratamento original. Fica registrado no histórico.')));
+      const ajDados = { valor: p.valor, forma: p.forma||'', data: p.data||'', afetaComissao: false, justificativa:'' };
+
+      const row1aj = el('div', { class:'row' });
+      const valorField = el('div', { class:'field' });
+      valorField.appendChild(el('label', {}, document.createTextNode('Novo valor (R$)')));
+      const valorInputAj = el('input', { type:'number', step:'0.01', min:'0', value: String(ajDados.valor) });
+      valorInputAj.oninput = (e) => { ajDados.valor = e.target.value; };
+      valorField.appendChild(valorInputAj);
+      row1aj.appendChild(valorField);
+      const dataFieldAj = el('div', { class:'field' });
+      dataFieldAj.appendChild(el('label', {}, document.createTextNode('Nova data de vencimento')));
+      const dataInputAj = el('input', { type:'date', value: ajDados.data });
+      dataInputAj.oninput = (e) => { ajDados.data = e.target.value; };
+      dataFieldAj.appendChild(dataInputAj);
+      row1aj.appendChild(dataFieldAj);
+      formAj.appendChild(row1aj);
+
+      const formaFieldAj = el('div', { class:'field' });
+      formaFieldAj.appendChild(el('label', {}, document.createTextNode('Nova forma de pagamento')));
+      const formaSelectAj = el('select', {});
+      ['', 'Cartão de crédito', 'Cartão de Débito', 'Pix', 'Dinheiro', 'Promissória', 'Boleto'].forEach(opt => {
+        const optEl = el('option', { value: opt }, document.createTextNode(opt || 'Selecione...'));
+        if(ajDados.forma === opt) optEl.setAttribute('selected','selected');
+        formaSelectAj.appendChild(optEl);
+      });
+      formaSelectAj.onchange = (e) => { ajDados.forma = e.target.value; };
+      formaFieldAj.appendChild(formaSelectAj);
+      formAj.appendChild(formaFieldAj);
+
+      const justField = el('div', { class:'field' });
+      justField.appendChild(el('label', {}, document.createTextNode('Motivo do ajuste (obrigatório)')));
+      const justInput = el('input', { type:'text', placeholder:'Ex: desconto combinado com o paciente' });
+      justInput.oninput = (e) => { ajDados.justificativa = e.target.value; };
+      justField.appendChild(justInput);
+      formAj.appendChild(justField);
+
+      const comissaoLabel = el('label', { style:'display:flex;align-items:center;gap:8px;font-size:12.5px;margin:6px 0 10px;cursor:pointer;' });
+      const comissaoCheck = el('input', { type:'checkbox' });
+      comissaoCheck.onchange = (e) => { ajDados.afetaComissao = e.target.checked; };
+      comissaoLabel.appendChild(comissaoCheck);
+      comissaoLabel.appendChild(document.createTextNode('Esse ajuste também deve refletir na comissão do profissional responsável'));
+      formAj.appendChild(comissaoLabel);
+
+      const btnRowAj = el('div', { class:'row' });
+      const salvarAjBtn = el('div', { class:'add-row-btn', style:'flex:1;background:var(--amber);color:#fff;border:none;' }, document.createTextNode('Salvar ajuste'));
+      salvarAjBtn.onclick = () => {
+        if(!ajDados.justificativa.trim()){ alert('Informe o motivo do ajuste.'); return; }
+        const valorNovo = parseFloat(ajDados.valor) || 0;
+        const valorAnterior = p.valor;
+        const partes = [];
+        if(valorNovo !== valorAnterior) partes.push('valor de R$ '+formatMoney(valorAnterior)+' para R$ '+formatMoney(valorNovo));
+        if(ajDados.forma && ajDados.forma !== p.forma) partes.push('forma de "'+(p.forma||'—')+'" para "'+ajDados.forma+'"');
+        if(ajDados.data && ajDados.data !== p.data) partes.push('data de '+(p.data?formatDateBR(p.data):'—')+' para '+formatDateBR(ajDados.data));
+        if(!partes.length){ alert('Nada foi alterado.'); return; }
+
+        if(!p.historicoAjustes) p.historicoAjustes = [];
+        p.historicoAjustes.push({
+          quem: (window._clinicaMe && window._clinicaMe.nome) || 'Administrador',
+          quando: Date.now(),
+          justificativa: ajDados.justificativa.trim(),
+          resumo: partes.join('; '),
+          afetaComissao: ajDados.afetaComissao,
+        });
+
+        if(ajDados.afetaComissao){
+          const delta = valorNovo - valorAnterior;
+          lanc.ajusteComissaoTotal = (lanc.ajusteComissaoTotal || 0) + delta;
+        }
+
+        p.valor = valorNovo;
+        if(ajDados.forma) p.forma = ajDados.forma;
+        if(ajDados.data) p.data = ajDados.data;
+        parcelaAjustandoId = null;
+        saveProgress(); refreshPanel();
+        toast('Ajuste salvo! ' + partes.join('; ') + '.');
+      };
+      const cancelarAjBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
+      cancelarAjBtn.onclick = () => { parcelaAjustandoId = null; refreshPanel(); };
+      btnRowAj.appendChild(salvarAjBtn); btnRowAj.appendChild(cancelarAjBtn);
+      formAj.appendChild(btnRowAj);
+      listWrap.appendChild(formAj);
+    }
 
     if(!p.pago && parcelaConfirmandoId === p.id){
       const formConf = el('div', { class:'card', style:'margin:-4px 0 10px;border-color:var(--blue-dark);' });
@@ -846,13 +952,17 @@ function calcularComissoes(){
 
     const comissaoAgendamento = comissaoPercentual + comissaoDiaria;
 
+    // Ajustes manuais feitos pelo administrador em parcelas (com a opção "afeta a comissão"
+    // marcada) somam ou descontam direto do valor devido a esse profissional.
+    const ajusteComissaoManual = lancsDoProf.reduce((s,l) => s + (l.ajusteComissaoTotal||0), 0);
+
     // Fixo: só vence no último dia de cada mês.
     const fixoConfigurado = parseFloat(prof.pagamento && prof.pagamento.fixo) || 0;
     const fixoMensal = mesFechado ? fixoConfigurado : 0;
 
     return {
       prof, totalContratado, recebido, pendente, comissao: recebido*pct/100, pct,
-      comissaoAgendamento, comissaoPercentual, comissaoDiaria,
+      comissaoAgendamento, comissaoPercentual, comissaoDiaria, ajusteComissaoManual,
       qtdConsultasPercentual: consultasPercentualDevido.length, qtdConsultasDiaria: consultasDiariaDevida.length,
       fixoMensal, fixoConfigurado, mesFechado, ultimoDiaMesAtual,
     };
@@ -898,7 +1008,7 @@ function renderComissoes(container){
   if(state.profissionais.length){
     container.appendChild(el('div', { style:'font-size:13px;font-weight:700;color:var(--blue-dark);margin:16px 0 8px;' }, document.createTextNode('Por profissional (sobre o que cada um atendeu)')));
   }
-  porProfissional.forEach(({prof, totalContratado, recebido, pendente, comissao, pct, comissaoAgendamento, comissaoPercentual, comissaoDiaria, qtdConsultasPercentual, qtdConsultasDiaria, fixoMensal, fixoConfigurado, mesFechado, ultimoDiaMesAtual}) => {
+  porProfissional.forEach(({prof, totalContratado, recebido, pendente, comissao, pct, comissaoAgendamento, comissaoPercentual, comissaoDiaria, ajusteComissaoManual, qtdConsultasPercentual, qtdConsultasDiaria, fixoMensal, fixoConfigurado, mesFechado, ultimoDiaMesAtual}) => {
     const card = el('div', { class:'card' });
     const pg = prof.pagamento || {};
     const descPagamento = [
@@ -910,7 +1020,7 @@ function renderComissoes(container){
     card.appendChild(el('div', { class:'card-sub' }, document.createTextNode(descPagamento)));
 
     card.appendChild(el('div', { style:'margin-top:10px;font-size:19px;font-weight:700;color:var(--green);' },
-      document.createTextNode('Total devido agora: R$ '+formatMoney(comissaoAgendamento+fixoMensal))));
+      document.createTextNode('Total devido agora: R$ '+formatMoney(comissaoAgendamento+fixoMensal+ajusteComissaoManual))));
 
     if((pg.percentual!==undefined && pg.percentual!=='')){
       card.appendChild(el('div', { class:'card-sub', style:'margin-top:6px;' }, document.createTextNode(
@@ -927,6 +1037,11 @@ function renderComissoes(container){
         mesFechado
           ? ('• Fixo mensal: R$ '+formatMoney(fixoMensal)+' (venceu no dia '+ultimoDiaMesAtual+', último dia do mês)')
           : ('• Fixo mensal: R$ '+formatMoney(fixoConfigurado)+' — ainda não venceu (vence só no dia '+ultimoDiaMesAtual+', último dia do mês)')
+      )));
+    }
+    if(ajusteComissaoManual){
+      card.appendChild(el('div', { class:'card-sub', style:'color:'+(ajusteComissaoManual>0?'var(--green)':'var(--red)')+';' }, document.createTextNode(
+        '• Ajuste manual do administrador: ' + (ajusteComissaoManual>0?'+':'') + 'R$ ' + formatMoney(ajusteComissaoManual)
       )));
     }
 
@@ -1017,7 +1132,7 @@ function generateComissoesPDF(porProfissional, semProfTotal, semProfRecebido, te
   let totalComissoes = 0, totalRecebido = 0;
   porProfissional.forEach((item, ri) => {
     if(y+rowH>pageH-50){ doc.addPage(); y=50; drawHeader(); }
-    const aPagar = item.comissaoAgendamento + item.fixoMensal;
+    const aPagar = item.comissaoAgendamento + item.fixoMensal + (item.ajusteComissaoManual||0);
     totalComissoes += aPagar; totalRecebido += item.recebido;
     const pg = item.prof.pagamento || {};
     const descPagamento = [
@@ -1133,6 +1248,8 @@ function refreshPanel(){ renderPanel(currentStep, { keepScroll:true }); }
 // ============ INICIALIZAÇÃO ============
 (async function iniciarFinanceiro(){
   window._clinicaPerfil = await aplicarIdentidadeClinica();
+  const meResp = await fetch('/api/me', { credentials:'same-origin' });
+  window._clinicaMe = meResp.ok ? await meResp.json() : null;
   await carregarAgendamentoConsultasCache();
   await clinicaInitPacientes();
   await loadProgress();

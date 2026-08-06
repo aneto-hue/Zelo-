@@ -919,6 +919,7 @@ function renderPatient(container){
 // ============ ABA 3 — PRONTUÁRIO (inclui imagens, radiografias e observações por registro) ============
 let recordExpanded = {};
 let perguntaFinalizacao = {};
+let historicoAberto = {};
 function recordCard(r, idx){
   const isOpen = !!recordExpanded[r.id];
   const souAdmin = !!(window._clinicaMe && window._clinicaMe.papel === 'admin');
@@ -961,13 +962,43 @@ function recordCard(r, idx){
         card.appendChild(extra);
       }
     }
+    if((r.historicoCorrecoes && r.historicoCorrecoes.length) || souAdmin){
+      const toggleHist = el('div', { style:'cursor:pointer;color:var(--amber);font-size:12px;font-weight:700;margin-top:10px;' },
+        document.createTextNode((historicoAberto[r.id]?'▾':'▸')+' Histórico de correções ('+((r.historicoCorrecoes||[]).length)+')'));
+      if((r.historicoCorrecoes||[]).length){
+        toggleHist.onclick = () => { historicoAberto[r.id] = !historicoAberto[r.id]; refreshPanel(); };
+        card.appendChild(toggleHist);
+        if(historicoAberto[r.id]){
+          const listaHist = el('div', { style:'margin-top:8px;display:flex;flex-direction:column;gap:8px;' });
+          r.historicoCorrecoes.forEach(h => {
+            listaHist.appendChild(el('div', { style:'background:#FFF8EC;border-radius:8px;padding:8px 10px;font-size:12px;' }, [
+              el('div', { style:'font-weight:700;' }, document.createTextNode(h.quem + ' — ' + new Date(h.quando).toLocaleString('pt-BR'))),
+              el('div', { style:'margin-top:2px;' }, document.createTextNode('Motivo: ' + h.justificativa)),
+            ]));
+          });
+          card.appendChild(listaHist);
+        }
+      }
+    }
     if(souAdmin){
       const desbloquearBtn = el('div', { style:'margin-top:12px;font-size:12px;font-weight:700;color:var(--red);cursor:pointer;text-decoration:underline;' },
         document.createTextNode('🔓 Desbloquear para editar (admin)'));
-      desbloquearBtn.onclick = () => {
-        if(!confirm('Desbloquear este registro pra edição? Ele deixa de ficar marcado como "finalizado" até ser salvo de novo.')) return;
+      desbloquearBtn.onclick = async () => {
+        const justificativa = prompt('Por que este registro já finalizado precisa ser corrigido? (obrigatório — fica registrado no histórico)');
+        if(justificativa === null) return; // cancelou
+        if(!justificativa.trim()){ alert('É preciso informar o motivo da correção.'); return; }
+        if(!r.historicoCorrecoes) r.historicoCorrecoes = [];
+        r.historicoCorrecoes.push({
+          quem: (window._clinicaMe && window._clinicaMe.nome) || 'Administrador',
+          quando: Date.now(),
+          justificativa: justificativa.trim()
+        });
         r.finalizado = false;
-        saveProgressDebounced(); refreshPanel();
+        // Enquanto a correção não for salva de novo, a comissão desse atendimento para de contar
+        // no Financeiro — evita pagar em cima de um valor que ainda pode mudar.
+        await marcarPercentualDevido(r, false);
+        saveProgress(); refreshPanel();
+        toast('Registro desbloqueado — a correção ficou registrada no histórico. A comissão deste atendimento fica pausada até você salvar de novo.');
       };
       card.appendChild(desbloquearBtn);
     } else {
@@ -983,6 +1014,11 @@ function recordCard(r, idx){
   row1.appendChild(textField('Dente', r, 'dente'));
   card.appendChild(row1);
   card.appendChild(textField('Procedimento', r, 'procedimento'));
+
+  // ---- Procedimentos pendentes do orçamento deste paciente (opcional — pode digitar manualmente acima) ----
+  const pendentesWrap = el('div', { style:'margin:2px 0 10px;' });
+  card.appendChild(pendentesWrap);
+  renderProcedimentosPendentesDoOrcamento(pendentesWrap, r);
 
   // ---- Vincular a uma consulta confirmada no Agendamento (só assim a comissão do profissional conta) ----
   const vinculoWrap = el('div', { style:'margin:6px 0 10px;' });
@@ -1083,6 +1119,56 @@ async function marcarPercentualDevido(r, devido){
 // Vincula este registro a uma consulta confirmada do Agendamento — é isso que faz a comissão
 // do profissional realmente contar no Financeiro (em vez de contar só por estar "Confirmado" na Agenda).
 const CHAVE_AGENDAMENTO_PRONTUARIO = 'controle_agendamento_progresso_v1';
+// Mostra os itens do orçamento (gerado na Anamnese) que ainda não foram marcados como
+// finalizados em nenhum registro deste paciente — pra escolher rápido em vez de digitar de novo.
+// O campo de procedimento continua livre pra digitar manualmente, isso aqui é só um atalho.
+async function renderProcedimentosPendentesDoOrcamento(container, r){
+  container.innerHTML = '';
+  if(!fichaAtivaPacienteId) return;
+  let fichaAnamnese;
+  try{ fichaAnamnese = await ClinicaStorage.load('ficha_anamnese_paciente_' + fichaAtivaPacienteId); }catch(e){ return; }
+  const historico = (fichaAnamnese && fichaAnamnese.historicoOrcamentos) || [];
+  if(!historico.length) return;
+  const orcMaisRecente = historico[0];
+
+  const itensOrc = [];
+  (orcMaisRecente.itens||[]).forEach(it => { if(it.tratamento) itensOrc.push({ dente: it.dente||'', tratamento: it.tratamento }); });
+  (orcMaisRecente.outros||[]).forEach(it => { if(it.descricao) itensOrc.push({ dente: '', tratamento: it.descricao }); });
+  if(!itensOrc.length) return;
+
+  // Considera "pendente" o que ainda não está marcado como concluído em NENHUM registro deste
+  // paciente (incluindo os já salvos na ficha atual, não só os finalizados antes de abrir).
+  const jaFinalizados = (state.records||[]).filter(reg => reg.procedimentoConcluido);
+  const pendentes = itensOrc.filter(item => {
+    const tratNorm = item.tratamento.trim().toLowerCase();
+    return !jaFinalizados.some(reg => {
+      const procNorm = (reg.procedimento||'').trim().toLowerCase();
+      const bate = procNorm && (procNorm.includes(tratNorm) || tratNorm.includes(procNorm));
+      if(!bate) return false;
+      if(item.dente && reg.dente) return String(reg.dente) === String(item.dente);
+      return true;
+    });
+  });
+  if(!pendentes.length) return;
+
+  container.appendChild(el('label', { style:'display:block;font-size:12px;font-weight:700;color:var(--blue-dark);margin-bottom:4px;' },
+    document.createTextNode('Ou escolha um procedimento pendente do orçamento')));
+  const sel = el('select', { style:'width:100%;padding:9px;font-size:13px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  sel.appendChild(el('option', { value:'' }, document.createTextNode('— Selecione —')));
+  pendentes.forEach((item, idx) => {
+    sel.appendChild(el('option', { value:String(idx) }, document.createTextNode((item.dente?('Dente '+item.dente+': '):'') + item.tratamento)));
+  });
+  sel.onchange = (e) => {
+    if(e.target.value === '') return;
+    const item = pendentes[parseInt(e.target.value,10)];
+    r.procedimento = item.tratamento;
+    if(item.dente) r.dente = item.dente;
+    saveProgressDebounced();
+    refreshPanel();
+  };
+  container.appendChild(sel);
+}
+
 async function renderVinculoConsulta(container, r){
   container.innerHTML = '';
   if(r.consultaVinculadaId){

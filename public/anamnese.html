@@ -1725,6 +1725,17 @@ function renderOdontograma(container){
 
 // Calcula a data de vencimento (DD/MM/AAAA) para um dado dia do mês, avançando "monthOffset" meses a partir do mês atual.
 // Se o dia não existir no mês (ex: 31 em fevereiro), usa o último dia daquele mês.
+// Converte "DD/MM/AAAA" (formato usado na tabela de parcelas da Anamnese, mais fácil de ler)
+// para "AAAA-MM-DD" (formato usado para comparar datas no resto do sistema — Agendamento,
+// Central de Pendências etc.). Sem essa conversão, uma parcela com vencimento futuro podia
+// aparecer errado como "atrasada", porque comparar "15/08/2026" com "2026-08-04" como texto
+// puro não dá o resultado certo.
+function converterDataBRparaISO(str){
+  const m = String(str||'').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!m) return str||''; // não bate com o formato esperado — devolve como veio, sem quebrar nada
+  return m[3] + '-' + m[2] + '-' + m[1];
+}
+
 function computeDueDate(day, monthOffset){
   const today = new Date();
   let month = today.getMonth() + (monthOffset||0);
@@ -3037,7 +3048,7 @@ function generatePDF(){
   });
   const parcelasParaFinanceiro = (state.payRows||[])
     .filter(r => (r[0]||'').trim() || (r[1]||'').trim() || (r[2]||'').trim())
-    .map(r => ({ valor: parseMoney(r[0]), data: r[1]||'', forma: r[2]||'' }));
+    .map(r => ({ valor: parseMoney(r[0]), data: converterDataBRparaISO(r[1]), forma: r[2]||'' }));
   const financeiroPayload = {
     paciente: state.patient.nome||'',
     profissionalNome: state.clinic.dentista || state.clinic.nome || '',
