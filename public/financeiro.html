@@ -145,7 +145,7 @@ const state = {
   lancamentos: []    // {id, paciente, profissionalId, profissionalNomeOriginal, clinicaNome, dataContrato, valorTotal, tratamentos:[{descricao,valor}], parcelas:[{id,valor,data,forma,pago,dataRecebimento}], origem}
 };
 
-const STEPS = ['Profissionais','Lançamentos','Parcelas e Recebimentos','Comissões'];
+const STEPS = ['Profissionais','Lançamentos','Parcelas e Recebimentos','Comissões','Monitoramento'];
 let currentStep = 1;
 
 // ============ PERSISTÊNCIA (servidor com reserva local) ============
@@ -207,71 +207,11 @@ function formatDateBR(str){ if(!str) return '—'; const [y,m,d]=str.split('-');
 function getProfissional(id){ return state.profissionais.find(p=>p.id===id); }
 
 // ============ IMPORTAÇÃO DE PDF DA FICHA DE ANAMNESE ============
-const FINANCEIRO_TAG = 'FICHA_FINANCEIRO_DATA:';
-function decodePdfData(code){
-  try{
-    let b64 = String(code).trim().replace(/-/g,'+').replace(/_/g,'/');
-    while(b64.length % 4) b64 += '=';
-    return JSON.parse(decodeURIComponent(escape(atob(b64))));
-  }catch(e){ return null; }
-}
-function extractFinanceiroFromPDFBytes(bytes){
-  let raw = '';
-  const chunk = 0x8000;
-  for(let i=0;i<bytes.length;i+=chunk){
-    raw += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
-  }
-  const m = raw.match(/\/Keywords\s*\(([^)]*)\)/);
-  if(!m) return null;
-  const kwIdx = m[1].indexOf(FINANCEIRO_TAG);
-  if(kwIdx === -1) return null;
-  const codeMatch = m[1].slice(kwIdx + FINANCEIRO_TAG.length).match(/[A-Za-z0-9_-]+/);
-  if(!codeMatch) return null;
-  return decodePdfData(codeMatch[0]);
-}
 function encontrarProfissionalPorNome(nome){
   if(!nome) return '';
   const alvo = nome.trim().toLowerCase();
   const achado = state.profissionais.find(p => p.nome.trim().toLowerCase() === alvo);
   return achado ? achado.id : '';
-}
-function importarPDFAnamnese(file){
-  const reader = new FileReader();
-  reader.onload = () => {
-    try{
-      const bytes = new Uint8Array(reader.result);
-      const dados = extractFinanceiroFromPDFBytes(bytes);
-      if(!dados || typeof dados !== 'object'){
-        alert('Não foi possível encontrar dados financeiros neste PDF. Confirme se ele foi gerado pelo botão "Gerar PDF da ficha completa" na Ficha de Anamnese.');
-        return;
-      }
-      const lancamento = {
-        id: uid(),
-        paciente: dados.paciente || '(sem nome)',
-        profissionalId: encontrarProfissionalPorNome(dados.profissionalNome),
-        profissionalNomeOriginal: dados.profissionalNome || '',
-        clinicaNome: dados.clinicaNome || '',
-        dataContrato: dados.dataContrato || '',
-        valorTotal: parseFloat(dados.valorTotal)||0,
-        tratamentos: Array.isArray(dados.tratamentos) ? dados.tratamentos : [],
-        parcelas: (Array.isArray(dados.parcelas)?dados.parcelas:[]).map(p => ({
-          id: uid(), valor: parseFloat(p.valor)||0, data: p.data||'', forma: p.forma||'', pago:false, dataRecebimento:''
-        })),
-        origem: 'importado'
-      };
-      state.lancamentos.unshift(lancamento);
-      if(typeof clinicaUpsertPaciente === 'function' && lancamento.paciente && lancamento.paciente !== '(sem nome)'){
-        const pac = clinicaUpsertPaciente({ nome: lancamento.paciente });
-        if(pac) lancamento.pacienteId = pac.id;
-      }
-      saveProgress();
-      refreshPanel();
-      toast(lancamento.profissionalId ? 'Ficha importada e profissional identificado automaticamente!' : 'Ficha importada! Atribua um profissional a este lançamento.');
-    }catch(err){
-      alert('Não foi possível ler este PDF. Verifique se o arquivo não está corrompido.');
-    }
-  };
-  reader.readAsArrayBuffer(file);
 }
 
 // ============ RENDER: PROFISSIONAIS ============
@@ -549,21 +489,7 @@ function renderLancamentoExpandido(container, lanc){
 }
 
 function renderLancamentos(container){
-  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Importar da ficha de anamnese')));
-  const importBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-light);border-color:var(--blue-dark);color:var(--blue-dark);' },
-    document.createTextNode('📥 Importar PDF da Ficha de Anamnese'));
-  const importInput = el('input', { type:'file', accept:'.pdf,application/pdf' });
-  importInput.onchange = (e) => {
-    const file = e.target.files && e.target.files[0];
-    if(!file) return;
-    importarPDFAnamnese(file);
-  };
-  importBtn.appendChild(importInput);
-  container.appendChild(importBtn);
-  container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:6px;' },
-    document.createTextNode('Use o PDF gerado pelo botão "Gerar PDF da ficha completa" na Ficha de Anamnese — os dados de paciente, profissional, valor e parcelas são importados automaticamente.')));
-
-  container.appendChild(el('div', { class:'section-title', style:'margin-top:22px;' }, document.createTextNode('Lançamentos')));
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Lançamentos')));
 
   if(novoLancamentoAberto){
     renderNovoLancamentoForm(container);
@@ -715,6 +641,7 @@ function renderParcelasRecebimentos(container){
     info.appendChild(el('div', { class:'p-sub' }, document.createTextNode(
       [p.data?formatDateBR(p.data):'sem data', p.forma, prof?prof.nome:'sem profissional'].filter(Boolean).join(' • ')
       + (p.pago && p.dataRecebimento ? (' • Recebido em '+formatDateBR(p.dataRecebimento)+(p.horaRecebimento?(' às '+p.horaRecebimento):'')) : '')
+      + (p.parcelamentoCartaoInfo ? (' • ' + p.parcelamentoCartaoInfo) : '')
     )));
     row.appendChild(info);
 
@@ -843,7 +770,7 @@ function renderParcelasRecebimentos(container){
       const hoje = new Date();
       const hojeISO2 = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
       const horaAgora = String(hoje.getHours()).padStart(2,'0')+':'+String(hoje.getMinutes()).padStart(2,'0');
-      const confDados = { data: hojeISO2, hora: horaAgora, forma: p.forma || '' };
+      const confDados = { data: hojeISO2, hora: horaAgora, forma: p.forma || '', parcelasCartao: 1 };
 
       const row1 = el('div', { class:'row' });
       const dataField = el('div', { class:'field' });
@@ -869,19 +796,56 @@ function renderParcelasRecebimentos(container){
         if(confDados.forma === opt) optEl.setAttribute('selected','selected');
         formaSelect.appendChild(optEl);
       });
-      formaSelect.onchange = (e) => { confDados.forma = e.target.value; };
+      formaSelect.onchange = (e) => { confDados.forma = e.target.value; parcelasCartaoField.style.display = (e.target.value==='Cartão de crédito') ? '' : 'none'; };
       formaField.appendChild(formaSelect);
       formConf.appendChild(formaField);
+
+      // Só aparece quando a forma é Cartão de crédito — a maquininha costuma repassar o dinheiro
+      // pra clínica aos poucos, mês a mês, mesmo que o paciente tenha parcelado no cartão dele.
+      // Isso divide o valor pra cada mês contar certo no "recebido", em vez de tudo de uma vez.
+      const parcelasCartaoField = el('div', { class:'field', style: confDados.forma==='Cartão de crédito' ? '' : 'display:none;' });
+      parcelasCartaoField.appendChild(el('label', {}, document.createTextNode('Em quantas vezes a maquininha vai repassar? (mês a mês)')));
+      const parcelasCartaoInput = el('input', { type:'number', min:'1', max:'12', value:'1' });
+      parcelasCartaoInput.oninput = (e) => { confDados.parcelasCartao = Math.max(1, parseInt(e.target.value,10)||1); };
+      parcelasCartaoField.appendChild(parcelasCartaoInput);
+      parcelasCartaoField.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:4px 0 0;' },
+        document.createTextNode('Ex: paciente parcelou em 6x no cartão dele → coloque 6 aqui, e o valor recebido é dividido igualzinho, um por mês, a partir da data acima.')));
+      formConf.appendChild(parcelasCartaoField);
 
       const btnRow = el('div', { class:'row', style:'margin-top:8px;' });
       const confirmarBtn = el('div', { class:'add-row-btn', style:'flex:1;background:var(--green);color:#fff;border:none;' }, document.createTextNode('✓ Confirmar pagamento'));
       confirmarBtn.onclick = () => {
-        p.pago = true;
-        p.dataRecebimento = confDados.data || hojeISO2;
-        p.horaRecebimento = confDados.hora || '';
-        if(confDados.forma) p.forma = confDados.forma;
+        const n = (confDados.forma === 'Cartão de crédito') ? confDados.parcelasCartao : 1;
+        if(n <= 1){
+          p.pago = true;
+          p.dataRecebimento = confDados.data || hojeISO2;
+          p.horaRecebimento = confDados.hora || '';
+          if(confDados.forma) p.forma = confDados.forma;
+        } else {
+          // Divide essa parcela em N recebimentos, um por mês, a partir da data escolhida —
+          // assim cada mês só conta a fatia que a maquininha realmente repassou naquele mês.
+          const valorTotal = p.valor;
+          const valorPorMes = Math.round((valorTotal / n) * 100) / 100;
+          const [anoBase, mesBase, diaBase] = (confDados.data || hojeISO2).split('-').map(Number);
+          p.pago = true;
+          p.valor = valorPorMes;
+          p.dataRecebimento = confDados.data || hojeISO2;
+          p.horaRecebimento = confDados.hora || '';
+          p.forma = confDados.forma;
+          p.parcelamentoCartaoInfo = '1/'+n+' do valor total de R$ '+formatMoney(valorTotal)+' (cartão em '+n+'x)';
+          for(let i=1;i<n;i++){
+            let mes = mesBase + i, ano = anoBase;
+            while(mes>12){ mes-=12; ano++; }
+            const dataRep = ano+'-'+String(mes).padStart(2,'0')+'-'+String(Math.min(diaBase,28)).padStart(2,'0');
+            lanc.parcelas.push({
+              id: uid(), valor: (i===n-1) ? Math.round((valorTotal - valorPorMes*(n-1))*100)/100 : valorPorMes,
+              data: dataRep, forma: confDados.forma, pago: true, dataRecebimento: dataRep, horaRecebimento: '',
+              parcelamentoCartaoInfo: (i+1)+'/'+n+' do valor total de R$ '+formatMoney(valorTotal)+' (cartão em '+n+'x)',
+            });
+          }
+        }
         parcelaConfirmandoId = null;
-        saveProgress(); refreshPanel(); toast('Pagamento confirmado!');
+        saveProgress(); refreshPanel(); toast('Pagamento confirmado!' + (n>1 ? (' Dividido em '+n+' recebimentos mensais.') : ''));
       };
       const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Cancelar'));
       cancelarBtn.onclick = () => { parcelaConfirmandoId = null; refreshPanel(); };
@@ -894,7 +858,121 @@ function renderParcelasRecebimentos(container){
   container.appendChild(listWrap);
 }
 
-// ============ RENDER: COMISSÕES ============
+// ============ RENDER: MONITORAMENTO (recebido por período e por forma de pagamento) ============
+let filtroMonitPeriodo = 'mes'; // 'mes' | 'ano' | 'custom'
+let filtroMonitDataIni = '';
+let filtroMonitDataFim = '';
+
+function renderMonitoramento(container){
+  container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Monitoramento de recebimentos')));
+  container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
+    document.createTextNode('Acompanhe quanto entrou (e quanto ainda falta entrar) por período e por forma de pagamento.')));
+
+  const hoje = new Date();
+  const hojeISO = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+
+  const filterRow = el('div', { class:'filter-row' });
+  [['mes','Este mês'],['ano','Este ano'],['custom','Período personalizado']].forEach(([key,label]) => {
+    const chip = el('div', { class:'filter-chip'+(filtroMonitPeriodo===key?' selected':'') }, document.createTextNode(label));
+    chip.onclick = () => { filtroMonitPeriodo = key; refreshPanel(); };
+    filterRow.appendChild(chip);
+  });
+  container.appendChild(filterRow);
+
+  let dataIni, dataFim, labelPeriodo;
+  if(filtroMonitPeriodo === 'mes'){
+    dataIni = hojeISO.slice(0,8)+'01';
+    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate();
+    dataFim = hojeISO.slice(0,8)+String(ultimoDia).padStart(2,'0');
+    labelPeriodo = hoje.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  } else if(filtroMonitPeriodo === 'ano'){
+    dataIni = hoje.getFullYear()+'-01-01';
+    dataFim = hoje.getFullYear()+'-12-31';
+    labelPeriodo = 'ano de '+hoje.getFullYear();
+  } else {
+    const row = el('div', { class:'row', style:'margin-top:10px;' });
+    const iniField = el('div', { class:'field' });
+    iniField.appendChild(el('label', {}, document.createTextNode('De')));
+    const iniInput = el('input', { type:'date', value: filtroMonitDataIni || hojeISO.slice(0,8)+'01' });
+    iniInput.oninput = (e) => { filtroMonitDataIni = e.target.value; refreshPanel(); };
+    iniField.appendChild(iniInput);
+    row.appendChild(iniField);
+    const fimField = el('div', { class:'field' });
+    fimField.appendChild(el('label', {}, document.createTextNode('Até')));
+    const fimInput = el('input', { type:'date', value: filtroMonitDataFim || hojeISO });
+    fimInput.oninput = (e) => { filtroMonitDataFim = e.target.value; refreshPanel(); };
+    fimField.appendChild(fimInput);
+    row.appendChild(fimField);
+    container.appendChild(row);
+    dataIni = filtroMonitDataIni || hojeISO.slice(0,8)+'01';
+    dataFim = filtroMonitDataFim || hojeISO;
+    labelPeriodo = 'de '+formatDateBR(dataIni)+' até '+formatDateBR(dataFim);
+  }
+
+  // Junta todas as parcelas com o lançamento de origem, igual em Parcelas e Recebimentos
+  const todas = todasParcelasComContexto();
+
+  const recebidasNoPeriodo = todas.filter(x => x.parcela.pago && x.parcela.dataRecebimento && x.parcela.dataRecebimento >= dataIni && x.parcela.dataRecebimento <= dataFim);
+  const totalRecebidoPeriodo = recebidasNoPeriodo.reduce((s,x)=>s+x.parcela.valor,0);
+  const pendentesNoPeriodo = todas.filter(x => !x.parcela.pago && x.parcela.data && x.parcela.data >= dataIni && x.parcela.data <= dataFim);
+  const totalPendentePeriodo = pendentesNoPeriodo.reduce((s,x)=>s+x.parcela.valor,0);
+
+  const summary = el('div', { class:'summary-grid', style:'margin-top:14px;' });
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num green' }, document.createTextNode('R$ '+formatMoney(totalRecebidoPeriodo))),
+    el('div', { class:'summary-label' }, document.createTextNode('Recebido — '+labelPeriodo))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num amber' }, document.createTextNode('R$ '+formatMoney(totalPendentePeriodo))),
+    el('div', { class:'summary-label' }, document.createTextNode('A vencer — '+labelPeriodo))
+  ]));
+  container.appendChild(summary);
+
+  // ---- Por forma de pagamento (dentro do período escolhido) ----
+  container.appendChild(el('div', { class:'section-title', style:'margin-top:22px;' }, document.createTextNode('Recebido por forma de pagamento — '+labelPeriodo)));
+  const formasNoPeriodo = {};
+  recebidasNoPeriodo.forEach(x => {
+    const forma = x.parcela.forma || 'Não informado';
+    formasNoPeriodo[forma] = (formasNoPeriodo[forma]||0) + x.parcela.valor;
+  });
+  const formasOrdenadas = Object.entries(formasNoPeriodo).sort((a,b)=>b[1]-a[1]);
+  if(!formasOrdenadas.length){
+    container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum recebimento neste período ainda.')));
+  } else {
+    formasOrdenadas.forEach(([forma, valor]) => {
+      const linha = el('div', { style:'display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-light);font-size:13.5px;' });
+      linha.appendChild(el('span', {}, document.createTextNode(forma)));
+      linha.appendChild(el('span', { style:'font-weight:700;color:var(--green);' }, document.createTextNode('R$ '+formatMoney(valor))));
+      container.appendChild(linha);
+    });
+  }
+
+  // ---- Visão geral (todo o histórico) por forma: recebido x a receber ----
+  container.appendChild(el('div', { class:'section-title', style:'margin-top:22px;' }, document.createTextNode('Visão geral por forma de pagamento (todo o histórico)')));
+  const geralPorForma = {};
+  todas.forEach(x => {
+    const forma = x.parcela.forma || 'Não informado';
+    if(!geralPorForma[forma]) geralPorForma[forma] = { recebido:0, pendente:0 };
+    if(x.parcela.pago) geralPorForma[forma].recebido += x.parcela.valor;
+    else geralPorForma[forma].pendente += x.parcela.valor;
+  });
+  const geralOrdenado = Object.entries(geralPorForma).sort((a,b)=>(b[1].recebido+b[1].pendente)-(a[1].recebido+a[1].pendente));
+  if(!geralOrdenado.length){
+    container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum lançamento cadastrado ainda.')));
+  } else {
+    geralOrdenado.forEach(([forma, v]) => {
+      const card = el('div', { class:'card', style:'margin-bottom:8px;' });
+      card.appendChild(el('div', { class:'card-title' }, document.createTextNode(forma)));
+      const linha = el('div', { style:'display:flex;gap:16px;margin-top:6px;font-size:13px;' });
+      linha.appendChild(el('span', {}, [document.createTextNode('Recebido: '), el('b', { style:'color:var(--green);' }, document.createTextNode('R$ '+formatMoney(v.recebido)))]));
+      linha.appendChild(el('span', {}, [document.createTextNode('A receber: '), el('b', { style:'color:var(--amber);' }, document.createTextNode('R$ '+formatMoney(v.pendente)))]));
+      card.appendChild(linha);
+      container.appendChild(card);
+    });
+  }
+}
+
+
 let agendamentoConsultasCache = [];
 async function carregarAgendamentoConsultasCache(){
   try{
@@ -1239,7 +1317,7 @@ function renderPanel(stepIndex, opts={}){
   const main = document.getElementById('main');
   const scrollY = window.scrollY;
   main.innerHTML = '';
-  const renderers = [renderProfissionais, renderLancamentos, renderParcelasRecebimentos, renderComissoes];
+  const renderers = [renderProfissionais, renderLancamentos, renderParcelasRecebimentos, renderComissoes, renderMonitoramento];
   renderers[stepIndex](main);
   if(opts.keepScroll){ window.scrollTo(0, scrollY); } else { window.scrollTo(0,0); }
 }

@@ -158,9 +158,11 @@
   }
   .odo-tooth.documented{ background:var(--blue-dark); border-color:var(--blue-dark); color:#fff; }
   .odo-tooth.pending{ background:#FBEAEA; border-color:#C0392B; color:#C0392B; }
+  .odo-tooth.planned{ background:#FFF3E0; border-color:var(--amber); color:#8A5A0F; }
   .odo-tooth.deciduous{ border-color:#C9A227; color:#8A6D1B; background:#FEF8E4; }
   .odo-tooth.deciduous.documented{ background:#C9A227; border-color:#C9A227; color:#fff; }
   .odo-tooth.deciduous.pending{ background:#FBEAEA; border-color:#C0392B; color:#C0392B; }
+  .odo-tooth.deciduous.planned{ background:#FFF3E0; border-color:var(--amber); color:#8A5A0F; }
   .odo-label{font-size:10.5px; font-weight:700; color:var(--muted); text-align:center; text-transform:uppercase; letter-spacing:.4px; margin:6px 0 5px;}
   .odo-sep{border-top:1px dashed var(--line-light); margin:10px 0;}
   .odo-legend{display:flex; gap:14px; flex-wrap:wrap; justify-content:center; font-size:11px; color:var(--muted); margin-bottom:14px;}
@@ -418,8 +420,34 @@ function saveProgressDebounced(){
   _saveTimer = setTimeout(saveProgress, 400);
 }
 
+let anamneseProcedimentosCache = {}; // { [dente]: 'Nome do tratamento planejado na Anamnese' }
+
+// Carrega o que foi indicado no odontograma da Anamnese (orçamento mais recente, ou o
+// odontograma atual se ainda não tiver orçamento gerado) — pra já mostrar no odontograma
+// do Prontuário o que precisa ser feito, sem precisar digitar tudo de novo.
+async function carregarProcedimentosPlanejadosDaAnamnese(pacienteId){
+  anamneseProcedimentosCache = {};
+  let fichaAnamnese;
+  try{ fichaAnamnese = await ClinicaStorage.load('ficha_anamnese_paciente_' + pacienteId); }catch(e){ return; }
+  if(!fichaAnamnese) return;
+
+  if(fichaAnamnese.historicoOrcamentos && fichaAnamnese.historicoOrcamentos.length){
+    const orcMaisRecente = fichaAnamnese.historicoOrcamentos[0];
+    (orcMaisRecente.itens||[]).forEach(it => {
+      if(it.dente && it.tratamento) anamneseProcedimentosCache[String(it.dente)] = it.tratamento;
+    });
+  } else if(fichaAnamnese.toothData){
+    Object.entries(fichaAnamnese.toothData).forEach(([dente, d]) => {
+      const tratamentos = (d && d.tratamentos) || [];
+      const primeiro = tratamentos.find(t => t.tratamento);
+      if(primeiro) anamneseProcedimentosCache[String(dente)] = primeiro.tratamento;
+    });
+  }
+}
+
 async function abrirFicha(pacienteId){
   fichaAtivaPacienteId = pacienteId;
+  await carregarProcedimentosPlanejadosDaAnamnese(pacienteId);
   const salvo = await ClinicaStorage.load(chaveFicha(pacienteId));
   const dadosFicha = salvo || JSON.parse(JSON.stringify(FICHA_TEMPLATE_VAZIA));
   FICHA_KEYS.forEach(k => { state[k] = dadosFicha[k] !== undefined ? dadosFicha[k] : FICHA_TEMPLATE_VAZIA[k]; });
@@ -1229,15 +1257,21 @@ async function renderVinculoConsulta(container, r){
 // ---- Odontograma clicável ----
 function toothStatus(num){
   const recs = state.records.filter(r => String(r.dente).trim() === String(num));
-  if(!recs.length) return 'default';
   const hasContent = recs.some(r => (r.procedimento||'').trim());
-  return hasContent ? 'documented' : 'pending';
+  if(hasContent) return 'documented';
+  if(anamneseProcedimentosCache[String(num)]) return 'planned'; // indicado na Anamnese, ainda não atendido aqui
+  if(recs.length) return 'pending';
+  return 'default';
 }
 function openRecordForTooth(num){
   let rec = state.records.find(r => String(r.dente).trim() === String(num) && !(r.procedimento||'').trim());
   if(!rec){
     rec = makeRecord();
     rec.dente = String(num);
+    // Já vem preenchido com o que foi indicado no odontograma da Anamnese, se houver —
+    // só finaliza (ou ajusta) em vez de digitar tudo de novo. Pode apagar e digitar outra coisa
+    // à vontade, isso é só um ponto de partida.
+    if(anamneseProcedimentosCache[String(num)]) rec.procedimento = anamneseProcedimentosCache[String(num)];
     state.records.push(rec);
   }
   recordExpanded[rec.id] = true;
@@ -1265,6 +1299,7 @@ function odoRow(leftArr, rightArr, deciduous){
 function renderOdontogramBlock(container){
   container.appendChild(el('div', { class:'odo-legend' }, [
     el('span', {}, [el('i', { style:'background:#fff;border:1.5px solid var(--line);' }), document.createTextNode('Sem registro')]),
+    el('span', {}, [el('i', { style:'background:#FFF3E0;border:1.5px solid var(--amber);' }), document.createTextNode('Indicado na Anamnese (pendente)')]),
     el('span', {}, [el('i', { style:'background:#FBEAEA;border:1.5px solid #C0392B;' }), document.createTextNode('Registro em aberto')]),
     el('span', {}, [el('i', { style:'background:var(--blue-dark);' }), document.createTextNode('Documentado')]),
   ]));
@@ -1310,7 +1345,7 @@ function renderProntuario(container){
   container.appendChild(importWrap);
 
   container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:0;margin-bottom:10px;' },
-    document.createTextNode('Toque no número do dente no odontograma para abrir os campos de preenchimento, ou adicione um registro manualmente abaixo.')));
+    document.createTextNode('Dentes em laranja já têm procedimento indicado na Anamnese — toque neles pra abrir o registro já preenchido, só finalize ou ajuste. Também dá pra adicionar um registro manualmente, em qualquer dente, na lista abaixo.')));
   renderOdontogramBlock(container);
 
   container.appendChild(el('div', { class:'section-title', style:'margin-top:6px;' }, document.createTextNode('Registros')));

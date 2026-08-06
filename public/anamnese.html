@@ -2054,7 +2054,7 @@ function renderContract(container){
 
   // Separador botões finais
   const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:20px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
-    document.createTextNode('Gerar PDF da ficha completa'));
+    document.createTextNode('Concluir contrato e enviar para financeiro'));
   pdfBtn.onclick = generatePDF;
   container.appendChild(pdfBtn);
 
@@ -2092,7 +2092,7 @@ function renderPanel(stepIndex, opts={}){
   const subtitleParts = [state.clinic.nome, state.clinic.dentista].filter(Boolean);
   document.getElementById('clinicSubtitle').textContent = subtitleParts.length ? subtitleParts.join(' — ') : 'Nome da Clínica / Cirurgião-Dentista';
   document.getElementById('btnPrev').style.visibility = stepIndex===0 ? 'hidden' : 'visible';
-  document.getElementById('btnNext').textContent = stepIndex===STEPS.length-1 ? 'Concluir' : 'Avançar';
+  document.getElementById('btnNext').textContent = stepIndex===STEPS.length-1 ? 'Concluir contrato e enviar para financeiro' : 'Avançar';
   if(opts.keepScroll){
     window.scrollTo(0, scrollY);
   } else {
