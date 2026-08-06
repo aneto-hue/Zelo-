@@ -429,6 +429,7 @@ const FICHA_TEMPLATE_VAZIA = JSON.parse(JSON.stringify(
 ));
 
 const GENERAL_QUESTIONS = [
+  { key:'dornosdentes', text:'Sente alguma dor nos dentes ou boca?', sub:[{key:'ondedoi', label:'Onde? (qual dente ou região)'}] },
   { key:'tratamento', text:'Está ou esteve recentemente em tratamento médico?', sub:[{key:'motivo', label:'Por qual motivo?'}] },
   { key:'remedio', text:'Está tomando algum remédio?', sub:[{key:'quais', label:'Quais?'}] },
   { key:'gravida', text:'Está grávida?', sub:[{key:'mes', label:'Qual mês?'}] },
@@ -927,6 +928,17 @@ function renderPatient(container){
     'Envie a ficha separada "Dados do Paciente e Saúde" para o paciente preencher pelo celular (dados pessoais + saúde geral + saúde bucal). Quando ele gerar o PDF e te devolver (ex: pelo WhatsApp), importe-o aqui.'));
 
   container.appendChild(el('div', { class:'section-title', style:'margin-top:20px;' }, document.createTextNode('Questionário de saúde geral')));
+
+  const queixaCard = el('div', { class:'q-card' });
+  queixaCard.appendChild(el('span', { class:'q-text' }, document.createTextNode('Queixa principal?')));
+  const queixaInput = el('input', { type:'text', value: state.general.queixaPrincipal||'', placeholder:'O que trouxe você à clínica hoje?' });
+  queixaInput.style.width='100%'; queixaInput.style.padding='9px 8px'; queixaInput.style.fontSize='14px';
+  queixaInput.style.border='1px solid var(--line-light)'; queixaInput.style.borderRadius='6px'; queixaInput.style.fontFamily='inherit';
+  queixaInput.style.marginTop='8px';
+  queixaInput.oninput = (e) => { state.general.queixaPrincipal = e.target.value; saveProgressDebounced(); };
+  queixaCard.appendChild(comDitado(queixaInput));
+  container.appendChild(queixaCard);
+
   GENERAL_QUESTIONS.forEach(q => container.appendChild(yesNoBlock(state.general, q)));
 
   container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Sofre alguma destas doenças?')));
@@ -2439,10 +2451,11 @@ function generateOrcamentoPDF(){
   toast('Orçamento gerado com sucesso!');
 }
 
-function generatePDF(){
+async function generatePDF(){
   migrateImages();
   if(typeof clinicaUpsertPaciente === 'function' && (state.patient.nome||'').trim()){
-    clinicaUpsertPaciente({
+    await clinicaUpsertPaciente({
+      id: fichaAtivaPacienteId || undefined,
       nome: state.patient.nome, nasc: state.patient.nasc, telefone: state.patient.telefone,
       cpf: state.patient.cpf, rg: state.patient.rg, endereco: state.patient.endereco, email: state.patient.email
     });
@@ -2707,6 +2720,8 @@ function generatePDF(){
   y += 6;
 
   sectionTitle('Questionário de saúde geral');
+  const queixaRow = [{text:'Queixa principal? ' + (state.general.queixaPrincipal||'________________________'), bold:true}];
+  questionBox(queixaRow);
   const genRows = GENERAL_QUESTIONS.map(q => ynRowText(q, state.general));
   questionBox(genRows);
 

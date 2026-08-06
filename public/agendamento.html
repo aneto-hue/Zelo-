@@ -771,12 +771,14 @@ function renderConsultaForm(container, consulta, dataFixa, onSalvar, onCancelar)
   const btnRow = el('div', { class:'row' });
   const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' },
     document.createTextNode('Salvar consulta'));
-  salvarBtn.onclick = () => {
+  salvarBtn.onclick = async () => {
     if(!(consulta.paciente||'').trim()){ alert('Informe o nome do paciente.'); return; }
     if(!consulta.data){ alert('Informe a data.'); return; }
     if(!consulta.horaInicio){ alert('Informe o horário.'); return; }
+    if(salvarBtn.dataset.enviando) return;
+    salvarBtn.dataset.enviando = '1';
     if(typeof clinicaUpsertPaciente === 'function'){
-      const pac = clinicaUpsertPaciente({ nome: consulta.paciente, telefone: consulta.telefone });
+      const pac = await clinicaUpsertPaciente({ nome: consulta.paciente, telefone: consulta.telefone });
       if(pac) consulta.pacienteId = pac.id;
     }
     // Calcula (e só GRAVA de vez) o valor a pagar ao profissional no momento do agendamento/confirmação —

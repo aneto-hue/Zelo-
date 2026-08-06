@@ -44,8 +44,16 @@ function clinicaFindPacienteById(id){
 
 // Cria ou atualiza um paciente no cadastro compartilhado a partir de um objeto parcial de dados.
 // Casa por nome (ou por id, se fornecido). Nunca apaga um dado já preenchido com um valor vazio novo.
-function clinicaUpsertPaciente(dados){
+// IMPORTANTE: busca a versão mais recente do cadastro no servidor antes de decidir — isso evita
+// criar duplicado quando duas pessoas, em aparelhos diferentes, mexem no mesmo paciente quase ao
+// mesmo tempo (cada aparelho tendo uma cópia local que podia estar um pouco desatualizada).
+async function clinicaUpsertPaciente(dados){
   if(!dados || !(dados.nome||'').trim()) return null;
+  try{
+    const maisRecente = await ClinicaStorage.load(CLINICA_PACIENTES_KEY);
+    if(Array.isArray(maisRecente)) _clinicaPacientesCache = maisRecente;
+  }catch(e){ /* segue com o que já tinha em memória, melhor que travar */ }
+
   let existente = dados.id ? _clinicaPacientesCache.find(p=>p.id===dados.id) : null;
   if(!existente) existente = _clinicaPacientesCache.find(p => clinicaNormalizaNome(p.nome) === clinicaNormalizaNome(dados.nome));
 
@@ -65,7 +73,7 @@ function clinicaUpsertPaciente(dados){
     }, dados);
     _clinicaPacientesCache.push(existente);
   }
-  clinicaSalvarCache();
+  await ClinicaStorage.save(CLINICA_PACIENTES_KEY, _clinicaPacientesCache);
   return existente;
 }
 

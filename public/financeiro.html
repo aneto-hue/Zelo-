@@ -532,8 +532,10 @@ function renderNovoLancamentoForm(container){
 
   const btnRow = el('div', { class:'row' });
   const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;' }, document.createTextNode('Salvar lançamento'));
-  salvarBtn.onclick = () => {
+  salvarBtn.onclick = async () => {
     if(!(dadosTemp.paciente||'').trim()){ alert('Informe o nome do paciente.'); return; }
+    if(salvarBtn.dataset.enviando) return;
+    salvarBtn.dataset.enviando = '1';
     const valorNum = parseFloat(dadosTemp.valorTotal)||0;
     const novoLancamento = {
       id: uid(), paciente: dadosTemp.paciente, profissionalId: dadosTemp.profissionalId,
@@ -541,7 +543,7 @@ function renderNovoLancamentoForm(container){
       tratamentos: [], parcelas: [], origem:'manual'
     };
     if(typeof clinicaUpsertPaciente === 'function'){
-      const pac = clinicaUpsertPaciente({ nome: dadosTemp.paciente });
+      const pac = await clinicaUpsertPaciente({ nome: dadosTemp.paciente });
       if(pac) novoLancamento.pacienteId = pac.id;
     }
     state.lancamentos.unshift(novoLancamento);

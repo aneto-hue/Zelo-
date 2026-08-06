@@ -158,11 +158,11 @@ function renderNovoPacienteForm(container){
   form.appendChild(textFieldSimple('CPF', dados, 'cpf'));
   const btnRow = el('div', { class:'row' });
   const salvarBtn = el('div', { class:'add-row-btn', style:'background:var(--blue-dark);color:#fff;border:none;flex:1;text-align:center;' }, document.createTextNode('Salvar'));
-  salvarBtn.onclick = () => {
+  salvarBtn.onclick = async () => {
     if(!(dados.nome||'').trim()){ alert('Informe o nome do paciente.'); return; }
     if(salvarBtn.dataset.enviando) return; // evita clique duplo criando o paciente duas vezes
     salvarBtn.dataset.enviando = '1';
-    clinicaUpsertPaciente(dados);
+    await clinicaUpsertPaciente(dados);
     novoPacienteAberto = false;
     render();
   };
