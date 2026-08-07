@@ -722,6 +722,15 @@ function renderParcelasRecebimentos(container){
   container.appendChild(el('p', { style:'font-size:12px;color:var(--muted);margin-top:-6px;margin-bottom:14px;' },
     document.createTextNode('Todas as parcelas de todos os contratos, de todos os tempos (não é filtrado por mês). Para ver por período, use a aba Monitoramento.')));
 
+  const souAdminAviso = !!(window._clinicaMe && window._clinicaMe.papel === 'admin');
+  const avisoAjuste = el('div', { style:'background:#F4F8FB;border:1.5px solid var(--blue-dark);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--ink);' });
+  if(souAdminAviso){
+    avisoAjuste.appendChild(document.createTextNode('💡 Precisa trocar valor, forma de pagamento ou data de uma parcela (mesmo já paga)? Clique em "⚙ Ajustar" ao lado dela — fica registrado no histórico com o motivo.'));
+  } else {
+    avisoAjuste.appendChild(document.createTextNode('💡 Precisa trocar valor, forma de pagamento ou data de uma parcela? Só o administrador da clínica consegue fazer esse ajuste (opção "⚙ Ajustar", visível quando ele está logado).'));
+  }
+  container.appendChild(avisoAjuste);
+
   const todas = todasParcelasComContexto();
   const totalGeral = todas.reduce((s,x)=>s+x.parcela.valor,0);
   const totalRecebido = todas.filter(x=>x.parcela.pago).reduce((s,x)=>s+x.parcela.valor,0);

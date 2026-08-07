@@ -190,16 +190,25 @@ function renderAvisoDuplicados(main, pacientes){
   const aviso = el('div', { style:'background:#FFF3E0;border:1.5px solid var(--amber);border-radius:10px;padding:12px 14px;margin-bottom:14px;' });
   aviso.appendChild(el('div', { style:'font-size:13px;font-weight:700;color:#8A5A0F;margin-bottom:8px;' },
     document.createTextNode('⚠ ' + duplicados.length + ' paciente(s) parecem estar cadastrados mais de uma vez')));
+  aviso.appendChild(el('p', { style:'font-size:11.5px;color:#8A5A0F;margin:0 0 10px;' },
+    document.createTextNode('Abra "Ver ficha" e "Ver prontuário" de cada uma pra comparar antes de decidir. Escolha uma como principal — o sistema migra os agendamentos e o financeiro das outras pra ela, e apaga só as duplicatas.')));
 
   duplicados.forEach(grupo => {
     const grupoWrap = el('div', { style:'margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(0,0,0,0.08);' });
-    grupoWrap.appendChild(el('div', { style:'font-size:13px;font-weight:700;margin-bottom:4px;' }, document.createTextNode(grupo[0].nome)));
+    grupoWrap.appendChild(el('div', { style:'font-size:13px;font-weight:700;margin-bottom:6px;' }, document.createTextNode(grupo[0].nome)));
     grupo.forEach(p => {
-      const linha = el('div', { style:'display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:4px 0;' });
-      linha.appendChild(el('span', {}, document.createTextNode('Cadastrado em ' + (p.criadoEm ? new Date(p.criadoEm).toLocaleDateString('pt-BR') : '—'))));
-      const excluirBtn = el('span', { style:'color:var(--red);font-weight:700;cursor:pointer;text-decoration:underline;flex-shrink:0;' }, document.createTextNode('Verificar e excluir'));
-      excluirBtn.onclick = () => verificarEExcluirDuplicado(p);
-      linha.appendChild(excluirBtn);
+      const linha = el('div', { style:'display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:6px 0;flex-wrap:wrap;' });
+      const esquerda = el('div', {}, [
+        el('span', {}, document.createTextNode('Cadastrado em ' + (p.criadoEm ? new Date(p.criadoEm).toLocaleDateString('pt-BR') : '—'))),
+        el('div', { style:'margin-top:2px;' }, [
+          el('a', { href:'anamnese.html?paciente='+encodeURIComponent(p.id), target:'_blank', style:'color:var(--blue-dark);font-weight:700;margin-right:12px;' }, document.createTextNode('Ver ficha')),
+          el('a', { href:'prontuario.html?paciente='+encodeURIComponent(p.id), target:'_blank', style:'color:var(--blue-dark);font-weight:700;' }, document.createTextNode('Ver prontuário')),
+        ])
+      ]);
+      linha.appendChild(esquerda);
+      const manterBtn = el('span', { style:'color:var(--green);font-weight:700;cursor:pointer;text-decoration:underline;flex-shrink:0;' }, document.createTextNode('Manter esta, mesclar as outras aqui'));
+      manterBtn.onclick = () => mesclarDuplicados(p, grupo.filter(x => x.id !== p.id));
+      linha.appendChild(manterBtn);
       grupoWrap.appendChild(linha);
     });
     aviso.appendChild(grupoWrap);
@@ -207,43 +216,84 @@ function renderAvisoDuplicados(main, pacientes){
   main.appendChild(aviso);
 }
 
-// Antes de excluir uma entrada duplicada, confere se tem ficha de anamnese, prontuário,
-// consulta agendada ou lançamento financeiro vinculado a ela — pra não apagar dado de verdade
-// por engano. Só deixa excluir sem aviso extra se não houver nada vinculado.
-async function verificarEExcluirDuplicado(paciente){
-  const [fichaAnamnese, fichaProntuario, dadosAgenda, dadosFinanceiro] = await Promise.all([
-    ClinicaStorage.load('ficha_anamnese_paciente_' + paciente.id).catch(()=>null),
-    ClinicaStorage.load('ficha_prontuario_paciente_' + paciente.id).catch(()=>null),
-    ClinicaStorage.load('controle_agendamento_progresso_v1').catch(()=>null),
-    ClinicaStorage.load('controle_pagamentos_comissoes_v1').catch(()=>null),
-  ]);
-  const temAnamnese = !!(fichaAnamnese && fichaAnamnese.patient && fichaAnamnese.patient.nome);
-  const temProntuario = !!(fichaProntuario && fichaProntuario.records && fichaProntuario.records.some(r => r.data||r.procedimento));
-  const consultasVinculadas = ((dadosAgenda && dadosAgenda.consultas) || []).filter(c => c.pacienteId === paciente.id).length;
-  const lancamentosVinculados = ((dadosFinanceiro && dadosFinanceiro.lancamentos) || []).filter(l => l.pacienteId === paciente.id).length;
+// Mescla um grupo de pacientes duplicados: mantém "principal", migra pra ela tudo que estava
+// vinculado às outras (agendamentos, lançamentos financeiros, e a ficha/prontuário — só se a
+// principal ainda não tiver nada preenchido, pra não sobrescrever dado real por engano) — e
+// só então apaga as duplicatas.
+async function mesclarDuplicados(principal, outras){
+  const nomesOutras = outras.map(o => o.nome).join(', ');
+  if(!confirm(
+    'Manter "' + principal.nome + '" (cadastrada em ' + (principal.criadoEm?new Date(principal.criadoEm).toLocaleDateString('pt-BR'):'—') + ') como principal?\n\n' +
+    'Os agendamentos e lançamentos financeiros das outras ' + outras.length + ' entrada(s) serão movidos pra essa. ' +
+    'Se a principal ainda não tiver ficha/prontuário preenchido e alguma das outras tiver, esse conteúdo é copiado pra ela. ' +
+    'Depois disso, as outras entradas são excluídas.\n\nConfirma a mesclagem?'
+  )) return;
 
-  const vinculos = [];
-  if(temAnamnese) vinculos.push('ficha de anamnese preenchida');
-  if(temProntuario) vinculos.push('registros no prontuário');
-  if(consultasVinculadas) vinculos.push(consultasVinculadas + ' consulta(s) agendada(s)');
-  if(lancamentosVinculados) vinculos.push(lancamentosVinculados + ' lançamento(s) financeiro(s)');
+  const idsOutras = outras.map(o => o.id);
 
-  let mensagem = 'Excluir esta entrada duplicada de "' + paciente.nome + '"?';
-  if(vinculos.length){
-    mensagem = '⚠ ATENÇÃO: essa entrada de "' + paciente.nome + '" tem dados vinculados (' + vinculos.join(', ') + ').\n\n' +
-      'Excluir agora vai deixar esses dados "órfãos" (sem paciente associado) — considere manter essa entrada e excluir a outra duplicata em vez desta.\n\n' +
-      'Ainda assim quer excluir esta?';
-  }
-  if(!confirm(mensagem)) return;
+  // 1) Agendamento: reatribui as consultas das duplicatas pra principal
+  try{
+    const dadosAgenda = await ClinicaStorage.load('controle_agendamento_progresso_v1');
+    if(dadosAgenda && Array.isArray(dadosAgenda.consultas)){
+      let mudou = false;
+      dadosAgenda.consultas.forEach(c => {
+        if(idsOutras.includes(c.pacienteId)){ c.pacienteId = principal.id; mudou = true; }
+      });
+      if(mudou) await ClinicaStorage.save('controle_agendamento_progresso_v1', dadosAgenda);
+    }
+  }catch(e){}
 
+  // 2) Financeiro: reatribui os lançamentos das duplicatas pra principal
+  try{
+    const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1');
+    if(dadosFin && Array.isArray(dadosFin.lancamentos)){
+      let mudou = false;
+      dadosFin.lancamentos.forEach(l => {
+        if(idsOutras.includes(l.pacienteId)){ l.pacienteId = principal.id; mudou = true; }
+      });
+      if(mudou) await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dadosFin);
+    }
+  }catch(e){}
+
+  // 3) Ficha de anamnese: se a principal não tiver, copia de alguma das outras que tiver
+  try{
+    const fichaPrincipal = await ClinicaStorage.load('ficha_anamnese_paciente_' + principal.id).catch(()=>null);
+    const temFichaPrincipal = !!(fichaPrincipal && fichaPrincipal.patient && fichaPrincipal.patient.nome);
+    if(!temFichaPrincipal){
+      for(const o of outras){
+        const ficha = await ClinicaStorage.load('ficha_anamnese_paciente_' + o.id).catch(()=>null);
+        if(ficha && ficha.patient && ficha.patient.nome){
+          await ClinicaStorage.save('ficha_anamnese_paciente_' + principal.id, ficha);
+          break;
+        }
+      }
+    }
+  }catch(e){}
+
+  // 4) Prontuário: mesma lógica
+  try{
+    const prontPrincipal = await ClinicaStorage.load('ficha_prontuario_paciente_' + principal.id).catch(()=>null);
+    const temPront = !!(prontPrincipal && prontPrincipal.records && prontPrincipal.records.some(r=>r.data||r.procedimento));
+    if(!temPront){
+      for(const o of outras){
+        const pront = await ClinicaStorage.load('ficha_prontuario_paciente_' + o.id).catch(()=>null);
+        if(pront && pront.records && pront.records.some(r=>r.data||r.procedimento)){
+          await ClinicaStorage.save('ficha_prontuario_paciente_' + principal.id, pront);
+          break;
+        }
+      }
+    }
+  }catch(e){}
+
+  // 5) Remove as duplicatas do cadastro
   const lista = clinicaGetPacientes();
-  const idx = lista.findIndex(p => p.id === paciente.id);
-  if(idx !== -1){
-    lista.splice(idx, 1);
-    clinicaSalvarCache();
-    alert('Entrada duplicada excluída.');
-    render();
-  }
+  idsOutras.forEach(id => {
+    const idx = lista.findIndex(p => p.id === id);
+    if(idx !== -1) lista.splice(idx, 1);
+  });
+  clinicaSalvarCache();
+  alert('Duplicatas mescladas! Só "' + principal.nome + '" continua no cadastro agora.');
+  render();
 }
 
 
