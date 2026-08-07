@@ -344,6 +344,7 @@ document.getElementById('buscaForm').addEventListener('submit', (e) => {
 // ---- Calendário mensal (substitui a grade de módulos, já coberta pela barra lateral) ----
 let calMes = new Date(); // mês sendo exibido no calendário (dia é ignorado, só mês/ano importam)
 let consultasParaCalendario = [];
+let profissionaisParaCalendario = [];
 
 function renderCalendario(){
   const grid = document.getElementById('calGrid');
@@ -385,8 +386,11 @@ function renderCalendario(){
     if(consultasDoDia.length){
       const badges = el('div', { class:'cal-day-badges' });
       consultasDoDia.slice(0,3).forEach(c => {
-        badges.appendChild(el('div', { class:'cal-day-item'+(c.aguardando?' aguardando':'') },
-          document.createTextNode((c.horaInicio||'')+' '+(c.paciente||''))));
+        const prof = profissionaisParaCalendario.find(p => p.id === c.profissionalId);
+        const cor = prof ? prof.cor : '#999';
+        const item = el('div', { class:'cal-day-item'+(c.aguardando?' aguardando':''), style: c.aguardando ? '' : ('border-left:3px solid '+cor+';background:'+cor+'22;color:'+cor+';') },
+          document.createTextNode((c.horaInicio||'')+' '+(c.paciente||'')));
+        badges.appendChild(item);
       });
       if(consultasDoDia.length > 3){
         badges.appendChild(el('div', { class:'cal-day-mais' }, document.createTextNode('+'+(consultasDoDia.length-3)+' mais')));
@@ -466,6 +470,7 @@ async function render(){
 
   // ---- Agenda do mês (calendário) ----
   consultasParaCalendario = todasConsultas;
+  profissionaisParaCalendario = profissionais;
   renderCalendario();
 
   // ---- Agenda de hoje ----
@@ -481,8 +486,14 @@ async function render(){
     };
     consultasHoje.slice(0,8).forEach(c => {
       const st = STATUS_STYLE[c.status] || STATUS_STYLE.agendado;
+      const prof = profissionais.find(p => p.id === c.profissionalId);
+      const corProf = prof ? prof.cor : '#999';
+      const tdPaciente = el('td', {}, [
+        el('span', { style:'display:inline-block;width:8px;height:8px;border-radius:999px;background:'+corProf+';margin-right:7px;flex-shrink:0;' }),
+        document.createTextNode(c.paciente||'—')
+      ]);
       const tr = el('tr', {}, [
-        el('td', {}, document.createTextNode(c.paciente||'—')),
+        tdPaciente,
         el('td', {}, document.createTextNode(c.horaInicio||'—')),
         el('td', {}, document.createTextNode(c.procedimento||'—')),
         el('td', {}, el('span', { class:'status-tag', style:'background:'+st.bg+';color:'+st.fg+';' }, document.createTextNode(c.aguardando ? '🔔 Aguardando' : st.label))),
