@@ -74,6 +74,7 @@ const state = {
 };
 
 const GENERAL_QUESTIONS = [
+  { key:'dornosdentes', text:'Sente alguma dor nos dentes ou boca?', sub:[{key:'ondedoi', label:'Onde? (qual dente ou região)'}] },
   { key:'tratamento', text:'Está ou esteve recentemente em tratamento médico?', sub:[{key:'motivo', label:'Por qual motivo?'}] },
   { key:'remedio', text:'Está tomando algum remédio?', sub:[{key:'quais', label:'Quais?'}] },
   { key:'gravida', text:'Está grávida?', sub:[{key:'mes', label:'Qual mês?'}] },
@@ -239,6 +240,17 @@ function render(){
   main.appendChild(row3);
 
   main.appendChild(el('div',{class:'section-title', style:'margin-top:24px;'},document.createTextNode('Questionário de saúde geral')));
+
+  const queixaCard = el('div', { class:'q-card' });
+  queixaCard.appendChild(el('span', { class:'q-text' }, document.createTextNode('Queixa principal?')));
+  const queixaInput = el('input', { type:'text', value: state.general.queixaPrincipal||'', placeholder:'O que trouxe você à clínica hoje?' });
+  queixaInput.style.width='100%'; queixaInput.style.padding='9px 8px'; queixaInput.style.fontSize='14px';
+  queixaInput.style.border='1px solid var(--line-light)'; queixaInput.style.borderRadius='6px'; queixaInput.style.fontFamily='inherit';
+  queixaInput.style.marginTop='8px';
+  queixaInput.oninput = (e) => { state.general.queixaPrincipal = e.target.value; };
+  queixaCard.appendChild(queixaInput);
+  main.appendChild(queixaCard);
+
   GENERAL_QUESTIONS.forEach(q => main.appendChild(yesNoBlock(state.general, q)));
 
   main.appendChild(el('div',{class:'section-title'},document.createTextNode('Sofre alguma destas doenças?')));

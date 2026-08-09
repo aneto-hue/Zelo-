@@ -378,7 +378,7 @@ function render(){
         e.stopPropagation();
         const resp = await fetch('/api/portal/gerar-link', {
           method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ pacienteId: p.id })
+          body: JSON.stringify({ pacienteId: p.id, fichaId: p.id })
         });
         const data = await resp.json();
         if(!resp.ok){ alert(data.erro || 'Não foi possível gerar o link.'); return; }

@@ -390,7 +390,7 @@ async function render(){
   portalBtn.onclick = async () => {
     const resp = await fetch('/api/portal/gerar-link', {
       method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ pacienteId: PACIENTE_ID })
+      body: JSON.stringify({ pacienteId: PACIENTE_ID, fichaId: PACIENTE_ID })
     });
     const data = await resp.json();
     if(!resp.ok){ alert(data.erro || 'Não foi possível gerar o link.'); return; }
