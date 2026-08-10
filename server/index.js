@@ -152,12 +152,14 @@ const server = http.createServer((req, res) => {
   }
   // Assinatura pendente/atrasada/cancelada: bloqueia as rotas de dados (API de armazenamento),
   // mas deixa passar login/logout/consulta da própria assinatura, pra clínica conseguir ver
-  // a situação dela e ir pagar.
-  const ROTAS_LIVRES_SEM_ASSINATURA = ['/api/me', '/api/logout', '/api/minha-assinatura'];
+  // a situação dela e ir pagar. Nunca bloqueia as rotas do Painel do Sistema (/api/sistema/*) —
+  // são do dono do sistema, sem nenhuma relação com a assinatura de uma clínica específica;
+  // sem essa exclusão, uma sessão antiga de clínica pendente no mesmo navegador vazava pra cá.
+  const ROTAS_LIVRES_SEM_ASSINATURA = ['/api/me', '/api/logout', '/api/minha-assinatura', '/api/login', '/api/criar-clinica'];
   const STATUS_COM_ACESSO_LIBERADO = ['ativa', 'teste']; // 'teste' é o status antigo, de clínicas
   // criadas antes dessa cobrança existir — continuam liberadas até o dono do sistema decidir.
   if(profissionalLogado && clinicaDoProfLogado && !STATUS_COM_ACESSO_LIBERADO.includes(clinicaDoProfLogado.assinaturaStatus)
-     && pathname.startsWith('/api/') && !ROTAS_LIVRES_SEM_ASSINATURA.includes(pathname)){
+     && pathname.startsWith('/api/') && !pathname.startsWith('/api/sistema/') && !ROTAS_LIVRES_SEM_ASSINATURA.includes(pathname)){
     enviarJSON(res, 402, { erro:'assinatura_pendente', assinaturaStatus: clinicaDoProfLogado.assinaturaStatus });
     return;
   }
