@@ -92,7 +92,8 @@ async function tentarLogin(){
     });
     const data = await resp.json();
     if(!resp.ok){
-      erroMsg.textContent = data.erro || 'Não foi possível entrar.';
+      const MENSAGENS_ERRO = { assinatura_pendente: 'Sessão de outra conta interferindo — feche esta aba, abra uma nova e tente entrar de novo.' };
+      erroMsg.textContent = (data.erro && MENSAGENS_ERRO[data.erro]) || (data.erro && !/^[a-z_]+$/.test(data.erro) ? data.erro : null) || 'E-mail ou senha incorretos.';
       erroMsg.classList.add('show');
       entrarBtn.disabled = false;
       entrarBtn.textContent = 'Entrar';

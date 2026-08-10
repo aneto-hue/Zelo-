@@ -100,7 +100,8 @@ async function tentarLogin(){
     });
     const data = await resp.json();
     if(!resp.ok){
-      erroMsg.textContent = data.erro || 'Não foi possível entrar.';
+      const MENSAGENS_ERRO = { assinatura_pendente: 'Sua clínica ainda está aguardando aprovação ou tem um problema no acesso — entre normalmente que a tela de status explica certinho.' };
+      erroMsg.textContent = (data.erro && MENSAGENS_ERRO[data.erro]) || (data.erro && !/^[a-z_]+$/.test(data.erro) ? data.erro : null) || 'E-mail ou senha incorretos.';
       erroMsg.classList.add('show');
       entrarBtn.disabled = false;
       entrarBtn.textContent = 'Entrar';
