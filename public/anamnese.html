@@ -2101,7 +2101,7 @@ function renderPanel(stepIndex, opts={}){
   main.innerHTML = '';
   const renderers = [renderPatient, renderImages, renderOdontograma, renderContract];
   renderers[stepIndex](main);
-  const subtitleParts = [state.clinic.nome, state.clinic.dentista].filter(Boolean);
+  const subtitleParts = [state.clinic.nome, nomeProfissionalEmitindo()].filter(Boolean);
   document.getElementById('clinicSubtitle').textContent = subtitleParts.length ? subtitleParts.join(' — ') : 'Nome da Clínica / Cirurgião-Dentista';
   document.getElementById('btnPrev').style.visibility = stepIndex===0 ? 'hidden' : 'visible';
   document.getElementById('btnNext').textContent = stepIndex===STEPS.length-1 ? 'Concluir contrato e enviar para financeiro' : 'Avançar';
@@ -2130,6 +2130,15 @@ function formatDateBR(dateStr){
   if(!dateStr) return '___/___/______';
   const [y,m,d] = dateStr.split('-');
   return `${d}/${m}/${y}`;
+}
+
+// Nome de quem está DE FATO emitindo o documento agora (o profissional logado no momento),
+// não o "dentista responsável" fixo cadastrado no Perfil da Clínica.
+function nomeProfissionalEmitindo(){
+  return (window._clinicaMe && window._clinicaMe.nome) || state.clinic.dentista || '';
+}
+function croProfissionalEmitindo(){
+  return (window._clinicaMe && window._clinicaMe.cro) || state.clinic.cro || '';
 }
 
 function valueByExtension(val){
@@ -2361,7 +2370,7 @@ function generateOrcamentoPDF(){
   doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...BLUE);
   doc.text((state.clinic.nome || 'Orçamento Odontológico').toUpperCase(), titleX, y+8);
   doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
-  const subParts = [state.clinic.dentista, state.clinic.cro?('CRO '+state.clinic.cro):''].filter(Boolean);
+  const subParts = [nomeProfissionalEmitindo(), croProfissionalEmitindo()?('CRO '+croProfissionalEmitindo()):''].filter(Boolean);
   doc.text(subParts.join(' — ') || ' ', titleX, y+22);
   y = Math.max(y+logoSize+2, y+34);
   doc.setDrawColor(...BLUE); doc.setLineWidth(1.4);
@@ -2670,11 +2679,11 @@ async function generatePDF(){
     }catch(e){ /* if image fails to embed, silently skip it */ }
   }
   doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...BLUE);
-  const clinicMainTitle = (state.clinic.nome || state.clinic.dentista || 'Ficha de Anamnese Odontológica').toUpperCase();
+  const clinicMainTitle = (state.clinic.nome || nomeProfissionalEmitindo() || 'Ficha de Anamnese Odontológica').toUpperCase();
   doc.text(clinicMainTitle, titleX, y);
   y += 14;
   doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...MUTED);
-  const clinicSubtitleParts = [state.clinic.dentista, state.clinic.cro ? ('CRO '+state.clinic.cro) : ''].filter(Boolean);
+  const clinicSubtitleParts = [nomeProfissionalEmitindo(), croProfissionalEmitindo() ? ('CRO '+croProfissionalEmitindo()) : ''].filter(Boolean);
   doc.text(clinicSubtitleParts.length ? clinicSubtitleParts.join(' — ') : 'Ficha de Anamnese Odontológica', titleX, y);
   y += 6;
   if(clinicLogo && y < (40-30+logoSize)){ y = 40-30+logoSize+6; }
@@ -2683,7 +2692,7 @@ async function generatePDF(){
   y += 24;
 
   sectionTitle('Dados da clínica / dentista');
-  fieldRow([{label:'Clínica:', value:state.clinic.nome},{label:'Dentista:', value:state.clinic.dentista}]);
+  fieldRow([{label:'Clínica:', value:state.clinic.nome},{label:'Dentista:', value:nomeProfissionalEmitindo()}]);
   fieldRow([{label:'CRO:', value:state.clinic.cro},{label:'CNPJ:', value:state.clinic.cnpj}]);
   fieldRow([{label:'Endereço:', value:state.clinic.endereco, weight:3}]);
   fieldRow([{label:'Telefone:', value:state.clinic.telefone},{label:'E-mail:', value:state.clinic.email}]);
@@ -2782,7 +2791,7 @@ async function generatePDF(){
   doc.line(marginX+sigW+sigGap, y, marginX+contentW, y);
   doc.setFontSize(8.5); doc.setTextColor(...MUTED);
   const patientSigLabel = 'Assinatura do paciente' + (state.patient.nome ? (' — '+state.patient.nome) : '') + (state.patient.cpf ? (' — CPF: '+state.patient.cpf) : '');
-  const dentistSigLabel = 'Assinatura do(a) dentista' + (state.clinic.dentista ? (' — Dr.(a) '+state.clinic.dentista) : '');
+  const dentistSigLabel = 'Assinatura do(a) dentista' + (nomeProfissionalEmitindo() ? (' — Dr.(a) '+nomeProfissionalEmitindo()) : '');
   function drawWrappedCentered(text, cx, startY, maxW, lineH){
     const lines = doc.splitTextToSize(text, maxW);
     lines.forEach((l,i)=> doc.text(l, cx, startY+i*lineH, { align:'center' }));
@@ -2938,7 +2947,7 @@ async function generatePDF(){
     contratanteParas.push('Responsável legal (quando aplicável): ' + v(state.patient.responsavel) + '   CPF: ' + v(state.patient.respCpf));
   }
   const contratadoParas = [
-    'Nome do profissional ou clínica: ' + v(state.clinic.nome) + (state.clinic.dentista ? (' — Dr.(a) '+state.clinic.dentista) : ''),
+    'Nome do profissional ou clínica: ' + v(state.clinic.nome) + (nomeProfissionalEmitindo() ? (' — Dr.(a) '+nomeProfissionalEmitindo()) : ''),
     'CNPJ/CPF: ' + v(state.clinic.cnpj) + '   CRO: ' + v(state.clinic.cro),
     'Endereço profissional: ' + v(state.clinic.endereco),
     'Telefone: ' + v(state.clinic.telefone) + '   E-mail: ' + v(state.clinic.email)
@@ -3036,7 +3045,7 @@ async function generatePDF(){
 
   ensureSpace(40);
   doc.line(marginX, y, marginX+contentW, y);
-  doc.text(v(state.clinic.nome) + (state.clinic.dentista ? (' — Dr.(a) '+state.clinic.dentista) : ''), marginX, y+11);
+  doc.text(v(state.clinic.nome) + (nomeProfissionalEmitindo() ? (' — Dr.(a) '+nomeProfissionalEmitindo()) : ''), marginX, y+11);
   doc.text('CONTRATADO(A)', marginX, y+22);
   y += 30;
 

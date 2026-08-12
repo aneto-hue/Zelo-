@@ -670,6 +670,16 @@ function importPdfIcon(kind, targetLabel){
 // ============ HELPERS DE RENDER ============
 function formatDateBR(str){ if(!str) return ''; const [y,m,d]=String(str).split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
 
+// Nome de quem está DE FATO emitindo o documento agora (o profissional logado no momento),
+// não o "dentista responsável" fixo cadastrado no Perfil da Clínica — cada documento deve sair
+// no nome de quem realmente está assinando, não sempre no nome de uma única pessoa.
+function nomeProfissionalEmitindo(){
+  return (window._clinicaMe && window._clinicaMe.nome) || state.clinic.dentista || '';
+}
+function croProfissionalEmitindo(){
+  return (window._clinicaMe && window._clinicaMe.cro) || state.clinic.cro || '';
+}
+
 function el(tag, attrs={}, children=[]){
   const e = document.createElement(tag);
   for(const k in attrs){
@@ -1800,7 +1810,7 @@ function generateReceituarioPDF(){
       headerTextX = marginX + logoSize + 16;
     }catch(e){}
   }
-  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : 'Prescrição Odontológica');
+  const headerTitle = state.clinic.nome || (nomeProfissionalEmitindo() ? ('Dr(a). '+nomeProfissionalEmitindo()) : 'Prescrição Odontológica');
   doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
   doc.text(headerTitle, headerTextX, y);
   if(state.clinic.cro){
@@ -1909,13 +1919,13 @@ function generateReceituarioPDF(){
   doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
   doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
   doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
-  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  doc.text(nomeProfissionalEmitindo() || '________________________________', pageW/2, y, { align:'center' });
   y += 15;
   doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
   doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
   y += 14;
   doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
-  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(croProfissionalEmitindo()){ doc.text('CRO – ' + croProfissionalEmitindo(), pageW/2, y, { align:'center' }); y += 14; }
   if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
 
   // ---------- Rodapé: clínica e endereço ----------
@@ -2076,7 +2086,7 @@ function generateDocumentoGenericoPDF(tituloDoc, textoBody){
       headerTextX = marginX + logoSize + 16;
     }catch(e){}
   }
-  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : tituloDoc);
+  const headerTitle = state.clinic.nome || (nomeProfissionalEmitindo() ? ('Dr(a). '+nomeProfissionalEmitindo()) : tituloDoc);
   doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
   doc.text(headerTitle, headerTextX, y);
   if(state.clinic.cro){
@@ -2145,13 +2155,13 @@ function generateDocumentoGenericoPDF(tituloDoc, textoBody){
   doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
   doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
   doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
-  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  doc.text(nomeProfissionalEmitindo() || '________________________________', pageW/2, y, { align:'center' });
   y += 15;
   doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
   doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
   y += 14;
   doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
-  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(croProfissionalEmitindo()){ doc.text('CRO – ' + croProfissionalEmitindo(), pageW/2, y, { align:'center' }); y += 14; }
   if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
 
   y += 34;
@@ -2225,7 +2235,7 @@ function generateAtestadoPDF(){
       headerTextX = marginX + logoSize + 16;
     }catch(e){}
   }
-  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : 'Atestado Odontológico');
+  const headerTitle = state.clinic.nome || (nomeProfissionalEmitindo() ? ('Dr(a). '+nomeProfissionalEmitindo()) : 'Atestado Odontológico');
   doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
   doc.text(headerTitle, headerTextX, y);
   if(state.clinic.cro){
@@ -2299,13 +2309,13 @@ function generateAtestadoPDF(){
   doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
   doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
   doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
-  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  doc.text(nomeProfissionalEmitindo() || '________________________________', pageW/2, y, { align:'center' });
   y += 15;
   doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
   doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
   y += 14;
   doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
-  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(croProfissionalEmitindo()){ doc.text('CRO – ' + croProfissionalEmitindo(), pageW/2, y, { align:'center' }); y += 14; }
   if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
 
   // ---------- Rodapé: clínica e endereço ----------
@@ -2379,7 +2389,7 @@ function generateTermoPDF(){
       headerTextX = marginX + logoSize + 16;
     }catch(e){}
   }
-  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : 'Termo de Comparecimento');
+  const headerTitle = state.clinic.nome || (nomeProfissionalEmitindo() ? ('Dr(a). '+nomeProfissionalEmitindo()) : 'Termo de Comparecimento');
   doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
   doc.text(headerTitle, headerTextX, y);
   if(state.clinic.cro){
@@ -2453,13 +2463,13 @@ function generateTermoPDF(){
   doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
   doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
   doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
-  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  doc.text(nomeProfissionalEmitindo() || '________________________________', pageW/2, y, { align:'center' });
   y += 15;
   doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
   doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
   y += 14;
   doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
-  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(croProfissionalEmitindo()){ doc.text('CRO – ' + croProfissionalEmitindo(), pageW/2, y, { align:'center' }); y += 14; }
   if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
 
   // ---------- Rodapé: clínica e endereço ----------
@@ -2533,7 +2543,7 @@ function generatePosOpPDF(){
       headerTextX = marginX + logoSize + 16;
     }catch(e){}
   }
-  const headerTitle = state.clinic.nome || (state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : 'Recomendações Pós-operatórias');
+  const headerTitle = state.clinic.nome || (nomeProfissionalEmitindo() ? ('Dr(a). '+nomeProfissionalEmitindo()) : 'Recomendações Pós-operatórias');
   doc.setFont(F,'bold'); doc.setFontSize(19); doc.setTextColor(...BLUE);
   doc.text(headerTitle, headerTextX, y);
   if(state.clinic.cro){
@@ -2613,13 +2623,13 @@ function generatePosOpPDF(){
   doc.setDrawColor(...BLUE_SOFT); doc.setLineWidth(0.6);
   doc.line(pageW/2-110, y-14, pageW/2+110, y-14);
   doc.setFont(F,'bold'); doc.setFontSize(11.5); doc.setTextColor(...INK);
-  doc.text(state.clinic.dentista || '________________________________', pageW/2, y, { align:'center' });
+  doc.text(nomeProfissionalEmitindo() || '________________________________', pageW/2, y, { align:'center' });
   y += 15;
   doc.setFont(F,'italic'); doc.setFontSize(10); doc.setTextColor(...MUTED);
   doc.text('Cirurgião Dentista', pageW/2, y, { align:'center' });
   y += 14;
   doc.setFont(F,'normal'); doc.setTextColor(...BLUE_SOFT);
-  if(state.clinic.cro){ doc.text('CRO – ' + state.clinic.cro, pageW/2, y, { align:'center' }); y += 14; }
+  if(croProfissionalEmitindo()){ doc.text('CRO – ' + croProfissionalEmitindo(), pageW/2, y, { align:'center' }); y += 14; }
   if(state.clinic.rg){ doc.text('RG: ' + state.clinic.rg, pageW/2, y, { align:'center' }); y += 14; }
 
   // ---------- Rodapé: clínica e endereço ----------
@@ -2754,10 +2764,10 @@ async function generatePDF(){
   }
   doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...BLUE);
   doc.text(state.clinic.nome || 'PRONTUÁRIO', titleX, y);
-  if(state.clinic.nome || state.clinic.dentista || state.clinic.cro){
+  if(state.clinic.nome || nomeProfissionalEmitindo() || state.clinic.cro){
     y += 15;
     doc.setFont('helvetica','italic'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
-    const subtitleParts = [state.clinic.dentista ? ('Dr(a). '+state.clinic.dentista) : '', state.clinic.cro ? ('CRO '+state.clinic.cro) : ''].filter(Boolean);
+    const subtitleParts = [nomeProfissionalEmitindo() ? ('Dr(a). '+nomeProfissionalEmitindo()) : '', croProfissionalEmitindo() ? ('CRO '+croProfissionalEmitindo()) : ''].filter(Boolean);
     doc.text(subtitleParts.length ? subtitleParts.join(' — ') : 'PRONTUÁRIO', titleX, y);
   }
   y += 18;
