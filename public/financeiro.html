@@ -584,12 +584,21 @@ function renderPlanilhaLancamentos(container){
     // Cada parcela conta no mês do VENCIMENTO dela, não no mês em que foi confirmada como paga
     // — assim um parcelamento em 6x, por exemplo, aparece dividido nos 6 meses certos, mesmo
     // que você acabe confirmando vários pagamentos atrasados de uma vez, no mesmo dia.
+    // Parcela no cartão de crédito conta como "praticamente garantida" (verde) mesmo antes de
+    // confirmar mês a mês — uma vez aprovado no cartão, a maquininha vai repassando sozinha,
+    // diferente de dinheiro/pix/boleto, que dependem do paciente aparecer pra pagar de novo.
     const porMes = new Array(12).fill(null).map(()=>({ pago:0, previsto:0 }));
     (lanc.parcelas||[]).forEach(p => {
       if(!p.data) return;
-      const [ano, mes] = p.data.split('-').map(Number);
+      let ano, mes;
+      const isoMatch = String(p.data).match(/^(\d{4})-(\d{2})-\d{2}$/);
+      const brMatch = String(p.data).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // formato antigo, de registros de antes da correção
+      if(isoMatch){ ano = parseInt(isoMatch[1],10); mes = parseInt(isoMatch[2],10); }
+      else if(brMatch){ ano = parseInt(brMatch[3],10); mes = parseInt(brMatch[2],10); }
+      else return;
       if(ano !== planilhaAno) return;
-      if(p.pago) porMes[mes-1].pago += p.valor;
+      const garantida = p.pago || p.forma === 'Cartão de crédito';
+      if(garantida) porMes[mes-1].pago += p.valor;
       else porMes[mes-1].previsto += p.valor;
     });
     return porMes;
@@ -606,11 +615,23 @@ function renderPlanilhaLancamentos(container){
 
   state.lancamentos.forEach(lanc => {
     const porMes = valoresPorMes(lanc);
+    const semDatas = (lanc.parcelas||[]).length && (lanc.parcelas||[]).every(p => !p.data);
     porMes.forEach((v,i) => { totalPorMes[i].pago += v.pago; totalPorMes[i].previsto += v.previsto; });
     const tr = el('tr', { class:'fin-table-row' });
-    const tdNome = el('td', { style:'font-weight:600;cursor:pointer;color:var(--blue-dark);' }, document.createTextNode(lanc.paciente));
+    const tdNomeWrap = el('td', {});
+    const tdNome = el('div', { style:'font-weight:600;cursor:pointer;color:var(--blue-dark);' }, document.createTextNode(lanc.paciente));
     tdNome.onclick = () => { visaoLancamentos='lista'; lancamentoExpandido=lanc.id; refreshPanel(); };
-    tr.appendChild(tdNome);
+    tdNomeWrap.appendChild(tdNome);
+    if(!lanc.parcelas || !lanc.parcelas.length){
+      const avisoEl = el('div', { style:'font-size:10.5px;color:var(--red);cursor:pointer;' }, document.createTextNode('⚠ sem parcelas cadastradas — toque pra adicionar'));
+      avisoEl.onclick = () => { visaoLancamentos='lista'; lancamentoExpandido=lanc.id; refreshPanel(); };
+      tdNomeWrap.appendChild(avisoEl);
+    } else if(semDatas){
+      const avisoEl = el('div', { style:'font-size:10.5px;color:var(--red);cursor:pointer;' }, document.createTextNode('⚠ parcelas sem data de vencimento — toque pra corrigir'));
+      avisoEl.onclick = () => { visaoLancamentos='lista'; lancamentoExpandido=lanc.id; refreshPanel(); };
+      tdNomeWrap.appendChild(avisoEl);
+    }
+    tr.appendChild(tdNomeWrap);
     tr.appendChild(el('td', {}, document.createTextNode('R$ '+formatMoney(lanc.valorTotal))));
 
     const tdForma = el('td', {});
@@ -649,7 +670,7 @@ function renderPlanilhaLancamentos(container){
   container.appendChild(tableWrap);
 
   container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:10px;' },
-    document.createTextNode('Cada parcela conta no mês do vencimento dela. Em verde: já pago. Em laranja com *: vencimento naquele mês, ainda não pago. Toque no nome do paciente pra abrir os detalhes e editar parcelas, profissional ou comissão.')));
+    document.createTextNode('Cada parcela conta no mês do vencimento dela. Em verde: já pago, ou no cartão de crédito (considerado garantido assim que aprovado). Em laranja com *: vencimento naquele mês, ainda não pago (dinheiro, pix, boleto ou promissória). Toque no nome do paciente pra abrir os detalhes e editar parcelas, profissional ou comissão.')));
 }
 
 
