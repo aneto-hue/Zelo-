@@ -559,6 +559,88 @@ function renderNovoLancamentoForm(container){
   container.appendChild(form);
 }
 
+const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+// Visão em planilha: uma linha por paciente, uma coluna por mês, mostrando quanto entrou
+// (foi efetivamente pago) naquele mês — igual à planilha que a clínica já usava.
+function renderPlanilhaLancamentos(container){
+  const anoRow = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:12px;' });
+  const anoPrevBtn = el('button', { style:'border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;' }, document.createTextNode('‹'));
+  anoPrevBtn.onclick = () => { planilhaAno--; refreshPanel(); };
+  const anoNextBtn = el('button', { style:'border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;' }, document.createTextNode('›'));
+  anoNextBtn.onclick = () => { planilhaAno++; refreshPanel(); };
+  anoRow.appendChild(anoPrevBtn);
+  anoRow.appendChild(el('div', { style:'font-weight:700;font-size:15px;' }, document.createTextNode('Entradas — '+planilhaAno)));
+  anoRow.appendChild(anoNextBtn);
+  container.appendChild(anoRow);
+
+  if(!state.lancamentos.length){
+    container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum lançamento cadastrado ainda.')));
+    return;
+  }
+
+  // Quanto esse lançamento recebeu, de fato, em cada mês do ano selecionado
+  function valoresPorMes(lanc){
+    const porMes = new Array(12).fill(0);
+    (lanc.parcelas||[]).forEach(p => {
+      if(!p.pago || !p.dataRecebimento) return;
+      const [ano, mes] = p.dataRecebimento.split('-').map(Number);
+      if(ano === planilhaAno) porMes[mes-1] += p.valor;
+    });
+    return porMes;
+  }
+
+  const tableWrap = el('div', { style:'overflow-x:auto;' });
+  const table = el('table', { class:'fin-table', style:'font-size:12px;' });
+  const theadRow = [el('th', {}, document.createTextNode('Paciente')), el('th', {}, document.createTextNode('Valor total')), el('th', {}, document.createTextNode('Forma de pgto'))];
+  MESES_ABREV.forEach(m => theadRow.push(el('th', { style:'text-align:right;' }, document.createTextNode(m))));
+  table.appendChild(el('thead', {}, el('tr', {}, theadRow)));
+
+  const tbody = el('tbody', {});
+  const totalPorMes = new Array(12).fill(0);
+
+  state.lancamentos.forEach(lanc => {
+    const porMes = valoresPorMes(lanc);
+    porMes.forEach((v,i) => totalPorMes[i] += v);
+    const tr = el('tr', { class:'fin-table-row' });
+    const tdNome = el('td', { style:'font-weight:600;cursor:pointer;color:var(--blue-dark);' }, document.createTextNode(lanc.paciente));
+    tdNome.onclick = () => { visaoLancamentos='lista'; lancamentoExpandido=lanc.id; refreshPanel(); };
+    tr.appendChild(tdNome);
+    tr.appendChild(el('td', {}, document.createTextNode('R$ '+formatMoney(lanc.valorTotal))));
+
+    const tdForma = el('td', {});
+    const formaInput = el('input', { type:'text', value: lanc.formaResumo||'', placeholder:'ex: 6x cartão',
+      style:'width:120px;font-size:11.5px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;' });
+    formaInput.oninput = (e) => { lanc.formaResumo = e.target.value; saveProgressDebounced(); };
+    tdForma.appendChild(formaInput);
+    tr.appendChild(tdForma);
+
+    porMes.forEach(v => {
+      tr.appendChild(el('td', { style:'text-align:right;'+(v>0?'font-weight:700;color:var(--green);':'color:var(--line);') },
+        document.createTextNode(v>0 ? formatMoney(v) : '—')));
+    });
+    tbody.appendChild(tr);
+  });
+
+  // Linha de totais, no rodapé
+  const trTotal = el('tr', { style:'background:#F4F8FB;font-weight:700;' });
+  trTotal.appendChild(el('td', {}, document.createTextNode('Total do mês')));
+  trTotal.appendChild(el('td', {}));
+  trTotal.appendChild(el('td', {}));
+  totalPorMes.forEach(v => {
+    trTotal.appendChild(el('td', { style:'text-align:right;' }, document.createTextNode(v>0 ? 'R$ '+formatMoney(v) : '—')));
+  });
+  tbody.appendChild(trTotal);
+
+  table.appendChild(tbody);
+  tableWrap.appendChild(table);
+  container.appendChild(tableWrap);
+
+  container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:10px;' },
+    document.createTextNode('Cada valor é o que foi efetivamente marcado como pago naquele mês. Toque no nome do paciente pra abrir os detalhes e editar parcelas, profissional ou comissão.')));
+}
+
+
 function renderLancamentoExpandido(container, lanc){
   const wrap = el('div', { style:'margin-top:10px;padding-top:10px;border-top:1.5px dashed var(--line-light);' });
 
@@ -730,10 +812,25 @@ function renderLancamentoExpandido(container, lanc){
 }
 let parcelaPagandoId = null;
 
+let visaoLancamentos = 'lista'; // 'lista' | 'planilha'
+let planilhaAno = new Date().getFullYear();
 let filtroBuscaLancamento = '';
 
 function renderLancamentos(container){
   container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Lançamentos')));
+
+  const toggleRow = el('div', { class:'filter-row', style:'margin-bottom:12px;' });
+  [['lista','📋 Lista'],['planilha','📊 Planilha (por mês)']].forEach(([key,label]) => {
+    const chip = el('div', { class:'filter-chip'+(visaoLancamentos===key?' selected':'') }, document.createTextNode(label));
+    chip.onclick = () => { visaoLancamentos = key; refreshPanel(); };
+    toggleRow.appendChild(chip);
+  });
+  container.appendChild(toggleRow);
+
+  if(visaoLancamentos === 'planilha'){
+    renderPlanilhaLancamentos(container);
+    return;
+  }
 
   if(novoLancamentoAberto){
     renderNovoLancamentoForm(container);
