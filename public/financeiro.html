@@ -155,8 +155,8 @@ const state = {
   lancamentos: []    // {id, paciente, profissionalId, profissionalNomeOriginal, clinicaNome, dataContrato, valorTotal, tratamentos:[{descricao,valor}], parcelas:[{id,valor,data,forma,pago,dataRecebimento}], origem}
 };
 
-const STEPS = ['Profissionais','Lançamentos','Parcelas e Recebimentos','Comissões','Monitoramento'];
-let currentStep = 1;
+const STEPS = ['Lançamentos'];
+let currentStep = 0;
 
 // ============ PERSISTÊNCIA (servidor com reserva local) ============
 const STORAGE_KEY = 'controle_pagamentos_comissoes_v1';
@@ -562,6 +562,28 @@ function renderNovoLancamentoForm(container){
 function renderLancamentoExpandido(container, lanc){
   const wrap = el('div', { style:'margin-top:10px;padding-top:10px;border-top:1.5px dashed var(--line-light);' });
 
+  // ---- Profissional responsável e % de comissão dele sobre esse pagamento ----
+  wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;color:var(--blue-dark);margin-bottom:6px;' }, document.createTextNode('Profissional e comissão')));
+  const profRow = el('div', { style:'display:flex;gap:8px;margin-bottom:12px;' });
+  const profSelect = el('select', { style:'flex:1.6;padding:9px;font-size:13px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Não atribuído')));
+  state.profissionais.forEach(pr => {
+    const opt = el('option', { value:pr.id }, document.createTextNode(pr.nome));
+    if(lanc.profissionalId===pr.id) opt.setAttribute('selected','selected');
+    profSelect.appendChild(opt);
+  });
+  profSelect.onchange = (e) => { lanc.profissionalId = e.target.value; saveProgress(); };
+  profRow.appendChild(profSelect);
+  const pctInput = el('input', { type:'number', min:'0', max:'100', step:'0.1', value: lanc.profissionalPercentual||'', placeholder:'% comissão',
+    style:'width:110px;padding:9px;font-size:13px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  pctInput.oninput = (e) => { lanc.profissionalPercentual = e.target.value; saveProgressDebounced(); };
+  profRow.appendChild(pctInput);
+  wrap.appendChild(profRow);
+  if(lanc.profissionalNomeOriginal && !lanc.profissionalId){
+    wrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:-8px 0 12px;' },
+      document.createTextNode('Sugerido pela ficha: "'+lanc.profissionalNomeOriginal+'" — cadastre-o ou selecione acima.')));
+  }
+
   if(lanc.tratamentos && lanc.tratamentos.length){
     wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;color:var(--blue-dark);margin-bottom:6px;' }, document.createTextNode('Tratamentos')));
     lanc.tratamentos.forEach(t => {
@@ -574,22 +596,54 @@ function renderLancamentoExpandido(container, lanc){
   if(!lanc.parcelas.length){
     wrap.appendChild(el('div', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode('Nenhuma parcela cadastrada.')));
   } else {
+    const hojeISOParcela = new Date().toISOString().slice(0,10);
     lanc.parcelas.forEach(p => {
-      const row = el('div', { class:'parcela-row'+(p.pago?' pago':'') });
+      const atrasada = !p.pago && p.data && p.data < hojeISOParcela;
+      const row = el('div', { class:'parcela-row'+(p.pago?' pago':''), style: atrasada ? 'border-color:var(--red);' : '' });
       const info = el('div', { class:'parcela-info' });
       info.appendChild(el('div', { class:'p-valor' }, document.createTextNode('R$ '+formatMoney(p.valor))));
-      info.appendChild(el('div', { class:'p-sub' }, document.createTextNode(
-        [p.data?formatDateBR(p.data):'', p.forma].filter(Boolean).join(' • ') + (p.pago && p.dataRecebimento ? (' • Recebido em '+formatDateBR(p.dataRecebimento)) : '')
-      )));
+
+      const dataVencInput = el('input', { type:'date', value: p.data||'', style:'font-size:12px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;margin-top:3px;' });
+      dataVencInput.oninput = (e) => { p.data = e.target.value; saveProgressDebounced(); refreshPanel(); };
+      info.appendChild(dataVencInput);
+
+      const statusLabel = p.pago ? '✓ Pago' : (atrasada ? '⚠ Em atraso' : 'Não pago');
+      const statusCor = p.pago ? 'var(--green)' : (atrasada ? 'var(--red)' : 'var(--muted)');
+      info.appendChild(el('div', { style:'font-size:11.5px;font-weight:700;color:'+statusCor+';margin-top:3px;' }, document.createTextNode(statusLabel)));
+      if(p.pago && p.dataRecebimento){
+        info.appendChild(el('div', { style:'font-size:11px;color:var(--muted);' }, document.createTextNode('Pago em '+formatDateBR(p.dataRecebimento))));
+      }
       row.appendChild(info);
-      const toggle = el('div', { class:'parcela-toggle'+(p.pago?' marcado':'') }, document.createTextNode(p.pago?'✓ Recebido':'Marcar recebido'));
-      toggle.onclick = () => {
-        p.pago = !p.pago;
-        p.dataRecebimento = p.pago ? new Date().toISOString().slice(0,10) : '';
-        saveProgress(); refreshPanel();
-      };
-      row.appendChild(toggle);
+
+      if(!p.pago){
+        const toggle = el('div', { class:'parcela-toggle' }, document.createTextNode('Marcar como pago'));
+        toggle.onclick = () => { parcelaPagandoId = parcelaPagandoId===p.id ? null : p.id; refreshPanel(); };
+        row.appendChild(toggle);
+      } else {
+        const toggle = el('div', { class:'parcela-toggle marcado' }, document.createTextNode('✓ Pago'));
+        toggle.onclick = () => {
+          if(!confirm('Desmarcar esse pagamento?')) return;
+          p.pago = false; p.dataRecebimento = '';
+          saveProgress(); refreshPanel();
+        };
+        row.appendChild(toggle);
+      }
       wrap.appendChild(row);
+
+      if(!p.pago && parcelaPagandoId === p.id){
+        const miniForm = el('div', { style:'background:#F4F8FB;border-radius:8px;padding:10px;margin:-4px 0 10px;' });
+        const dataPagoInput = el('input', { type:'date', value: hojeISOParcela });
+        const btnConfirmar = el('div', { class:'add-row-btn', style:'margin-top:8px;background:var(--green);color:#fff;border:none;' }, document.createTextNode('Confirmar'));
+        btnConfirmar.onclick = () => {
+          p.pago = true;
+          p.dataRecebimento = dataPagoInput.value || hojeISOParcela;
+          parcelaPagandoId = null;
+          saveProgress(); refreshPanel();
+        };
+        const lbl = el('label', {}, document.createTextNode('Data em que foi pago'));
+        miniForm.appendChild(lbl); miniForm.appendChild(dataPagoInput); miniForm.appendChild(btnConfirmar);
+        wrap.appendChild(miniForm);
+      }
     });
   }
 
@@ -602,6 +656,7 @@ function renderLancamentoExpandido(container, lanc){
 
   container.appendChild(wrap);
 }
+let parcelaPagandoId = null;
 
 let filtroBuscaLancamento = '';
 
@@ -677,21 +732,6 @@ function renderLancamentos(container){
       const trDetalhe = el('tr', { class:'fin-table-detail-row' });
       const tdDetalhe = el('td', { colspan:'6' });
       const detalheWrap = el('div', { style:'padding:12px 4px;' });
-
-      const profField = el('div', { class:'field', style:'margin-bottom:0;' });
-      profField.appendChild(el('label', {}, document.createTextNode('Profissional responsável'
-        + (lanc.profissionalNomeOriginal && !lanc.profissionalId ? ' (sugerido pela ficha: "'+lanc.profissionalNomeOriginal+'" — cadastre-o ou selecione abaixo)' : ''))));
-      const profSelect = el('select', {});
-      profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Não atribuído')));
-      state.profissionais.forEach(p => {
-        const opt = el('option', { value:p.id }, document.createTextNode(p.nome));
-        if(lanc.profissionalId===p.id) opt.setAttribute('selected','selected');
-        profSelect.appendChild(opt);
-      });
-      profSelect.onchange = (e) => { lanc.profissionalId = e.target.value; saveProgress(); };
-      profField.appendChild(profSelect);
-      detalheWrap.appendChild(profField);
-
       renderLancamentoExpandido(detalheWrap, lanc);
       tdDetalhe.appendChild(detalheWrap);
       trDetalhe.appendChild(tdDetalhe);
@@ -1627,6 +1667,8 @@ function generateComissoesPDF(porProfissional, semProfTotal, semProfRecebido, te
 function renderNav(){
   const nav = document.getElementById('stepsNav');
   nav.innerHTML = '';
+  if(STEPS.length <= 1){ nav.style.display = 'none'; return; }
+  nav.style.display = '';
   STEPS.forEach((label, i) => {
     const btn = el('button', { class: i===currentStep?'active':'' }, document.createTextNode(label));
     btn.onclick = () => { currentStep = i; renderPanel(i); };
@@ -1639,7 +1681,7 @@ function renderPanel(stepIndex, opts={}){
   const main = document.getElementById('main');
   const scrollY = window.scrollY;
   main.innerHTML = '';
-  const renderers = [renderProfissionais, renderLancamentos, renderParcelasRecebimentos, renderComissoes, renderMonitoramento];
+  const renderers = [renderLancamentos];
   renderers[stepIndex](main);
   if(opts.keepScroll){ window.scrollTo(0, scrollY); } else { window.scrollTo(0,0); }
 }
