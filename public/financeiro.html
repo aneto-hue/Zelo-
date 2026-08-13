@@ -107,8 +107,8 @@
   .fin-table-row:hover{ background:#F4F8FB; }
   .fin-table-detail-row td{ background:#FAFBFC; white-space:normal; }
   .parcela-row{
-    display:flex; align-items:center; gap:8px; padding:10px; border:1.5px solid var(--line-light); border-radius:8px;
-    margin-bottom:8px; background:#fff;
+    display:flex; align-items:flex-start; gap:8px; padding:10px; border:1.5px solid var(--line-light); border-radius:8px;
+    margin-bottom:8px; background:#fff; flex-wrap:wrap;
   }
   .parcela-row.pago{background:#F3FBF6; border-color:var(--green);}
   .parcela-info{flex:1; font-size:12.5px;}
@@ -644,28 +644,45 @@ function renderLancamentoExpandido(container, lanc){
     wrap.appendChild(el('div', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode('Nenhuma parcela cadastrada.')));
   } else {
     const hojeISOParcela = new Date().toISOString().slice(0,10);
-    lanc.parcelas.forEach(p => {
+    const FORMAS_PAGAMENTO = ['', 'Cartão de crédito', 'Cartão de Débito', 'Pix', 'Dinheiro', 'Promissória', 'Boleto'];
+    lanc.parcelas.forEach((p, pi) => {
       const atrasada = !p.pago && p.data && p.data < hojeISOParcela;
       const row = el('div', { class:'parcela-row'+(p.pago?' pago':''), style: atrasada ? 'border-color:var(--red);' : '' });
-      const info = el('div', { class:'parcela-info' });
-      info.appendChild(el('div', { class:'p-valor' }, document.createTextNode('R$ '+formatMoney(p.valor))));
+      const info = el('div', { class:'parcela-info', style:'flex:1;' });
 
-      const dataVencInput = el('input', { type:'date', value: p.data||'', style:'font-size:12px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;margin-top:3px;' });
+      const linha1 = el('div', { style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;' });
+      const valorInput = el('input', { type:'number', min:'0', step:'0.01', value: p.valor||0,
+        style:'width:90px;font-size:13px;font-weight:700;border:1px solid var(--line-light);border-radius:6px;padding:4px 6px;' });
+      valorInput.oninput = (e) => { p.valor = parseFloat(e.target.value)||0; saveProgressDebounced(); };
+      linha1.appendChild(valorInput);
+
+      const dataVencInput = el('input', { type:'date', value: p.data||'', style:'font-size:12px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;' });
       dataVencInput.oninput = (e) => { p.data = e.target.value; saveProgressDebounced(); refreshPanel(); };
-      info.appendChild(dataVencInput);
+      linha1.appendChild(dataVencInput);
+
+      const formaSelect = el('select', { style:'font-size:12px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;font-family:inherit;' });
+      FORMAS_PAGAMENTO.forEach(f => {
+        const opt = el('option', { value:f }, document.createTextNode(f||'Forma...'));
+        if(p.forma===f) opt.setAttribute('selected','selected');
+        formaSelect.appendChild(opt);
+      });
+      formaSelect.onchange = (e) => { p.forma = e.target.value; saveProgress(); };
+      linha1.appendChild(formaSelect);
+      info.appendChild(linha1);
 
       const statusLabel = p.pago ? '✓ Pago' : (atrasada ? '⚠ Em atraso' : 'Não pago');
       const statusCor = p.pago ? 'var(--green)' : (atrasada ? 'var(--red)' : 'var(--muted)');
-      info.appendChild(el('div', { style:'font-size:11.5px;font-weight:700;color:'+statusCor+';margin-top:3px;' }, document.createTextNode(statusLabel)));
+      info.appendChild(el('div', { style:'font-size:11.5px;font-weight:700;color:'+statusCor+';margin-top:4px;' }, document.createTextNode(statusLabel)));
       if(p.pago && p.dataRecebimento){
         info.appendChild(el('div', { style:'font-size:11px;color:var(--muted);' }, document.createTextNode('Pago em '+formatDateBR(p.dataRecebimento))));
       }
       row.appendChild(info);
 
+      const acoesWrap = el('div', { style:'display:flex;flex-direction:column;gap:6px;align-items:flex-end;' });
       if(!p.pago){
         const toggle = el('div', { class:'parcela-toggle' }, document.createTextNode('Marcar como pago'));
         toggle.onclick = () => { parcelaPagandoId = parcelaPagandoId===p.id ? null : p.id; refreshPanel(); };
-        row.appendChild(toggle);
+        acoesWrap.appendChild(toggle);
       } else {
         const toggle = el('div', { class:'parcela-toggle marcado' }, document.createTextNode('✓ Pago'));
         toggle.onclick = () => {
@@ -673,8 +690,16 @@ function renderLancamentoExpandido(container, lanc){
           p.pago = false; p.dataRecebimento = '';
           saveProgress(); refreshPanel();
         };
-        row.appendChild(toggle);
+        acoesWrap.appendChild(toggle);
       }
+      const removerParcelaBtn = el('span', { style:'font-size:11px;color:var(--red);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Remover parcela'));
+      removerParcelaBtn.onclick = () => {
+        if(!confirm('Remover esta parcela de R$ '+formatMoney(p.valor)+'?')) return;
+        lanc.parcelas.splice(pi,1);
+        saveProgress(); refreshPanel();
+      };
+      acoesWrap.appendChild(removerParcelaBtn);
+      row.appendChild(acoesWrap);
       wrap.appendChild(row);
 
       if(!p.pago && parcelaPagandoId === p.id){
