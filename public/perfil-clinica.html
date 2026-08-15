@@ -382,8 +382,9 @@ function renderProfissionais(container){
 
   async function carregar(){
     wrap.innerHTML = '';
-    if(novoProfissionalAberto){
-      const dados = { nome:'', email:'', senha:'', papel:'profissional', cargo:'', modulosPermitidos:[] };
+    const souAdminGeral = window._clinicaMe && window._clinicaMe.papel === 'admin';
+    if(souAdminGeral && novoProfissionalAberto){
+      const dados = { nome:'', email:'', senha:'', papel:'profissional', cargo:'', cro:'', telefone:'', modulosPermitidos:[] };
       const form = el('div', { class:'card-form' });
       form.appendChild(textField('Nome', dados, 'nome', ()=>{}));
       const cargoField = el('div', { class:'field' });
@@ -400,6 +401,10 @@ function renderProfissionais(container){
       form.appendChild(cargoField);
       form.appendChild(textField('E-mail (usado para login)', dados, 'email', ()=>{}));
       form.appendChild(textField('Senha provisória', dados, 'senha', ()=>{}));
+      const rowExtra = el('div', { class:'row' });
+      rowExtra.appendChild(textField('CRO (opcional)', dados, 'cro', ()=>{}));
+      rowExtra.appendChild(textField('Telefone (opcional)', dados, 'telefone', ()=>{}));
+      form.appendChild(rowExtra);
       const papelField = el('div', { class:'field' });
       papelField.appendChild(el('label', {}, document.createTextNode('Papel')));
       const papelSelect = el('select', {});
@@ -426,7 +431,7 @@ function renderProfissionais(container){
       btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
       form.appendChild(btnRow);
       wrap.appendChild(form);
-    } else {
+    } else if(souAdminGeral) {
       const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Novo profissional (login)'));
       addBtn.onclick = () => { novoProfissionalAberto = true; carregar(); };
       wrap.appendChild(addBtn);
@@ -434,12 +439,15 @@ function renderProfissionais(container){
 
     const resp = await fetch('/api/profissionais', { credentials:'same-origin' });
     const data = await resp.json();
-    (data.profissionais||[]).forEach(p => {
+    const listaVisivel = souAdminGeral ? (data.profissionais||[]) : (data.profissionais||[]).filter(p => window._clinicaMe && p.id === window._clinicaMe.id);
+    listaVisivel.forEach(p => {
       const card = el('div', { class:'pac-card', style:'flex-direction:column;align-items:stretch;' });
       const topRow = el('div', { style:'display:flex;justify-content:space-between;align-items:flex-start;gap:8px;' });
       const info = el('div', {});
       info.appendChild(el('div', { class:'pac-name' }, document.createTextNode(p.nome + (p.ativo===false?' (desativado)':''))));
       info.appendChild(el('div', { class:'pac-sub' }, document.createTextNode(p.email + ' • ' + (p.cargo || (p.papel==='admin'?'Administrador':'Profissional')))));
+      const linhaExtra = [p.cro?('CRO '+p.cro):'', p.telefone||''].filter(Boolean).join(' • ');
+      if(linhaExtra) info.appendChild(el('div', { class:'pac-sub' }, document.createTextNode(linhaExtra)));
       info.appendChild(el('div', { class:'pac-sub', style:'margin-top:4px;' }, document.createTextNode(
         p.papel==='admin' ? 'Acesso total (administrador)' :
         (!p.modulosPermitidos || !p.modulosPermitidos.length) ? 'Acesso total (sem restrição configurada)' :
@@ -448,33 +456,63 @@ function renderProfissionais(container){
       topRow.appendChild(info);
       if(p.ativo !== false){
         const acoesWrap = el('div', { style:'display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;' });
-        if(p.papel !== 'admin'){
-          const editarBtn = el('span', { style:'color:var(--blue-dark);cursor:pointer;font-weight:700;font-size:12.5px;' }, document.createTextNode('Editar acesso'));
+        // Qualquer pessoa pode editar o PRÓPRIO cadastro (nome, cargo, CRO, telefone). Só quem
+        // é admin pode editar o cadastro de outra pessoa (e mexer em acesso/papel/comissão).
+        const souEuMesmo = window._clinicaMe && window._clinicaMe.id === p.id;
+        const souAdminLogado = window._clinicaMe && window._clinicaMe.papel === 'admin';
+        if(souEuMesmo || (souAdminLogado && p.papel !== 'admin')){
+          const editarBtn = el('span', { style:'color:var(--blue-dark);cursor:pointer;font-weight:700;font-size:12.5px;' },
+            document.createTextNode(souEuMesmo ? 'Editar meu cadastro' : 'Editar acesso'));
           editarBtn.onclick = () => { profissionalEditandoId = (profissionalEditandoId===p.id) ? null : p.id; carregar(); };
           acoesWrap.appendChild(editarBtn);
         }
-        const del = el('span', { class:'pac-del' }, document.createTextNode('Desativar'));
-        del.onclick = async () => {
-          if(!confirm('Desativar o acesso de "'+p.nome+'"? Ele não conseguirá mais fazer login.')) return;
-          await fetch('/api/profissionais/'+p.id, { method:'DELETE', credentials:'same-origin' });
-          carregar();
-        };
-        acoesWrap.appendChild(del);
+        if(souAdminLogado && p.papel !== 'admin'){
+          const del = el('span', { class:'pac-del' }, document.createTextNode('Desativar'));
+          del.onclick = async () => {
+            if(!confirm('Desativar o acesso de "'+p.nome+'"? Ele não conseguirá mais fazer login.')) return;
+            await fetch('/api/profissionais/'+p.id, { method:'DELETE', credentials:'same-origin' });
+            carregar();
+          };
+          acoesWrap.appendChild(del);
+        }
         topRow.appendChild(acoesWrap);
       }
       card.appendChild(topRow);
 
       if(profissionalEditandoId === p.id){
-        const dadosEdicao = { papel: p.papel, modulosPermitidos: (p.modulosPermitidos||[]).slice() };
+        const souEuMesmo = window._clinicaMe && window._clinicaMe.id === p.id;
+        const souAdminLogado = window._clinicaMe && window._clinicaMe.papel === 'admin';
+        const dadosEdicao = { nome: p.nome, cargo: p.cargo||'', cro: p.cro||'', telefone: p.telefone||'', modulosPermitidos: (p.modulosPermitidos||[]).slice() };
         const editCampo = el('div', { style:'margin-top:12px;padding-top:12px;border-top:1px solid var(--line-light);' });
-        renderSeletorModulos(dadosEdicao, editCampo);
+        editCampo.appendChild(textField('Nome', dadosEdicao, 'nome', ()=>{}));
+        const rowEditExtra = el('div', { class:'row' });
+        rowEditExtra.appendChild(textField('CRO', dadosEdicao, 'cro', ()=>{}));
+        rowEditExtra.appendChild(textField('Telefone', dadosEdicao, 'telefone', ()=>{}));
+        editCampo.appendChild(rowEditExtra);
+        const cargoEditField = el('div', { class:'field' });
+        cargoEditField.appendChild(el('label', {}, document.createTextNode('Cargo / função')));
+        const cargoEditSelect = el('select', {});
+        ['Dentista','Secretária','Recepção','Auxiliar','Gerente','Outro'].forEach(opt => {
+          const optEl = el('option', { value:opt }, document.createTextNode(opt));
+          if(dadosEdicao.cargo === opt) optEl.setAttribute('selected','selected');
+          cargoEditSelect.appendChild(optEl);
+        });
+        cargoEditSelect.onchange = (e) => { dadosEdicao.cargo = e.target.value; };
+        cargoEditField.appendChild(cargoEditSelect);
+        editCampo.appendChild(cargoEditField);
+        if(souAdminLogado){
+          renderSeletorModulos(dadosEdicao, editCampo);
+        }
         card.appendChild(editCampo);
-        const salvarEdicaoBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;' }, document.createTextNode('Salvar acesso'));
+        const salvarEdicaoBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;' }, document.createTextNode('Salvar'));
         salvarEdicaoBtn.onclick = async () => {
-          await fetch('/api/profissionais/'+p.id, {
+          const corpo = { nome: dadosEdicao.nome, cargo: dadosEdicao.cargo, cro: dadosEdicao.cro, telefone: dadosEdicao.telefone };
+          if(souAdminLogado) corpo.modulosPermitidos = dadosEdicao.modulosPermitidos;
+          const resp = await fetch('/api/profissionais/'+p.id, {
             method:'PUT', credentials:'same-origin', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ modulosPermitidos: dadosEdicao.modulosPermitidos })
+            body: JSON.stringify(corpo)
           });
+          if(!resp.ok){ const d = await resp.json().catch(()=>({})); alert(d.erro || 'Não foi possível salvar.'); return; }
           profissionalEditandoId = null;
           carregar();
         };
@@ -546,13 +584,13 @@ function renderTudo(){
   main.appendChild(cardAgenda);
 
   main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Profissionais da equipe (acesso ao sistema)')));
-  main.appendChild(el('p', { class:'hint' }, document.createTextNode('Somente administradores veem e gerenciam esta lista.')));
+  main.appendChild(el('p', { class:'hint' }, document.createTextNode(
+    (window._clinicaMe && window._clinicaMe.papel === 'admin')
+      ? 'Administradores veem e gerenciam toda a equipe.'
+      : 'Você pode editar seu próprio cadastro (nome, cargo, CRO, telefone) aqui embaixo.'
+  )));
   const cardEquipe = el('div', {});
-  if(window._clinicaMe && window._clinicaMe.papel === 'admin'){
-    renderProfissionais(cardEquipe);
-  } else {
-    cardEquipe.appendChild(el('div', { class:'card' }, document.createTextNode('Fale com um administrador do sistema para adicionar ou remover profissionais.')));
-  }
+  renderProfissionais(cardEquipe);
   main.appendChild(cardEquipe);
 }
 

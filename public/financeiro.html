@@ -106,6 +106,11 @@
   .fin-table-row{ cursor:pointer; transition:background .1s; }
   .fin-table-row:hover{ background:#F4F8FB; }
   .fin-table-detail-row td{ background:#FAFBFC; white-space:normal; }
+  .fin-col-fixa{ position:sticky; background:#fff; z-index:1; }
+  .fin-col-1{ left:0; min-width:150px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
+  .fin-col-2{ left:150px; min-width:100px; }
+  .fin-col-3{ left:250px; min-width:130px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
+  thead .fin-col-fixa{ background:var(--bg,#F4F8FB); z-index:2; }
   .parcela-row{
     display:flex; align-items:flex-start; gap:8px; padding:10px; border:1.5px solid var(--line-light); border-radius:8px;
     margin-bottom:8px; background:#fff; flex-wrap:wrap;
@@ -563,8 +568,11 @@ const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out'
 
 // Visão em planilha: uma linha por paciente, uma coluna por mês, mostrando quanto entrou
 // (foi efetivamente pago) naquele mês — igual à planilha que a clínica já usava.
+let planilhaMesIni = null; // null = usa o padrão (mês atual, se for o ano corrente)
+let planilhaMesFim = null; // null = até dezembro
+
 function renderPlanilhaLancamentos(container){
-  const anoRow = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:12px;' });
+  const anoRow = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;' });
   const anoPrevBtn = el('button', { style:'border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;' }, document.createTextNode('‹'));
   anoPrevBtn.onclick = () => { planilhaAno--; refreshPanel(); };
   const anoNextBtn = el('button', { style:'border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;' }, document.createTextNode('›'));
@@ -572,12 +580,49 @@ function renderPlanilhaLancamentos(container){
   anoRow.appendChild(anoPrevBtn);
   anoRow.appendChild(el('div', { style:'font-weight:700;font-size:15px;' }, document.createTextNode('Entradas — '+planilhaAno)));
   anoRow.appendChild(anoNextBtn);
+
+  // Filtro de período: de qual mês até qual mês mostrar — por padrão, a partir do mês atual
+  // (não mostra os meses que já passaram, que geralmente não interessam mais no dia a dia).
+  const hoje = new Date();
+  const mesAtualIdx = hoje.getMonth(); // 0-11
+  const mesIniPadrao = (planilhaAno === hoje.getFullYear()) ? mesAtualIdx : 0;
+  const mesIniAtivo = planilhaMesIni !== null ? planilhaMesIni : mesIniPadrao;
+  const mesFimAtivo = planilhaMesFim !== null ? planilhaMesFim : 11;
+
+  const filtroWrap = el('div', { style:'display:flex;align-items:center;gap:8px;font-size:12.5px;' });
+  filtroWrap.appendChild(el('span', { style:'color:var(--muted);' }, document.createTextNode('Mostrar de')));
+  const selIni = el('select', { style:'padding:6px 8px;font-size:12.5px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  MESES_ABREV.forEach((m,i) => {
+    const opt = el('option', { value:i }, document.createTextNode(m));
+    if(i===mesIniAtivo) opt.setAttribute('selected','selected');
+    selIni.appendChild(opt);
+  });
+  selIni.onchange = (e) => { planilhaMesIni = parseInt(e.target.value,10); refreshPanel(); };
+  filtroWrap.appendChild(selIni);
+  filtroWrap.appendChild(el('span', { style:'color:var(--muted);' }, document.createTextNode('até')));
+  const selFim = el('select', { style:'padding:6px 8px;font-size:12.5px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  MESES_ABREV.forEach((m,i) => {
+    const opt = el('option', { value:i }, document.createTextNode(m));
+    if(i===mesFimAtivo) opt.setAttribute('selected','selected');
+    selFim.appendChild(opt);
+  });
+  selFim.onchange = (e) => { planilhaMesFim = parseInt(e.target.value,10); refreshPanel(); };
+  filtroWrap.appendChild(selFim);
+  if(planilhaMesIni !== null || planilhaMesFim !== null){
+    const limparBtn = el('span', { style:'color:var(--blue-dark);text-decoration:underline;cursor:pointer;' }, document.createTextNode('mostrar tudo'));
+    limparBtn.onclick = () => { planilhaMesIni = 0; planilhaMesFim = 11; refreshPanel(); };
+    filtroWrap.appendChild(limparBtn);
+  }
+  anoRow.appendChild(filtroWrap);
   container.appendChild(anoRow);
 
   if(!state.lancamentos.length){
     container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum lançamento cadastrado ainda.')));
     return;
   }
+
+  const mesesVisiveis = []; // índices (0-11) dos meses que entram na tabela, respeitando o filtro
+  for(let i=mesIniAtivo; i<=mesFimAtivo; i++) mesesVisiveis.push(i);
 
   // Quanto esse lançamento recebeu, de fato, em cada mês do ano selecionado
   function valoresPorMes(lanc){
@@ -606,8 +651,12 @@ function renderPlanilhaLancamentos(container){
 
   const tableWrap = el('div', { style:'overflow-x:auto;' });
   const table = el('table', { class:'fin-table', style:'font-size:12px;' });
-  const theadRow = [el('th', {}, document.createTextNode('Paciente')), el('th', {}, document.createTextNode('Valor total')), el('th', {}, document.createTextNode('Forma de pgto'))];
-  MESES_ABREV.forEach(m => theadRow.push(el('th', { style:'text-align:right;' }, document.createTextNode(m))));
+  const theadRow = [
+    el('th', { class:'fin-col-fixa fin-col-1' }, document.createTextNode('Paciente')),
+    el('th', { class:'fin-col-fixa fin-col-2' }, document.createTextNode('Valor total')),
+    el('th', { class:'fin-col-fixa fin-col-3' }, document.createTextNode('Forma de pgto')),
+  ];
+  mesesVisiveis.forEach(i => theadRow.push(el('th', { style:'text-align:right;' }, document.createTextNode(MESES_ABREV[i]))));
   table.appendChild(el('thead', {}, el('tr', {}, theadRow)));
 
   const tbody = el('tbody', {});
@@ -632,16 +681,18 @@ function renderPlanilhaLancamentos(container){
       tdNomeWrap.appendChild(avisoEl);
     }
     tr.appendChild(tdNomeWrap);
-    tr.appendChild(el('td', {}, document.createTextNode('R$ '+formatMoney(lanc.valorTotal))));
+    tdNomeWrap.className = 'fin-col-fixa fin-col-1';
+    tr.appendChild(el('td', { class:'fin-col-fixa fin-col-2' }, document.createTextNode('R$ '+formatMoney(lanc.valorTotal))));
 
-    const tdForma = el('td', {});
+    const tdForma = el('td', { class:'fin-col-fixa fin-col-3' });
     const formaInput = el('input', { type:'text', value: lanc.formaResumo||'', placeholder:'ex: 6x cartão',
       style:'width:120px;font-size:11.5px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;' });
     formaInput.oninput = (e) => { lanc.formaResumo = e.target.value; saveProgressDebounced(); };
     tdForma.appendChild(formaInput);
     tr.appendChild(tdForma);
 
-    porMes.forEach(({pago, previsto}) => {
+    mesesVisiveis.forEach(i => {
+      const {pago, previsto} = porMes[i];
       const td = el('td', { style:'text-align:right;' });
       if(pago>0) td.appendChild(el('div', { style:'font-weight:700;color:var(--green);' }, document.createTextNode(formatMoney(pago))));
       if(previsto>0) td.appendChild(el('div', { style:'font-size:10.5px;color:var(--amber);'+(pago>0?'':'font-weight:600;') }, document.createTextNode(formatMoney(previsto)+(pago>0?'':' *'))));
@@ -653,10 +704,11 @@ function renderPlanilhaLancamentos(container){
 
   // Linha de totais, no rodapé
   const trTotal = el('tr', { style:'background:#F4F8FB;font-weight:700;' });
-  trTotal.appendChild(el('td', {}, document.createTextNode('Total do mês')));
-  trTotal.appendChild(el('td', {}));
-  trTotal.appendChild(el('td', {}));
-  totalPorMes.forEach(({pago, previsto}) => {
+  trTotal.appendChild(el('td', { class:'fin-col-fixa fin-col-1', style:'background:#F4F8FB;' }, document.createTextNode('Total do mês')));
+  trTotal.appendChild(el('td', { class:'fin-col-fixa fin-col-2', style:'background:#F4F8FB;' }));
+  trTotal.appendChild(el('td', { class:'fin-col-fixa fin-col-3', style:'background:#F4F8FB;' }));
+  mesesVisiveis.forEach(i => {
+    const {pago, previsto} = totalPorMes[i];
     const td = el('td', { style:'text-align:right;' });
     if(pago>0) td.appendChild(el('div', { style:'color:var(--green);' }, document.createTextNode('R$ '+formatMoney(pago))));
     if(previsto>0) td.appendChild(el('div', { style:'font-size:10.5px;color:var(--amber);' }, document.createTextNode('R$ '+formatMoney(previsto)+(pago>0?'':' *'))));
