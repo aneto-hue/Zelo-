@@ -933,28 +933,52 @@ function renderPainelProfissional(lanc, linha){
         if(!t.profissionalAvaliadorId) t.profissionalAvaliadorId = lanc.profissionalId;
         if(novoProfId === linha.profissionalId) return; // nada mudou de fato
 
+        // Valor atual da linha de ORIGEM (de onde o tratamento está saindo), incluindo t —
+        // é sobre esse total que a fração de saída é calculada.
+        const valorOrigemAntes = linha.tratamentos.reduce((s,x)=>s+(x.valor||0),0) || 1;
+        const fracaoSaindo = (t.valor||0) / valorOrigemAntes;
+        const parcelasOrigemAntes = (linha.parcelas||[]).map(p=>p.valor); // guarda os valores originais, antes de reduzir
+
+        // Reduz a linha de origem na proporção do que está saindo — sem isso, ela ficava com
+        // o valor total certo, mas as parcelas continuavam com o valor cheio de antes (o bug).
+        (linha.parcelas||[]).forEach(p => { p.valor = Math.round(p.valor * (1-fracaoSaindo) * 100)/100; });
+
         if(novoProfId === lanc.profissionalId && !linha.isPrincipal){
-          // Voltou pro profissional principal — remove da linha derivada
+          // Voltou pro profissional principal — remove da linha derivada e devolve o valor
+          // proporcional de volta pras parcelas da linha principal.
           linha.derivada.tratamentoIds = linha.derivada.tratamentoIds.filter(id=>id!==t.id);
-          registrarAlteracao(lanc, 'Tratamento "'+(t.descricao||'—')+'" voltou pro profissional principal');
+          const parcelasPrincipal = lanc.parcelas || [];
+          parcelasOrigemAntes.forEach((valorAntes, i) => {
+            const valorVoltando = Math.round(valorAntes * fracaoSaindo * 100)/100;
+            if(parcelasPrincipal[i]) parcelasPrincipal[i].valor = Math.round((parcelasPrincipal[i].valor + valorVoltando)*100)/100;
+          });
+          registrarAlteracao(lanc, 'Tratamento "'+(t.descricao||'—')+'" voltou pro profissional principal, com as parcelas ajustadas de volta');
         } else {
           // Cria (ou reaproveita) uma linha derivada pro profissional novo
           if(!lanc.linhasDerivadas) lanc.linhasDerivadas = [];
           let destino = lanc.linhasDerivadas.find(ld => ld.profissionalId === novoProfId);
+          const parcelasChegando = parcelasOrigemAntes.map((v,i) => ({
+            id: uid(), valor: Math.round(v*fracaoSaindo*100)/100,
+            data: (linha.parcelas[i]&&linha.parcelas[i].data)||'', forma: linha.forma||'', pago:false, dataRecebimento:'', corManual:null,
+          }));
           if(!destino){
-            const valorAntes = linha.tratamentos.reduce((s,x)=>s+(x.valor||0),0) || 1;
-            const fracao = (t.valor||0) / valorAntes;
             destino = {
               id: uid(), profissionalId: novoProfId, profissionalNome: pr?pr.nome:'',
               tratamentoIds: [], forma: linha.forma,
-              parcelas: gerarParcelasProporcionais(linha.parcelas, fracao),
+              parcelas: parcelasChegando,
             };
             lanc.linhasDerivadas.push(destino);
+          } else {
+            // Já existe uma linha pra esse profissional — soma o valor chegando nas parcelas dela
+            parcelasChegando.forEach((pc,i) => {
+              if(destino.parcelas[i]) destino.parcelas[i].valor = Math.round((destino.parcelas[i].valor + pc.valor)*100)/100;
+              else destino.parcelas.push(pc);
+            });
           }
           // Remove de onde estava antes (principal ou outra derivada) e coloca na nova
           if(!linha.isPrincipal) linha.derivada.tratamentoIds = linha.derivada.tratamentoIds.filter(id=>id!==t.id);
           if(!destino.tratamentoIds.includes(t.id)) destino.tratamentoIds.push(t.id);
-          registrarAlteracao(lanc, 'Tratamento "'+(t.descricao||'—')+'" reatribuído para '+(pr?pr.nome:'—')+' (nova linha na planilha)');
+          registrarAlteracao(lanc, 'Tratamento "'+(t.descricao||'—')+'" reatribuído para '+(pr?pr.nome:'—')+' (nova linha na planilha, com as parcelas divididas)');
         }
         saveProgress(); celulaProfAberta = null; refreshPanel();
       };
