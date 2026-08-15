@@ -107,9 +107,10 @@
   .fin-table-row:hover{ background:#F4F8FB; }
   .fin-table-detail-row td{ background:#FAFBFC; white-space:normal; }
   .fin-col-fixa{ position:sticky; background:#fff; z-index:1; }
-  .fin-col-1{ left:0; min-width:150px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
-  .fin-col-2{ left:150px; min-width:100px; }
-  .fin-col-3{ left:250px; min-width:130px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
+  .fin-col-1{ left:0; min-width:140px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
+  .fin-col-2{ left:140px; min-width:95px; }
+  .fin-col-3{ left:235px; min-width:110px; }
+  .fin-col-4{ left:345px; min-width:135px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
   thead .fin-col-fixa{ background:var(--bg,#F4F8FB); z-index:2; }
   .parcela-row{
     display:flex; align-items:flex-start; gap:8px; padding:10px; border:1.5px solid var(--line-light); border-radius:8px;
@@ -643,21 +644,41 @@ function renderPlanilhaLancamentos(container){
     return;
   }
 
-  // Monta todas as linhas de todos os lançamentos, e descobre o maior número de parcelas
-  // pra saber quantas colunas "Parcela N" desenhar.
+  // Monta todas as linhas de todos os lançamentos.
   const todasLinhas = [];
   state.lancamentos.forEach(lanc => getLinhasDaPlanilha(lanc).forEach(linha => todasLinhas.push(linha)));
-  const maxParcelas = Math.max(1, ...todasLinhas.map(l => (l.parcelas||[]).length));
 
-  const tableWrap = el('div', { style:'overflow-x:auto;' });
+  // Descobre o intervalo de meses a mostrar como coluna: do mês mais antigo com parcela até o
+  // mais recente, com uma margem de alguns meses pra trás e pra frente (pra dar espaço de
+  // rolar e já ver os próximos meses vazios, prontos pra próximas parcelas).
+  const hoje = new Date();
+  let minData = new Date(hoje.getFullYear(), hoje.getMonth()-2, 1);
+  let maxData = new Date(hoje.getFullYear(), hoje.getMonth()+6, 1);
+  todasLinhas.forEach(l => (l.parcelas||[]).forEach(p => {
+    if(!p.data) return;
+    const m = String(p.data).match(/^(\d{4})-(\d{2})-\d{2}$/);
+    if(!m) return;
+    const d = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, 1);
+    if(d < minData) minData = d;
+    if(d > maxData) maxData = d;
+  }));
+  const mesesColunas = [];
+  let cursor = new Date(minData);
+  while(cursor <= maxData){
+    mesesColunas.push({ ano: cursor.getFullYear(), mes: cursor.getMonth()+1 });
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth()+1, 1);
+  }
+  const idxMesAtual = mesesColunas.findIndex(c => c.ano===hoje.getFullYear() && c.mes===hoje.getMonth()+1);
+
+  const tableWrap = el('div', { style:'overflow-x:auto;', id:'planilhaScrollWrap' });
   const table = el('table', { class:'fin-table', style:'font-size:12px;' });
   const theadCells = [
     el('th', { class:'fin-col-fixa fin-col-1' }, document.createTextNode('Nome')),
     el('th', { class:'fin-col-fixa fin-col-2' }, document.createTextNode('Valor total')),
-    el('th', {}, document.createTextNode('Forma de pgto')),
-    el('th', {}, document.createTextNode('Profissional executor')),
+    el('th', { class:'fin-col-fixa fin-col-3' }, document.createTextNode('Forma de pgto')),
+    el('th', { class:'fin-col-fixa fin-col-4' }, document.createTextNode('Profissional')),
   ];
-  for(let i=0;i<maxParcelas;i++) theadCells.push(el('th', { style:'text-align:center;' }, document.createTextNode('Parcela '+(i+1))));
+  mesesColunas.forEach(c => theadCells.push(el('th', { style:'text-align:center;min-width:86px;' }, document.createTextNode(MESES_ABREV[c.mes-1]+'/'+String(c.ano).slice(2)))));
   table.appendChild(el('thead', {}, el('tr', {}, theadCells)));
 
   const tbody = el('tbody', {});
@@ -679,24 +700,34 @@ function renderPlanilhaLancamentos(container){
 
     // ---- 2) Forma de pagamento — clique abre as opções ----
     const chaveLinha = lanc.id+'|'+linha.id;
-    const tdForma = el('td', { style:'cursor:pointer;color:var(--blue-dark);text-decoration:underline dotted;' },
+    const tdForma = el('td', { class:'fin-col-fixa fin-col-3', style:'cursor:pointer;color:var(--blue-dark);text-decoration:underline dotted;' },
       document.createTextNode(linha.forma || 'Definir...'));
     tdForma.onclick = () => { celulaFormaAberta = (celulaFormaAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
     tr.appendChild(tdForma);
 
     // ---- 3) Profissional executor — clique abre a redistribuição por tratamento ----
-    const tdProf = el('td', { style:'cursor:pointer;color:var(--blue-dark);text-decoration:underline dotted;' },
+    const tdProf = el('td', { class:'fin-col-fixa fin-col-4', style:'cursor:pointer;color:var(--blue-dark);text-decoration:underline dotted;' },
       document.createTextNode(linha.profissionalNome || 'Definir...'));
     tdProf.onclick = () => { celulaProfAberta = (celulaProfAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaParcelaAberta=null; refreshPanel(); };
     tr.appendChild(tdProf);
 
-    // ---- 4) Parcelas — uma célula por coluna, colorida ----
-    for(let i=0;i<maxParcelas;i++){
-      const p = (linha.parcelas||[])[i];
+    // ---- 4) Parcelas — uma célula por mês (coluna), colorida, com o número da parcela dentro ----
+    // Mapeia cada parcela dessa linha pro seu mês/ano de vencimento, guardando também a posição
+    // sequencial dela (1ª, 2ª, 3ª...) dentro do plano de pagamento.
+    const parcelaPorMes = {}; // chave "ano-mes" -> {parcela, indice}
+    (linha.parcelas||[]).forEach((p, i) => {
+      const m = p.data ? String(p.data).match(/^(\d{4})-(\d{2})-\d{2}$/) : null;
+      if(m) parcelaPorMes[m[1]+'-'+m[2]] = { p, i };
+    });
+    let mostrouRoxo = false;
+    mesesColunas.forEach(c => {
+      const chaveMes = c.ano+'-'+String(c.mes).padStart(2,'0');
+      const achado = parcelaPorMes[chaveMes];
       const td = el('td', { style:'text-align:center;padding:4px;' });
-      if(!p){
-        if(i===0 && (!linha.parcelas || !linha.parcelas.length) && linha.valor>0){
-          // Ainda não foi dividido em parcelas — mostra o valor inteiro em roxo, sinalizando indefinição
+      if(!achado){
+        if(!mostrouRoxo && (!linha.parcelas || !linha.parcelas.length) && linha.valor>0 && c.ano===hoje.getFullYear() && c.mes===hoje.getMonth()+1){
+          // Ainda não foi dividido em parcelas — mostra o valor inteiro em roxo, sinalizando indefinição, no mês atual
+          mostrouRoxo = true;
           const chip = el('div', { style:'background:#EDE7F6;color:#5E35B1;border-radius:6px;padding:5px 4px;font-weight:700;cursor:pointer;' },
             document.createTextNode('R$ '+formatMoney(linha.valor)));
           chip.onclick = () => { celulaParcelaAberta = (celulaParcelaAberta===(chaveLinha+'|0')) ? null : (chaveLinha+'|0'); celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; refreshPanel(); };
@@ -705,35 +736,38 @@ function renderPlanilhaLancamentos(container){
           td.appendChild(document.createTextNode('—'));
         }
         tr.appendChild(td);
-        continue;
+        return;
       }
+      const { p, i } = achado;
       const cor = p.corManual || (p.pago ? 'verde' : 'vermelho');
       const bg = cor==='verde' ? '#E8F5E9' : (cor==='vermelho' ? '#FFEBEE' : '#EDE7F6');
       const fg = cor==='verde' ? '#2E7D32' : (cor==='vermelho' ? '#C62828' : '#5E35B1');
       const chip = el('div', { style:'background:'+bg+';color:'+fg+';border-radius:6px;padding:5px 4px;font-weight:700;cursor:pointer;' }, [
         el('div', {}, document.createTextNode('R$ '+formatMoney(p.valor))),
-        el('div', { style:'font-size:9.5px;font-weight:600;opacity:0.85;' }, document.createTextNode(p.data?formatDateBR(p.data):'—')),
+        el('div', { style:'font-size:9.5px;font-weight:600;opacity:0.85;' }, document.createTextNode('Parcela '+(i+1))),
       ]);
       const chaveParcela = chaveLinha+'|'+i;
       chip.onclick = () => { celulaParcelaAberta = (celulaParcelaAberta===chaveParcela) ? null : chaveParcela; celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; refreshPanel(); };
       td.appendChild(chip);
       tr.appendChild(td);
-    }
+    });
     tbody.appendChild(tr);
 
     // ---- Painéis abertos (aparecem numa linha logo abaixo, ocupando a largura toda) ----
+    const totalColunas = 4 + mesesColunas.length;
     if(celulaValorAberta === lanc.id && linha.isPrincipal){
-      tbody.appendChild(linhaPainel(maxParcelas, renderPainelValorTotal(lanc)));
+      tbody.appendChild(linhaPainel(totalColunas, renderPainelValorTotal(lanc)));
     }
     if(celulaFormaAberta === chaveLinha){
-      tbody.appendChild(linhaPainel(maxParcelas, renderPainelForma(lanc, linha)));
+      tbody.appendChild(linhaPainel(totalColunas, renderPainelForma(lanc, linha)));
     }
     if(celulaProfAberta === chaveLinha){
-      tbody.appendChild(linhaPainel(maxParcelas, renderPainelProfissional(lanc, linha)));
+      tbody.appendChild(linhaPainel(totalColunas, renderPainelProfissional(lanc, linha)));
     }
-    for(let i=0;i<maxParcelas;i++){
+    const qtdParcelasLinha = Math.max((linha.parcelas||[]).length, 1);
+    for(let i=0;i<qtdParcelasLinha;i++){
       if(celulaParcelaAberta === chaveLinha+'|'+i){
-        tbody.appendChild(linhaPainel(maxParcelas, renderPainelParcela(lanc, linha, i)));
+        tbody.appendChild(linhaPainel(totalColunas, renderPainelParcela(lanc, linha, i)));
       }
     }
   });
@@ -743,14 +777,22 @@ function renderPlanilhaLancamentos(container){
   container.appendChild(tableWrap);
 
   container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:10px;' },
-    document.createTextNode('Verde: recebido. Vermelho: não recebido. Roxo: ainda sem definição de parcelas (mostra o valor cheio do tratamento). Toque em qualquer célula pra editar.')));
+    document.createTextNode('Verde: recebido. Vermelho: não recebido. Roxo: ainda sem definição de parcelas (mostra o valor cheio do tratamento). Toque em qualquer célula pra editar. Arraste a tabela pros lados pra ver outros meses.')));
+
+  // Já abre a planilha rolada até o mês atual, em vez de começar lá em janeiro.
+  if(idxMesAtual > 0){
+    setTimeout(() => {
+      const larguraColunaMes = 86;
+      tableWrap.scrollLeft = Math.max(0, (idxMesAtual - 1) * larguraColunaMes);
+    }, 30);
+  }
 }
 
 // Cria uma <tr> que ocupa a largura toda da tabela, pra mostrar um painel de edição
 // logo abaixo da linha que foi clicada.
-function linhaPainel(maxParcelas, conteudo){
+function linhaPainel(totalColunas, conteudo){
   const tr = el('tr', {});
-  const td = el('td', { colspan: String(4+maxParcelas), style:'background:#FAFBFC;padding:12px;' });
+  const td = el('td', { colspan: String(totalColunas), style:'background:#FAFBFC;padding:12px;' });
   td.appendChild(conteudo);
   tr.appendChild(td);
   return tr;
