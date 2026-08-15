@@ -704,8 +704,14 @@ function renderPlanilhaLancamentos(container){
     tr.appendChild(tdNome);
 
     // ---- 1) Valor total do tratamento — clique abre a lista de tratamentos pra editar valores ----
-    const tdValor = el('td', { class:'fin-col-fixa fin-col-2', style:'cursor:pointer;color:var(--blue-dark);font-weight:700;text-decoration:underline dotted;' },
-      document.createTextNode('R$ '+formatMoney(linha.valor)));
+    const somaParcelasLinha = (linha.parcelas||[]).reduce((s,p)=>s+(p.valor||0),0);
+    const divergeDoTotal = linha.valor>0 && Math.abs(somaParcelasLinha - linha.valor) > 0.01;
+    const tdValor = el('td', { class:'fin-col-fixa fin-col-2', style:'cursor:pointer;color:var(--blue-dark);font-weight:700;' });
+    tdValor.appendChild(el('span', { style:'text-decoration:underline dotted;' }, document.createTextNode('R$ '+formatMoney(linha.valor))));
+    if(divergeDoTotal){
+      tdValor.appendChild(el('div', { style:'font-size:9.5px;color:var(--red);font-weight:700;', title:'A soma das parcelas cadastradas (R$ '+formatMoney(somaParcelasLinha)+') não bate com o valor total. Toque em Parcelas pra corrigir.' },
+        document.createTextNode('⚠ parcelas somam R$ '+formatMoney(somaParcelasLinha))));
+    }
     tdValor.onclick = () => { celulaValorAberta = (celulaValorAberta===lanc.id) ? null : lanc.id; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
     tr.appendChild(tdValor);
 
@@ -725,7 +731,26 @@ function renderPlanilhaLancamentos(container){
     // ---- Coluna extra: quantidade de parcelas (ou "Único"), e botão de desfazer pra linhas desmembradas ----
     const qtdParcelasLinhaAtual = (linha.parcelas||[]).length;
     const tdQtd = el('td', { class:'fin-col-fixa fin-col-5' });
-    tdQtd.appendChild(el('span', {}, document.createTextNode(qtdParcelasLinhaAtual<=1 ? 'Único' : qtdParcelasLinhaAtual+'x')));
+    const rotuloParcelas = qtdParcelasLinhaAtual<=1
+      ? (divergeDoTotal ? '1x (parcial)' : 'Único')
+      : qtdParcelasLinhaAtual+'x';
+    tdQtd.appendChild(el('span', {}, document.createTextNode(rotuloParcelas)));
+    if(divergeDoTotal){
+      const corrigirBtn = el('span', { style:'margin-left:8px;color:var(--amber);cursor:pointer;font-size:11px;text-decoration:underline;', title:'Ajusta essa(s) parcela(s) pra somar exatamente o valor total, dividindo igualmente' },
+        document.createTextNode('Corrigir valor'));
+      corrigirBtn.onclick = () => {
+        const parcelas = linha.parcelas && linha.parcelas.length ? linha.parcelas : [{ id: uid(), valor:0, data:'', forma: linha.forma||'', pago:false, dataRecebimento:'', corManual:null }];
+        if(!linha.parcelas || !linha.parcelas.length){
+          if(linha.isPrincipal) lanc.parcelas = parcelas; else linha.derivada.parcelas = parcelas;
+        }
+        const n = parcelas.length;
+        const valorCada = Math.round((linha.valor/n)*100)/100;
+        parcelas.forEach((p,i) => { p.valor = (i===n-1) ? Math.round((linha.valor - valorCada*(n-1))*100)/100 : valorCada; });
+        registrarAlteracao(lanc, 'Parcelas de "'+lanc.paciente+(linha.isPrincipal?'':' ('+linha.profissionalNome+')')+'" corrigidas pra somar o valor total (R$ '+formatMoney(linha.valor)+')');
+        saveProgress(); refreshPanel();
+      };
+      tdQtd.appendChild(corrigirBtn);
+    }
     if(!linha.isPrincipal){
       if(confirmandoDesfazer === chaveLinha){
         const simBtn = el('span', { style:'margin-left:8px;color:#fff;background:var(--red);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:700;' }, document.createTextNode('Sim, desfazer'));
