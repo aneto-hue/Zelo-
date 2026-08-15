@@ -649,17 +649,25 @@ function renderPlanilhaLancamentos(container){
   state.lancamentos.forEach(lanc => getLinhasDaPlanilha(lanc).forEach(linha => todasLinhas.push(linha)));
 
   // Descobre o intervalo de meses a mostrar como coluna: do mês mais antigo com parcela até o
-  // mais recente, com uma margem de alguns meses pra trás e pra frente (pra dar espaço de
-  // rolar e já ver os próximos meses vazios, prontos pra próximas parcelas).
+  // mais recente. Começa sempre no mês atual (sem mostrar meses que já passaram) e vai pelo
+  // menos 12 meses pra frente, com espaço de rolar caso alguma parcela seja mais longe que isso.
   const hoje = new Date();
-  let minData = new Date(hoje.getFullYear(), hoje.getMonth()-2, 1);
-  let maxData = new Date(hoje.getFullYear(), hoje.getMonth()+6, 1);
+  let minData = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  let maxData = new Date(hoje.getFullYear(), hoje.getMonth()+12, 1);
+  // Aceita tanto AAAA-MM-DD (formato atual) quanto DD/MM/AAAA (formato antigo, de registros
+  // criados antes da correção) — sem isso, parcelas mais velhas somem da planilha silenciosamente.
+  function extrairAnoMes(dataStr){
+    if(!dataStr) return null;
+    const iso = String(dataStr).match(/^(\d{4})-(\d{2})-\d{2}$/);
+    if(iso) return { ano: parseInt(iso[1],10), mes: parseInt(iso[2],10) };
+    const br = String(dataStr).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(br) return { ano: parseInt(br[3],10), mes: parseInt(br[2],10) };
+    return null;
+  }
   todasLinhas.forEach(l => (l.parcelas||[]).forEach(p => {
-    if(!p.data) return;
-    const m = String(p.data).match(/^(\d{4})-(\d{2})-\d{2}$/);
-    if(!m) return;
-    const d = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, 1);
-    if(d < minData) minData = d;
+    const am = extrairAnoMes(p.data);
+    if(!am) return;
+    const d = new Date(am.ano, am.mes-1, 1);
     if(d > maxData) maxData = d;
   }));
   const mesesColunas = [];
@@ -716,8 +724,8 @@ function renderPlanilhaLancamentos(container){
     // sequencial dela (1ª, 2ª, 3ª...) dentro do plano de pagamento.
     const parcelaPorMes = {}; // chave "ano-mes" -> {parcela, indice}
     (linha.parcelas||[]).forEach((p, i) => {
-      const m = p.data ? String(p.data).match(/^(\d{4})-(\d{2})-\d{2}$/) : null;
-      if(m) parcelaPorMes[m[1]+'-'+m[2]] = { p, i };
+      const am = extrairAnoMes(p.data);
+      if(am) parcelaPorMes[am.ano+'-'+String(am.mes).padStart(2,'0')] = { p, i };
     });
     let mostrouRoxo = false;
     mesesColunas.forEach(c => {
