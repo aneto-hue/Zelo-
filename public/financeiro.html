@@ -1200,7 +1200,9 @@ function renderPainelProfissional(lanc, linha){
           if(!destino.tratamentoIds.includes(t.id)) destino.tratamentoIds.push(t.id);
           registrarAlteracao(lanc, 'Tratamento "'+(t.descricao||'—')+'" reatribuído para '+(pr?pr.nome:'—')+' (nova linha na planilha, com as parcelas divididas)');
         }
-        saveProgress(); celulaProfAberta = null; refreshPanel();
+        saveProgress(); refreshPanel();
+        // Não fecha o painel — assim dá pra mover mais de um tratamento seguido sem precisar
+        // reabrir toda vez (e sem risco de clicar num seletor que já não existe mais na tela).
       };
       tdIndicado.appendChild(selectIndicado);
       tr.appendChild(tdIndicado);
