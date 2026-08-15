@@ -583,159 +583,425 @@ const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out'
 let planilhaMesIni = null; // null = usa o padrão (mês atual, se for o ano corrente)
 let planilhaMesFim = null; // null = até dezembro
 
+// ===================== NOVA PLANILHA (projeto financeiro parte 1) =====================
+// Cada lançamento pode virar mais de uma "linha" na planilha: por padrão todos os tratamentos
+// do paciente ficam numa linha só (o profissional que fechou o contrato), mas se algum
+// tratamento for atribuído a outro profissional, ele "desmembra" pra uma linha nova, logo
+// abaixo, repetindo os dados do paciente — com seu próprio valor e suas próprias parcelas
+// (uma fração proporcional das parcelas originais, recalculada automaticamente).
+function getLinhasDaPlanilha(lanc){
+  if(!lanc.linhasDerivadas) lanc.linhasDerivadas = [];
+  const temTratamentos = lanc.tratamentos && lanc.tratamentos.length > 0;
+  const idsNasDerivadas = new Set();
+  lanc.linhasDerivadas.forEach(ld => (ld.tratamentoIds||[]).forEach(id => idsNasDerivadas.add(id)));
+
+  const tratamentosPrincipais = temTratamentos ? lanc.tratamentos.filter(t => !idsNasDerivadas.has(t.id)) : [];
+  const valorPrincipal = temTratamentos ? tratamentosPrincipais.reduce((s,t)=>s+(t.valor||0),0) : (lanc.valorTotal||0);
+
+  const linhas = [{
+    id: 'principal', lanc, isPrincipal: true,
+    tratamentos: tratamentosPrincipais,
+    valor: valorPrincipal,
+    profissionalId: lanc.profissionalId || '',
+    profissionalNome: (getProfissional(lanc.profissionalId)||{}).nome || lanc.profissionalNomeOriginal || '',
+    forma: lanc.formaResumo || '',
+    parcelas: lanc.parcelas || [],
+  }];
+
+  lanc.linhasDerivadas.forEach(ld => {
+    const tratsDaLinha = temTratamentos ? lanc.tratamentos.filter(t => (ld.tratamentoIds||[]).includes(t.id)) : [];
+    linhas.push({
+      id: ld.id, lanc, isPrincipal: false, derivada: ld,
+      tratamentos: tratsDaLinha,
+      valor: tratsDaLinha.reduce((s,t)=>s+(t.valor||0),0),
+      profissionalId: ld.profissionalId, profissionalNome: ld.profissionalNome,
+      forma: ld.forma || lanc.formaResumo || '',
+      parcelas: ld.parcelas || [],
+    });
+  });
+  return linhas;
+}
+
+// Gera parcelas novas pra uma linha derivada, proporcionais ao valor dela, replicando as
+// mesmas datas de vencimento e a mesma forma de pagamento das parcelas originais.
+function gerarParcelasProporcionais(parcelasBase, fracao){
+  return (parcelasBase||[]).map(p => ({
+    id: uid(), valor: Math.round((p.valor||0) * fracao * 100)/100,
+    data: p.data||'', forma: p.forma||'', pago:false, dataRecebimento:'', corManual:null,
+  }));
+}
+
+let celulaValorAberta = null;   // lancId
+let celulaFormaAberta = null;   // lancId+linhaId
+let celulaProfAberta = null;    // lancId+linhaId
+let celulaParcelaAberta = null; // lancId+linhaId+parcelaIdx
+const FORMAS_PAGAMENTO_PLANILHA = ['Cartão de crédito', 'Cartão de Débito', 'Pix', 'Dinheiro', 'Promissória', 'Boleto'];
+
 function renderPlanilhaLancamentos(container){
-  const anoRow = el('div', { style:'display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;' });
-  const anoPrevBtn = el('button', { style:'border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;' }, document.createTextNode('‹'));
-  anoPrevBtn.onclick = () => { planilhaAno--; refreshPanel(); };
-  const anoNextBtn = el('button', { style:'border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;' }, document.createTextNode('›'));
-  anoNextBtn.onclick = () => { planilhaAno++; refreshPanel(); };
-  anoRow.appendChild(anoPrevBtn);
-  anoRow.appendChild(el('div', { style:'font-weight:700;font-size:15px;' }, document.createTextNode('Entradas — '+planilhaAno)));
-  anoRow.appendChild(anoNextBtn);
-
-  // Filtro de período: de qual mês até qual mês mostrar — por padrão, a partir do mês atual
-  // (não mostra os meses que já passaram, que geralmente não interessam mais no dia a dia).
-  const hoje = new Date();
-  const mesAtualIdx = hoje.getMonth(); // 0-11
-  const mesIniPadrao = (planilhaAno === hoje.getFullYear()) ? mesAtualIdx : 0;
-  const mesIniAtivo = planilhaMesIni !== null ? planilhaMesIni : mesIniPadrao;
-  const mesFimAtivo = planilhaMesFim !== null ? planilhaMesFim : 11;
-
-  const filtroWrap = el('div', { style:'display:flex;align-items:center;gap:8px;font-size:12.5px;' });
-  filtroWrap.appendChild(el('span', { style:'color:var(--muted);' }, document.createTextNode('Mostrar de')));
-  const selIni = el('select', { style:'padding:6px 8px;font-size:12.5px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
-  MESES_ABREV.forEach((m,i) => {
-    const opt = el('option', { value:i }, document.createTextNode(m));
-    if(i===mesIniAtivo) opt.setAttribute('selected','selected');
-    selIni.appendChild(opt);
-  });
-  selIni.onchange = (e) => { planilhaMesIni = parseInt(e.target.value,10); refreshPanel(); };
-  filtroWrap.appendChild(selIni);
-  filtroWrap.appendChild(el('span', { style:'color:var(--muted);' }, document.createTextNode('até')));
-  const selFim = el('select', { style:'padding:6px 8px;font-size:12.5px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
-  MESES_ABREV.forEach((m,i) => {
-    const opt = el('option', { value:i }, document.createTextNode(m));
-    if(i===mesFimAtivo) opt.setAttribute('selected','selected');
-    selFim.appendChild(opt);
-  });
-  selFim.onchange = (e) => { planilhaMesFim = parseInt(e.target.value,10); refreshPanel(); };
-  filtroWrap.appendChild(selFim);
-  if(planilhaMesIni !== null || planilhaMesFim !== null){
-    const limparBtn = el('span', { style:'color:var(--blue-dark);text-decoration:underline;cursor:pointer;' }, document.createTextNode('mostrar tudo'));
-    limparBtn.onclick = () => { planilhaMesIni = 0; planilhaMesFim = 11; refreshPanel(); };
-    filtroWrap.appendChild(limparBtn);
-  }
-  anoRow.appendChild(filtroWrap);
-  container.appendChild(anoRow);
-
   if(!state.lancamentos.length){
     container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum lançamento cadastrado ainda.')));
     return;
   }
 
-  const mesesVisiveis = []; // índices (0-11) dos meses que entram na tabela, respeitando o filtro
-  for(let i=mesIniAtivo; i<=mesFimAtivo; i++) mesesVisiveis.push(i);
-
-  // Quanto esse lançamento recebeu, de fato, em cada mês do ano selecionado
-  function valoresPorMes(lanc){
-    // Cada parcela conta no mês do VENCIMENTO dela, não no mês em que foi confirmada como paga
-    // — assim um parcelamento em 6x, por exemplo, aparece dividido nos 6 meses certos, mesmo
-    // que você acabe confirmando vários pagamentos atrasados de uma vez, no mesmo dia.
-    // Parcela no cartão de crédito conta como "praticamente garantida" (verde) mesmo antes de
-    // confirmar mês a mês — uma vez aprovado no cartão, a maquininha vai repassando sozinha,
-    // diferente de dinheiro/pix/boleto, que dependem do paciente aparecer pra pagar de novo.
-    const porMes = new Array(12).fill(null).map(()=>({ pago:0, previsto:0 }));
-    (lanc.parcelas||[]).forEach(p => {
-      if(!p.data) return;
-      let ano, mes;
-      const isoMatch = String(p.data).match(/^(\d{4})-(\d{2})-\d{2}$/);
-      const brMatch = String(p.data).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // formato antigo, de registros de antes da correção
-      if(isoMatch){ ano = parseInt(isoMatch[1],10); mes = parseInt(isoMatch[2],10); }
-      else if(brMatch){ ano = parseInt(brMatch[3],10); mes = parseInt(brMatch[2],10); }
-      else return;
-      if(ano !== planilhaAno) return;
-      const garantida = p.pago || p.forma === 'Cartão de crédito';
-      if(garantida) porMes[mes-1].pago += p.valor;
-      else porMes[mes-1].previsto += p.valor;
-    });
-    return porMes;
-  }
+  // Monta todas as linhas de todos os lançamentos, e descobre o maior número de parcelas
+  // pra saber quantas colunas "Parcela N" desenhar.
+  const todasLinhas = [];
+  state.lancamentos.forEach(lanc => getLinhasDaPlanilha(lanc).forEach(linha => todasLinhas.push(linha)));
+  const maxParcelas = Math.max(1, ...todasLinhas.map(l => (l.parcelas||[]).length));
 
   const tableWrap = el('div', { style:'overflow-x:auto;' });
   const table = el('table', { class:'fin-table', style:'font-size:12px;' });
-  const theadRow = [
-    el('th', { class:'fin-col-fixa fin-col-1' }, document.createTextNode('Paciente')),
+  const theadCells = [
+    el('th', { class:'fin-col-fixa fin-col-1' }, document.createTextNode('Nome')),
     el('th', { class:'fin-col-fixa fin-col-2' }, document.createTextNode('Valor total')),
-    el('th', { class:'fin-col-fixa fin-col-3' }, document.createTextNode('Forma de pgto')),
+    el('th', {}, document.createTextNode('Forma de pgto')),
+    el('th', {}, document.createTextNode('Profissional executor')),
   ];
-  mesesVisiveis.forEach(i => theadRow.push(el('th', { style:'text-align:right;' }, document.createTextNode(MESES_ABREV[i]))));
-  table.appendChild(el('thead', {}, el('tr', {}, theadRow)));
+  for(let i=0;i<maxParcelas;i++) theadCells.push(el('th', { style:'text-align:center;' }, document.createTextNode('Parcela '+(i+1))));
+  table.appendChild(el('thead', {}, el('tr', {}, theadCells)));
 
   const tbody = el('tbody', {});
-  const totalPorMes = new Array(12).fill(null).map(()=>({ pago:0, previsto:0 }));
 
-  state.lancamentos.forEach(lanc => {
-    const porMes = valoresPorMes(lanc);
-    const semDatas = (lanc.parcelas||[]).length && (lanc.parcelas||[]).every(p => !p.data);
-    porMes.forEach((v,i) => { totalPorMes[i].pago += v.pago; totalPorMes[i].previsto += v.previsto; });
+  todasLinhas.forEach(linha => {
+    const lanc = linha.lanc;
     const tr = el('tr', { class:'fin-table-row' });
-    const tdNomeWrap = el('td', {});
-    const tdNome = el('div', { style:'font-weight:600;cursor:pointer;color:var(--blue-dark);' }, document.createTextNode(lanc.paciente));
-    tdNome.onclick = () => { visaoLancamentos='lista'; lancamentoExpandido=lanc.id; refreshPanel(); };
-    tdNomeWrap.appendChild(tdNome);
-    if(!lanc.parcelas || !lanc.parcelas.length){
-      const avisoEl = el('div', { style:'font-size:10.5px;color:var(--red);cursor:pointer;' }, document.createTextNode('⚠ sem parcelas cadastradas — toque pra adicionar'));
-      avisoEl.onclick = () => { visaoLancamentos='lista'; lancamentoExpandido=lanc.id; refreshPanel(); };
-      tdNomeWrap.appendChild(avisoEl);
-    } else if(semDatas){
-      const avisoEl = el('div', { style:'font-size:10.5px;color:var(--red);cursor:pointer;' }, document.createTextNode('⚠ parcelas sem data de vencimento — toque pra corrigir'));
-      avisoEl.onclick = () => { visaoLancamentos='lista'; lancamentoExpandido=lanc.id; refreshPanel(); };
-      tdNomeWrap.appendChild(avisoEl);
-    }
-    tr.appendChild(tdNomeWrap);
-    tdNomeWrap.className = 'fin-col-fixa fin-col-1';
-    tr.appendChild(el('td', { class:'fin-col-fixa fin-col-2' }, document.createTextNode('R$ '+formatMoney(lanc.valorTotal))));
 
-    const tdForma = el('td', { class:'fin-col-fixa fin-col-3' });
-    const formaInput = el('input', { type:'text', value: lanc.formaResumo||'', placeholder:'ex: 6x cartão',
-      style:'width:120px;font-size:11.5px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;' });
-    formaInput.oninput = (e) => { lanc.formaResumo = e.target.value; saveProgressDebounced(); };
-    tdForma.appendChild(formaInput);
+    // ---- Nome (só a linha principal mostra; derivadas repetem em cinza claro, indicando o mesmo paciente) ----
+    const tdNome = el('td', { class:'fin-col-fixa fin-col-1', style: linha.isPrincipal ? 'font-weight:600;' : 'color:var(--muted);font-style:italic;' },
+      document.createTextNode(lanc.paciente + (linha.isPrincipal ? '' : ' (tratamento à parte)')));
+    tr.appendChild(tdNome);
+
+    // ---- 1) Valor total do tratamento — clique abre a lista de tratamentos pra editar valores ----
+    const tdValor = el('td', { class:'fin-col-fixa fin-col-2', style:'cursor:pointer;color:var(--blue-dark);font-weight:700;text-decoration:underline dotted;' },
+      document.createTextNode('R$ '+formatMoney(linha.valor)));
+    tdValor.onclick = () => { celulaValorAberta = (celulaValorAberta===lanc.id) ? null : lanc.id; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
+    tr.appendChild(tdValor);
+
+    // ---- 2) Forma de pagamento — clique abre as opções ----
+    const chaveLinha = lanc.id+'|'+linha.id;
+    const tdForma = el('td', { style:'cursor:pointer;color:var(--blue-dark);text-decoration:underline dotted;' },
+      document.createTextNode(linha.forma || 'Definir...'));
+    tdForma.onclick = () => { celulaFormaAberta = (celulaFormaAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
     tr.appendChild(tdForma);
 
-    mesesVisiveis.forEach(i => {
-      const {pago, previsto} = porMes[i];
-      const td = el('td', { style:'text-align:right;' });
-      if(pago>0) td.appendChild(el('div', { style:'font-weight:700;color:var(--green);' }, document.createTextNode(formatMoney(pago))));
-      if(previsto>0) td.appendChild(el('div', { style:'font-size:10.5px;color:var(--amber);'+(pago>0?'':'font-weight:600;') }, document.createTextNode(formatMoney(previsto)+(pago>0?'':' *'))));
-      if(!pago && !previsto) td.appendChild(document.createTextNode('—'));
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  });
+    // ---- 3) Profissional executor — clique abre a redistribuição por tratamento ----
+    const tdProf = el('td', { style:'cursor:pointer;color:var(--blue-dark);text-decoration:underline dotted;' },
+      document.createTextNode(linha.profissionalNome || 'Definir...'));
+    tdProf.onclick = () => { celulaProfAberta = (celulaProfAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaParcelaAberta=null; refreshPanel(); };
+    tr.appendChild(tdProf);
 
-  // Linha de totais, no rodapé
-  const trTotal = el('tr', { style:'background:#F4F8FB;font-weight:700;' });
-  trTotal.appendChild(el('td', { class:'fin-col-fixa fin-col-1', style:'background:#F4F8FB;' }, document.createTextNode('Total do mês')));
-  trTotal.appendChild(el('td', { class:'fin-col-fixa fin-col-2', style:'background:#F4F8FB;' }));
-  trTotal.appendChild(el('td', { class:'fin-col-fixa fin-col-3', style:'background:#F4F8FB;' }));
-  mesesVisiveis.forEach(i => {
-    const {pago, previsto} = totalPorMes[i];
-    const td = el('td', { style:'text-align:right;' });
-    if(pago>0) td.appendChild(el('div', { style:'color:var(--green);' }, document.createTextNode('R$ '+formatMoney(pago))));
-    if(previsto>0) td.appendChild(el('div', { style:'font-size:10.5px;color:var(--amber);' }, document.createTextNode('R$ '+formatMoney(previsto)+(pago>0?'':' *'))));
-    if(!pago && !previsto) td.appendChild(document.createTextNode('—'));
-    trTotal.appendChild(td);
+    // ---- 4) Parcelas — uma célula por coluna, colorida ----
+    for(let i=0;i<maxParcelas;i++){
+      const p = (linha.parcelas||[])[i];
+      const td = el('td', { style:'text-align:center;padding:4px;' });
+      if(!p){
+        if(i===0 && (!linha.parcelas || !linha.parcelas.length) && linha.valor>0){
+          // Ainda não foi dividido em parcelas — mostra o valor inteiro em roxo, sinalizando indefinição
+          const chip = el('div', { style:'background:#EDE7F6;color:#5E35B1;border-radius:6px;padding:5px 4px;font-weight:700;cursor:pointer;' },
+            document.createTextNode('R$ '+formatMoney(linha.valor)));
+          chip.onclick = () => { celulaParcelaAberta = (celulaParcelaAberta===(chaveLinha+'|0')) ? null : (chaveLinha+'|0'); celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; refreshPanel(); };
+          td.appendChild(chip);
+        } else {
+          td.appendChild(document.createTextNode('—'));
+        }
+        tr.appendChild(td);
+        continue;
+      }
+      const cor = p.corManual || (p.pago ? 'verde' : 'vermelho');
+      const bg = cor==='verde' ? '#E8F5E9' : (cor==='vermelho' ? '#FFEBEE' : '#EDE7F6');
+      const fg = cor==='verde' ? '#2E7D32' : (cor==='vermelho' ? '#C62828' : '#5E35B1');
+      const chip = el('div', { style:'background:'+bg+';color:'+fg+';border-radius:6px;padding:5px 4px;font-weight:700;cursor:pointer;' }, [
+        el('div', {}, document.createTextNode('R$ '+formatMoney(p.valor))),
+        el('div', { style:'font-size:9.5px;font-weight:600;opacity:0.85;' }, document.createTextNode(p.data?formatDateBR(p.data):'—')),
+      ]);
+      const chaveParcela = chaveLinha+'|'+i;
+      chip.onclick = () => { celulaParcelaAberta = (celulaParcelaAberta===chaveParcela) ? null : chaveParcela; celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; refreshPanel(); };
+      td.appendChild(chip);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+
+    // ---- Painéis abertos (aparecem numa linha logo abaixo, ocupando a largura toda) ----
+    if(celulaValorAberta === lanc.id && linha.isPrincipal){
+      tbody.appendChild(linhaPainel(maxParcelas, renderPainelValorTotal(lanc)));
+    }
+    if(celulaFormaAberta === chaveLinha){
+      tbody.appendChild(linhaPainel(maxParcelas, renderPainelForma(lanc, linha)));
+    }
+    if(celulaProfAberta === chaveLinha){
+      tbody.appendChild(linhaPainel(maxParcelas, renderPainelProfissional(lanc, linha)));
+    }
+    for(let i=0;i<maxParcelas;i++){
+      if(celulaParcelaAberta === chaveLinha+'|'+i){
+        tbody.appendChild(linhaPainel(maxParcelas, renderPainelParcela(lanc, linha, i)));
+      }
+    }
   });
-  tbody.appendChild(trTotal);
 
   table.appendChild(tbody);
   tableWrap.appendChild(table);
   container.appendChild(tableWrap);
 
   container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:10px;' },
-    document.createTextNode('Cada parcela conta no mês do vencimento dela. Em verde: já pago, ou no cartão de crédito (considerado garantido assim que aprovado). Em laranja com *: vencimento naquele mês, ainda não pago (dinheiro, pix, boleto ou promissória). Toque no nome do paciente pra abrir os detalhes e editar parcelas, profissional ou comissão.')));
+    document.createTextNode('Verde: recebido. Vermelho: não recebido. Roxo: ainda sem definição de parcelas (mostra o valor cheio do tratamento). Toque em qualquer célula pra editar.')));
 }
+
+// Cria uma <tr> que ocupa a largura toda da tabela, pra mostrar um painel de edição
+// logo abaixo da linha que foi clicada.
+function linhaPainel(maxParcelas, conteudo){
+  const tr = el('tr', {});
+  const td = el('td', { colspan: String(4+maxParcelas), style:'background:#FAFBFC;padding:12px;' });
+  td.appendChild(conteudo);
+  tr.appendChild(td);
+  return tr;
+}
+
+// ---- Painel 1: editar os valores dos tratamentos (clique na célula "Valor total") ----
+function renderPainelValorTotal(lanc){
+  const wrap = el('div', {});
+  wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:8px;' }, document.createTextNode('Tratamentos previstos — ajustar valores')));
+  const temTratamentos = lanc.tratamentos && lanc.tratamentos.length > 0;
+  if(!temTratamentos){
+    const linhaUnica = el('div', { style:'display:flex;gap:10px;align-items:center;margin-bottom:8px;' });
+    linhaUnica.appendChild(el('span', { style:'flex:1;' }, document.createTextNode('Valor total (sem detalhamento por tratamento)')));
+    const inputUnico = el('input', { type:'number', min:'0', step:'0.01', value: lanc.valorTotal||0, style:'width:110px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+    inputUnico.onchange = (e) => {
+      const novo = parseFloat(e.target.value)||0;
+      if(novo !== lanc.valorTotal){
+        registrarAlteracao(lanc, 'Valor total alterado de R$ '+formatMoney(lanc.valorTotal)+' para R$ '+formatMoney(novo));
+        lanc.valorTotal = novo;
+        saveProgress(); refreshPanel();
+      }
+    };
+    linhaUnica.appendChild(inputUnico);
+    wrap.appendChild(linhaUnica);
+  } else {
+    const tabela = el('table', { style:'width:100%;font-size:12px;border-collapse:collapse;' });
+    tabela.appendChild(el('thead',{}, el('tr',{},[
+      el('th', { style:'text-align:left;padding:4px;' }, document.createTextNode('Tratamento')),
+      el('th', { style:'text-align:right;padding:4px;' }, document.createTextNode('Valor')),
+      el('th', { style:'text-align:right;padding:4px;' }, document.createTextNode('Novo valor')),
+    ])));
+    const tbodyT = el('tbody', {});
+    lanc.tratamentos.forEach(t => {
+      const tr = el('tr', {});
+      tr.appendChild(el('td', { style:'padding:4px;' }, document.createTextNode(t.descricao||'—')));
+      tr.appendChild(el('td', { style:'padding:4px;text-align:right;color:var(--muted);' }, document.createTextNode('R$ '+formatMoney(t.valor))));
+      const tdNovo = el('td', { style:'padding:4px;text-align:right;' });
+      const inputNovo = el('input', { type:'number', min:'0', step:'0.01', value: t.valor||0, style:'width:90px;padding:5px 6px;border:1.5px solid var(--line);border-radius:6px;font-family:inherit;text-align:right;' });
+      inputNovo.onchange = (e) => {
+        const novo = parseFloat(e.target.value)||0;
+        if(novo !== t.valor){
+          registrarAlteracao(lanc, 'Valor do tratamento "'+(t.descricao||'—')+'" alterado de R$ '+formatMoney(t.valor)+' para R$ '+formatMoney(novo));
+          t.valor = novo;
+          lanc.valorTotal = lanc.tratamentos.reduce((s,x)=>s+(x.valor||0),0);
+          saveProgress(); refreshPanel();
+        }
+      };
+      tdNovo.appendChild(inputNovo);
+      tr.appendChild(tdNovo);
+      tbodyT.appendChild(tr);
+    });
+    tabela.appendChild(tbodyT);
+    wrap.appendChild(tabela);
+  }
+  const fecharBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
+  fecharBtn.onclick = () => { celulaValorAberta = null; refreshPanel(); };
+  wrap.appendChild(fecharBtn);
+  return wrap;
+}
+
+// ---- Painel 2: mudar a forma de pagamento (clique na célula "Forma de pgto") ----
+function renderPainelForma(lanc, linha){
+  const wrap = el('div', {});
+  wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:8px;' }, document.createTextNode('Forma de pagamento')));
+  const opcoes = el('div', { style:'display:flex;gap:8px;flex-wrap:wrap;' });
+  FORMAS_PAGAMENTO_PLANILHA.forEach(f => {
+    const chip = el('div', { class:'filter-chip'+(linha.forma===f?' selected':'') }, document.createTextNode(f));
+    chip.onclick = () => {
+      const antiga = linha.forma;
+      if(linha.isPrincipal) lanc.formaResumo = f; else linha.derivada.forma = f;
+      registrarAlteracao(lanc, 'Forma de pagamento'+(linha.isPrincipal?'':' (tratamento à parte)')+' alterada de "'+(antiga||'—')+'" para "'+f+'"');
+      saveProgress(); celulaFormaAberta = null; refreshPanel();
+    };
+    opcoes.appendChild(chip);
+  });
+  wrap.appendChild(opcoes);
+  const fecharBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
+  fecharBtn.onclick = () => { celulaFormaAberta = null; refreshPanel(); };
+  wrap.appendChild(fecharBtn);
+  return wrap;
+}
+
+// ---- Painel 3: reatribuir profissional por tratamento (clique na célula "Profissional executor") ----
+function renderPainelProfissional(lanc, linha){
+  const wrap = el('div', {});
+  wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:4px;' }, document.createTextNode('Redistribuir tratamentos entre profissionais')));
+  wrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:0 0 8px;' },
+    document.createTextNode('Ao indicar um profissional diferente pra um tratamento específico, ele vira uma linha nova na planilha, com valor e parcelas próprias.')));
+
+  const temTratamentos = linha.tratamentos && linha.tratamentos.length > 0;
+  if(!temTratamentos){
+    const selectUnico = el('select', { style:'padding:7px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+    selectUnico.appendChild(el('option', { value:'' }, document.createTextNode('Não atribuído')));
+    state.profissionais.forEach(pr => {
+      const opt = el('option', { value:pr.id }, document.createTextNode(pr.nome));
+      if(lanc.profissionalId===pr.id) opt.setAttribute('selected','selected');
+      selectUnico.appendChild(opt);
+    });
+    selectUnico.onchange = (e) => {
+      const pr = state.profissionais.find(x=>x.id===e.target.value);
+      registrarAlteracao(lanc, 'Profissional executor alterado de "'+(linha.profissionalNome||'—')+'" para "'+(pr?pr.nome:'—')+'"');
+      lanc.profissionalId = e.target.value;
+      saveProgress(); refreshPanel();
+    };
+    wrap.appendChild(selectUnico);
+  } else {
+    const tabela = el('table', { style:'width:100%;font-size:12px;border-collapse:collapse;' });
+    tabela.appendChild(el('thead',{}, el('tr',{},[
+      el('th', { style:'text-align:left;padding:4px;' }, document.createTextNode('Tratamento')),
+      el('th', { style:'text-align:left;padding:4px;' }, document.createTextNode('Profissional avaliador')),
+      el('th', { style:'text-align:left;padding:4px;' }, document.createTextNode('Profissional indicado')),
+    ])));
+    const tbodyT = el('tbody', {});
+    linha.tratamentos.forEach(t => {
+      const tr = el('tr', {});
+      tr.appendChild(el('td', { style:'padding:4px;' }, document.createTextNode(t.descricao||'—')));
+      const avaliadorNome = getProfissional(t.profissionalAvaliadorId || lanc.profissionalId);
+      tr.appendChild(el('td', { style:'padding:4px;color:var(--muted);' }, document.createTextNode(avaliadorNome ? avaliadorNome.nome : '—')));
+      const tdIndicado = el('td', { style:'padding:4px;' });
+      const selectIndicado = el('select', { style:'padding:5px 6px;border:1.5px solid var(--line);border-radius:6px;font-family:inherit;width:100%;' });
+      selectIndicado.appendChild(el('option', { value:'' }, document.createTextNode('Selecione...')));
+      state.profissionais.forEach(pr => {
+        const opt = el('option', { value:pr.id }, document.createTextNode(pr.nome));
+        if(linha.profissionalId===pr.id) opt.setAttribute('selected','selected');
+        selectIndicado.appendChild(opt);
+      });
+      selectIndicado.onchange = (e) => {
+        const novoProfId = e.target.value;
+        const pr = state.profissionais.find(x=>x.id===novoProfId);
+        if(!t.profissionalAvaliadorId) t.profissionalAvaliadorId = lanc.profissionalId;
+        if(novoProfId === linha.profissionalId) return; // nada mudou de fato
+
+        if(novoProfId === lanc.profissionalId && !linha.isPrincipal){
+          // Voltou pro profissional principal — remove da linha derivada
+          linha.derivada.tratamentoIds = linha.derivada.tratamentoIds.filter(id=>id!==t.id);
+          registrarAlteracao(lanc, 'Tratamento "'+(t.descricao||'—')+'" voltou pro profissional principal');
+        } else {
+          // Cria (ou reaproveita) uma linha derivada pro profissional novo
+          if(!lanc.linhasDerivadas) lanc.linhasDerivadas = [];
+          let destino = lanc.linhasDerivadas.find(ld => ld.profissionalId === novoProfId);
+          if(!destino){
+            const valorAntes = linha.tratamentos.reduce((s,x)=>s+(x.valor||0),0) || 1;
+            const fracao = (t.valor||0) / valorAntes;
+            destino = {
+              id: uid(), profissionalId: novoProfId, profissionalNome: pr?pr.nome:'',
+              tratamentoIds: [], forma: linha.forma,
+              parcelas: gerarParcelasProporcionais(linha.parcelas, fracao),
+            };
+            lanc.linhasDerivadas.push(destino);
+          }
+          // Remove de onde estava antes (principal ou outra derivada) e coloca na nova
+          if(!linha.isPrincipal) linha.derivada.tratamentoIds = linha.derivada.tratamentoIds.filter(id=>id!==t.id);
+          if(!destino.tratamentoIds.includes(t.id)) destino.tratamentoIds.push(t.id);
+          registrarAlteracao(lanc, 'Tratamento "'+(t.descricao||'—')+'" reatribuído para '+(pr?pr.nome:'—')+' (nova linha na planilha)');
+        }
+        saveProgress(); celulaProfAberta = null; refreshPanel();
+      };
+      tdIndicado.appendChild(selectIndicado);
+      tr.appendChild(tdIndicado);
+      tbodyT.appendChild(tr);
+    });
+    tabela.appendChild(tbodyT);
+    wrap.appendChild(tabela);
+  }
+  const fecharBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
+  fecharBtn.onclick = () => { celulaProfAberta = null; refreshPanel(); };
+  wrap.appendChild(fecharBtn);
+  return wrap;
+}
+
+// ---- Painel 4: editar uma parcela específica (cor, valor, compensação em mês posterior) ----
+function renderPainelParcela(lanc, linha, idx){
+  const wrap = el('div', {});
+  if(!linha.parcelas) linha.parcelas = linha.isPrincipal ? (lanc.parcelas = lanc.parcelas||[]) : (linha.derivada.parcelas = linha.derivada.parcelas||[]);
+  // Se ainda não existe essa parcela (ex: veio do estado "roxo, tudo somado"), cria a primeira
+  // parcela de verdade com o valor cheio, pronta pra ser dividida/ajustada.
+  if(!linha.parcelas[idx]){
+    while(linha.parcelas.length <= idx) linha.parcelas.push({ id: uid(), valor: idx===0?linha.valor:0, data:'', forma: linha.forma||'', pago:false, dataRecebimento:'', corManual:null });
+  }
+  const p = linha.parcelas[idx];
+
+  wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:8px;' }, document.createTextNode('Parcela '+(idx+1))));
+
+  const row1 = el('div', { style:'display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;' });
+  const valorField = el('div', {});
+  valorField.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Valor')));
+  const valorInput = el('input', { type:'number', min:'0', step:'0.01', value: p.valor||0, style:'width:100px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  valorInput.onchange = (e) => {
+    const novo = parseFloat(e.target.value)||0;
+    if(novo !== p.valor){
+      registrarAlteracao(lanc, 'Valor da parcela '+(idx+1)+' alterado de R$ '+formatMoney(p.valor)+' para R$ '+formatMoney(novo));
+      p.valor = novo; saveProgress(); refreshPanel();
+    }
+  };
+  valorField.appendChild(valorInput);
+  row1.appendChild(valorField);
+
+  const dataField = el('div', {});
+  dataField.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Vencimento')));
+  const dataInput = el('input', { type:'date', value: p.data||'', style:'padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  dataInput.onchange = (e) => { p.data = e.target.value; saveProgress(); refreshPanel(); };
+  dataField.appendChild(dataInput);
+  row1.appendChild(dataField);
+  wrap.appendChild(row1);
+
+  wrap.appendChild(el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:4px;' }, document.createTextNode('Cor')));
+  const coresRow = el('div', { style:'display:flex;gap:8px;margin-bottom:12px;' });
+  [['verde','✓ Recebido','#2E7D32','#E8F5E9'],['vermelho','Não recebido','#C62828','#FFEBEE'],[null,'Automático','var(--ink)','#fff']].forEach(([valor,label,fg,bg]) => {
+    const chip = el('div', { style:'padding:6px 12px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:700;border:1.5px solid '+fg+';color:'+fg+';background:'+bg+((p.corManual===valor)?';box-shadow:0 0 0 2px '+fg+';':'') }, document.createTextNode(label));
+    chip.onclick = () => {
+      registrarAlteracao(lanc, 'Cor da parcela '+(idx+1)+' definida manualmente como "'+label+'"');
+      p.corManual = valor;
+      if(valor==='verde') p.pago = true; if(valor==='vermelho') p.pago = false;
+      saveProgress(); refreshPanel();
+    };
+    coresRow.appendChild(chip);
+  });
+  wrap.appendChild(coresRow);
+
+  // Compensar diferença numa parcela posterior
+  const compWrap = el('div', { style:'padding-top:10px;border-top:1px solid var(--line-light);' });
+  compWrap.appendChild(el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:6px;' },
+    document.createTextNode('Paciente pagou a menos? Compensa a diferença somando numa parcela mais pra frente:')));
+  const compRow = el('div', { style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;' });
+  const compValorInput = el('input', { type:'number', step:'0.01', placeholder:'Valor a compensar', style:'width:130px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  compRow.appendChild(compValorInput);
+  const compParcelaSelect = el('select', { style:'padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  linha.parcelas.forEach((pp,ppi) => { if(ppi>idx) compParcelaSelect.appendChild(el('option', { value:ppi }, document.createTextNode('Parcela '+(ppi+1)))); });
+  if(!compParcelaSelect.children.length) compParcelaSelect.appendChild(el('option', { value:'' }, document.createTextNode('(crie uma parcela posterior primeiro)')));
+  compRow.appendChild(compParcelaSelect);
+  const compBtn = el('div', { class:'add-row-btn', style:'padding:6px 14px;' }, document.createTextNode('Adicionar'));
+  compBtn.onclick = () => {
+    const valorComp = parseFloat(compValorInput.value)||0;
+    const destIdx = parseInt(compParcelaSelect.value,10);
+    if(!valorComp || isNaN(destIdx)){ alert('Preencha o valor e escolha a parcela de destino.'); return; }
+    linha.parcelas[destIdx].valor = (linha.parcelas[destIdx].valor||0) + valorComp;
+    registrarAlteracao(lanc, 'Compensação de R$ '+formatMoney(valorComp)+' da parcela '+(idx+1)+' somada na parcela '+(destIdx+1));
+    saveProgress(); refreshPanel();
+  };
+  compRow.appendChild(compBtn);
+  compWrap.appendChild(compRow);
+  wrap.appendChild(compWrap);
+
+  const fecharBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
+  fecharBtn.onclick = () => { celulaParcelaAberta = null; refreshPanel(); };
+  wrap.appendChild(fecharBtn);
+  return wrap;
+}
+// ===================== FIM DA NOVA PLANILHA =====================
+
+
 
 
 function renderLancamentoExpandido(container, lanc){
