@@ -649,6 +649,7 @@ let celulaValorAberta = null;   // lancId
 let confirmandoDesfazer = null; // chaveLinha, quando está pedindo confirmação de desfazer o desmembramento
 let celulaParcelasSemDataAberta = null; // chaveLinha
 let confirmandoResetTotal = null; // lancId
+let celulaQtdParcelasAberta = null; // chaveLinha
 let celulaFormaAberta = null;   // lancId+linhaId
 let celulaProfAberta = null;    // lancId+linhaId
 let celulaParcelaAberta = null; // lancId+linhaId+parcelaIdx
@@ -739,13 +740,13 @@ function renderPlanilhaLancamentos(container){
     const rotuloParcelas = qtdParcelasLinhaAtual<=1
       ? (divergeDoTotal ? '1x (parcial)' : 'Único')
       : qtdParcelasLinhaAtual+'x';
-    const rotuloSpan = el('span', { style: parcelasSemData.length ? 'cursor:pointer;text-decoration:underline dotted;' : '' }, document.createTextNode(rotuloParcelas));
-    if(parcelasSemData.length) rotuloSpan.onclick = () => { celulaParcelasSemDataAberta = (celulaParcelasSemDataAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
+    const rotuloSpan = el('span', { style:'cursor:pointer;text-decoration:underline dotted;font-weight:600;' }, document.createTextNode(rotuloParcelas));
+    rotuloSpan.onclick = () => { celulaQtdParcelasAberta = (celulaQtdParcelasAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; celulaParcelasSemDataAberta=null; refreshPanel(); };
     tdQtd.appendChild(rotuloSpan);
     if(parcelasSemData.length){
       const avisoSemData = el('div', { style:'font-size:9.5px;color:var(--red);font-weight:700;cursor:pointer;', title:'Essas parcelas existem mas não têm data de vencimento, por isso não aparecem em nenhum mês.' },
         document.createTextNode('⚠ '+parcelasSemData.length+' sem data — toque pra corrigir'));
-      avisoSemData.onclick = () => { celulaParcelasSemDataAberta = (celulaParcelasSemDataAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
+      avisoSemData.onclick = () => { celulaParcelasSemDataAberta = (celulaParcelasSemDataAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; celulaQtdParcelasAberta=null; refreshPanel(); };
       tdQtd.appendChild(avisoSemData);
     }
     if(divergeDoTotal){
@@ -819,9 +820,21 @@ function renderPlanilhaLancamentos(container){
         return;
       }
       const { p, i } = achado;
-      const cor = p.corManual || (p.pago ? 'verde' : 'vermelho');
-      const bg = cor==='verde' ? '#E8F5E9' : (cor==='vermelho' ? '#FFEBEE' : '#EDE7F6');
-      const fg = cor==='verde' ? '#2E7D32' : (cor==='vermelho' ? '#C62828' : '#5E35B1');
+      const hojeISOCor = new Date().toISOString().slice(0,10);
+      const vencida = !p.pago && p.data && p.data < hojeISOCor;
+      const ehCartao = /cart[ãa]o/i.test(p.forma||linha.forma||'');
+      let corAuto;
+      if(p.pago || ehCartao) corAuto = 'verde';       // quitada, ou cartão (praticamente garantido)
+      else if(vencida) corAuto = 'vermelho';           // venceu e ainda não pagou
+      else corAuto = 'azul';                            // ainda dentro do prazo, aguardando
+      const cor = p.corManual || corAuto;
+      const CORES_PARCELA = {
+        verde:   { bg:'#E8F5E9', fg:'#2E7D32' },
+        vermelho:{ bg:'#FFEBEE', fg:'#C62828' },
+        azul:    { bg:'#E3F2FD', fg:'#1565C0' },
+        roxo:    { bg:'#EDE7F6', fg:'#5E35B1' },
+      };
+      const { bg, fg } = CORES_PARCELA[cor] || CORES_PARCELA.azul;
       const chip = el('div', { style:'background:'+bg+';color:'+fg+';border-radius:6px;padding:5px 4px;font-weight:700;cursor:pointer;' }, [
         el('div', {}, document.createTextNode('R$ '+formatMoney(p.valor))),
         el('div', { style:'font-size:9.5px;font-weight:600;opacity:0.85;' }, document.createTextNode('Parcela '+(i+1))),
@@ -846,6 +859,9 @@ function renderPlanilhaLancamentos(container){
     }
     if(celulaParcelasSemDataAberta === chaveLinha){
       tbody.appendChild(linhaPainel(totalColunas, renderPainelParcelasSemData(lanc, linha)));
+    }
+    if(celulaQtdParcelasAberta === chaveLinha){
+      tbody.appendChild(linhaPainel(totalColunas, renderPainelQtdParcelas(lanc, linha)));
     }
     const qtdParcelasLinha = Math.max((linha.parcelas||[]).length, 1);
     for(let i=0;i<qtdParcelasLinha;i++){
@@ -991,6 +1007,58 @@ function renderPainelForma(lanc, linha){
 // ---- Painel 3: reatribuir profissional por tratamento (clique na célula "Profissional executor") ----
 // ---- Painel especial: lista todas as parcelas de uma linha (inclusive as sem data), pra
 // corrigir rapidinho as que estão "invisíveis" na planilha por falta de vencimento ----
+// ---- Painel: alterar quantas parcelas essa linha tem, redividindo o valor igualmente ----
+function renderPainelQtdParcelas(lanc, linha){
+  const wrap = el('div', {});
+  const qtdAtual = (linha.parcelas||[]).length || 1;
+  wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:4px;' }, document.createTextNode('Quantidade de parcelas')));
+  wrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:0 0 10px;' },
+    document.createTextNode('Muda quantas vezes o valor total (R$ '+formatMoney(linha.valor)+') é dividido. Os vencimentos são recalculados mês a mês a partir da primeira data que já existir (ou de hoje, se não tiver nenhuma). Parcelas já pagas não são mexidas.')));
+
+  const row = el('div', { style:'display:flex;gap:10px;align-items:center;' });
+  const inputQtd = el('input', { type:'number', min:'1', max:'60', value: qtdAtual, style:'width:80px;padding:7px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  row.appendChild(inputQtd);
+  const salvarBtn = el('div', { class:'add-row-btn', style:'padding:8px 16px;' }, document.createTextNode('Salvar'));
+  salvarBtn.onclick = () => {
+    const novaQtd = Math.max(1, parseInt(inputQtd.value,10)||1);
+    const parcelasAtuais = linha.parcelas || [];
+    const jaPagas = parcelasAtuais.filter(p => p.pago);
+    const valorJaPago = jaPagas.reduce((s,p)=>s+(p.valor||0),0);
+    const valorRestante = Math.max(0, linha.valor - valorJaPago);
+    const qtdNaoPagas = Math.max(1, novaQtd - jaPagas.length);
+
+    // Data de partida pras novas parcelas: a primeira data já existente entre as não-pagas, ou hoje
+    const naoPagasAntigas = parcelasAtuais.filter(p => !p.pago);
+    let dataBase = (naoPagasAntigas[0] && naoPagasAntigas[0].data) || new Date().toISOString().slice(0,10);
+    const partesData = dataBase.split('-');
+    let [anoBase, mesBase, diaBase] = partesData.length===3 ? partesData.map(Number) : [new Date().getFullYear(), new Date().getMonth()+1, new Date().getDate()];
+
+    const valorCadaNova = Math.round((valorRestante/qtdNaoPagas)*100)/100;
+    const novasNaoPagas = [];
+    for(let i=0;i<qtdNaoPagas;i++){
+      let mes = mesBase + i, ano = anoBase;
+      while(mes>12){ mes-=12; ano++; }
+      const dataParcela = ano+'-'+String(mes).padStart(2,'0')+'-'+String(Math.min(diaBase,28)).padStart(2,'0');
+      novasNaoPagas.push({
+        id: uid(), valor: (i===qtdNaoPagas-1) ? Math.round((valorRestante - valorCadaNova*(qtdNaoPagas-1))*100)/100 : valorCadaNova,
+        data: dataParcela, forma: linha.forma||'', pago:false, dataRecebimento:'', corManual:null,
+      });
+    }
+    const novasParcelas = [...jaPagas, ...novasNaoPagas];
+    if(linha.isPrincipal) lanc.parcelas = novasParcelas; else linha.derivada.parcelas = novasParcelas;
+    registrarAlteracao(lanc, 'Quantidade de parcelas de "'+lanc.paciente+(linha.isPrincipal?'':' ('+linha.profissionalNome+')')+'" alterada de '+qtdAtual+' para '+novaQtd);
+    celulaQtdParcelasAberta = null;
+    saveProgress(); refreshPanel();
+  };
+  row.appendChild(salvarBtn);
+  wrap.appendChild(row);
+
+  const fecharBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
+  fecharBtn.onclick = () => { celulaQtdParcelasAberta = null; refreshPanel(); };
+  wrap.appendChild(fecharBtn);
+  return wrap;
+}
+
 function renderPainelParcelasSemData(lanc, linha){
   const wrap = el('div', {});
   wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:4px;' }, document.createTextNode('Todas as parcelas desta linha')));
@@ -1184,17 +1252,19 @@ function renderPainelParcela(lanc, linha, idx){
 
   wrap.appendChild(el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:4px;' }, document.createTextNode('Cor')));
   const coresRow = el('div', { style:'display:flex;gap:8px;margin-bottom:12px;' });
-  [['verde','✓ Recebido','#2E7D32','#E8F5E9'],['vermelho','Não recebido','#C62828','#FFEBEE'],[null,'Automático','var(--ink)','#fff']].forEach(([valor,label,fg,bg]) => {
+  [['verde','✓ Quitada','#2E7D32','#E8F5E9'],['azul','A vencer','#1565C0','#E3F2FD'],['vermelho','Vencida/não paga','#C62828','#FFEBEE'],[null,'Automático','var(--ink)','#fff']].forEach(([valor,label,fg,bg]) => {
     const chip = el('div', { style:'padding:6px 12px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:700;border:1.5px solid '+fg+';color:'+fg+';background:'+bg+((p.corManual===valor)?';box-shadow:0 0 0 2px '+fg+';':'') }, document.createTextNode(label));
     chip.onclick = () => {
       registrarAlteracao(lanc, 'Cor da parcela '+(idx+1)+' definida manualmente como "'+label+'"');
       p.corManual = valor;
-      if(valor==='verde') p.pago = true; if(valor==='vermelho') p.pago = false;
+      if(valor==='verde') p.pago = true; if(valor==='vermelho'||valor==='azul') p.pago = false;
       saveProgress(); refreshPanel();
     };
     coresRow.appendChild(chip);
   });
   wrap.appendChild(coresRow);
+  wrap.appendChild(el('p', { style:'font-size:10.5px;color:var(--muted);margin:-6px 0 12px;' },
+    document.createTextNode('Automático: verde se já quitada ou for cartão de crédito; vermelho se venceu sem pagar; azul se ainda está dentro do prazo.')));
 
   // Compensar diferença numa parcela posterior
   const compWrap = el('div', { style:'padding-top:10px;border-top:1px solid var(--line-light);' });
