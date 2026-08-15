@@ -154,6 +154,18 @@
 // ============ ESTADO ============
 function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
+// Registra uma alteração manual no histórico do lançamento — quem fez, quando, e o que mudou.
+// Usado em toda edição relevante (tratamentos, valor total, parcelas, forma de pagamento,
+// status de pagamento), pra sempre ficar rastreável quem alterou o quê.
+function registrarAlteracao(lanc, texto){
+  if(!lanc.historicoAlteracoes) lanc.historicoAlteracoes = [];
+  lanc.historicoAlteracoes.unshift({
+    quem: (window._clinicaMe && window._clinicaMe.nome) || 'Usuário',
+    quando: Date.now(),
+    texto,
+  });
+}
+
 const state = {
   profissionais: [], // {id, nome, comissaoPercent}
   rateiosFixos: [],  // {id, nome, percentual} — ex: "Clínica" 30%, "Secretária" 5% — aplicado sobre TODO valor recebido, além da comissão do profissional
@@ -729,6 +741,22 @@ function renderPlanilhaLancamentos(container){
 function renderLancamentoExpandido(container, lanc){
   const wrap = el('div', { style:'margin-top:10px;padding-top:10px;border-top:1.5px dashed var(--line-light);' });
 
+  // ---- Valor total do orçamento (editável) ----
+  const valorTotalRow = el('div', { style:'display:flex;align-items:center;gap:8px;margin-bottom:14px;' });
+  valorTotalRow.appendChild(el('label', { style:'font-weight:700;font-size:12.5px;color:var(--blue-dark);' }, document.createTextNode('Valor total do orçamento')));
+  const valorTotalInput = el('input', { type:'number', min:'0', step:'0.01', value: lanc.valorTotal||0,
+    style:'width:120px;padding:7px 8px;font-size:13px;font-weight:700;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  valorTotalInput.onchange = (e) => {
+    const novo = parseFloat(e.target.value)||0;
+    if(novo !== lanc.valorTotal){
+      registrarAlteracao(lanc, 'Valor total do orçamento alterado de R$ '+formatMoney(lanc.valorTotal)+' para R$ '+formatMoney(novo));
+      lanc.valorTotal = novo;
+      saveProgress(); refreshPanel();
+    }
+  };
+  valorTotalRow.appendChild(valorTotalInput);
+  wrap.appendChild(valorTotalRow);
+
   const temTratamentosDetalhados = lanc.tratamentos && lanc.tratamentos.length > 0;
 
   if(temTratamentosDetalhados){
@@ -739,8 +767,39 @@ function renderLancamentoExpandido(container, lanc){
       if(!t.id) t.id = 'trat'+ti+'_'+Date.now().toString(36); // garante um id estável pra cada item
       if(!t.profissionais) t.profissionais = [];
       const tCard = el('div', { style:'background:#F4F8FB;border-radius:10px;padding:10px 12px;margin-bottom:10px;' });
-      tCard.appendChild(el('div', { style:'font-weight:600;font-size:13px;margin-bottom:8px;' },
-        document.createTextNode((t.descricao||'Tratamento') + (t.valor ? (' — R$ '+formatMoney(t.valor)) : ''))));
+
+      const tHeaderRow = el('div', { style:'display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;' });
+      const descInput = el('input', { type:'text', value: t.descricao||'', placeholder:'Descrição do tratamento',
+        style:'flex:1;min-width:140px;padding:7px 8px;font-size:13px;font-weight:600;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+      descInput.onchange = (e) => {
+        const novo = e.target.value;
+        if(novo !== t.descricao){
+          registrarAlteracao(lanc, 'Tratamento renomeado de "'+(t.descricao||'—')+'" para "'+novo+'"');
+          t.descricao = novo;
+          saveProgress();
+        }
+      };
+      tHeaderRow.appendChild(descInput);
+      const valorTratInput = el('input', { type:'number', min:'0', step:'0.01', value: t.valor||0,
+        style:'width:90px;padding:7px 8px;font-size:13px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+      valorTratInput.onchange = (e) => {
+        const novo = parseFloat(e.target.value)||0;
+        if(novo !== t.valor){
+          registrarAlteracao(lanc, 'Valor do tratamento "'+(t.descricao||'—')+'" alterado de R$ '+formatMoney(t.valor)+' para R$ '+formatMoney(novo));
+          t.valor = novo;
+          saveProgress();
+        }
+      };
+      tHeaderRow.appendChild(valorTratInput);
+      const removerTratBtn = el('span', { style:'cursor:pointer;color:var(--red);font-size:16px;padding:2px 6px;' }, document.createTextNode('✕'));
+      removerTratBtn.onclick = () => {
+        if(!confirm('Excluir o tratamento "'+(t.descricao||'este item')+'"?')) return;
+        registrarAlteracao(lanc, 'Tratamento excluído: "'+(t.descricao||'—')+'" (R$ '+formatMoney(t.valor)+')');
+        lanc.tratamentos.splice(ti,1);
+        saveProgress(); refreshPanel();
+      };
+      tHeaderRow.appendChild(removerTratBtn);
+      tCard.appendChild(tHeaderRow);
 
       const listaProfsWrap = el('div', {});
       tCard.appendChild(listaProfsWrap);
@@ -781,6 +840,14 @@ function renderLancamentoExpandido(container, lanc){
 
       wrap.appendChild(tCard);
     });
+    const addTratBtn = el('div', { class:'add-row-btn', style:'margin-bottom:14px;' }, document.createTextNode('+ Adicionar tratamento'));
+    addTratBtn.onclick = () => {
+      const novo = { id: uid(), descricao:'', valor:0, profissionais:[] };
+      lanc.tratamentos.push(novo);
+      registrarAlteracao(lanc, 'Novo tratamento adicionado');
+      saveProgress(); refreshPanel();
+    };
+    wrap.appendChild(addTratBtn);
   } else {
     // ---- Sem itens detalhados (lançamento manual, sem quebra por tratamento): um profissional
     // e uma % pro lançamento inteiro, do jeito mais simples ----
@@ -804,6 +871,14 @@ function renderLancamentoExpandido(container, lanc){
       wrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:-8px 0 12px;' },
         document.createTextNode('Sugerido pela ficha: "'+lanc.profissionalNomeOriginal+'" — cadastre-o ou selecione acima.')));
     }
+    const addTratBtn2 = el('div', { class:'add-row-btn', style:'margin-bottom:14px;' }, document.createTextNode('+ Detalhar por tratamento'));
+    addTratBtn2.onclick = () => {
+      if(!lanc.tratamentos) lanc.tratamentos = [];
+      lanc.tratamentos.push({ id: uid(), descricao:'', valor:0, profissionais:[] });
+      registrarAlteracao(lanc, 'Orçamento detalhado por tratamento (tinha só profissional único antes)');
+      saveProgress(); refreshPanel();
+    };
+    wrap.appendChild(addTratBtn2);
   }
 
   wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;color:var(--blue-dark);margin:10px 0 6px;' }, document.createTextNode('Parcelas')));
@@ -820,11 +895,25 @@ function renderLancamentoExpandido(container, lanc){
       const linha1 = el('div', { style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;' });
       const valorInput = el('input', { type:'number', min:'0', step:'0.01', value: p.valor||0,
         style:'width:90px;font-size:13px;font-weight:700;border:1px solid var(--line-light);border-radius:6px;padding:4px 6px;' });
-      valorInput.oninput = (e) => { p.valor = parseFloat(e.target.value)||0; saveProgressDebounced(); };
+      valorInput.onchange = (e) => {
+        const novo = parseFloat(e.target.value)||0;
+        if(novo !== p.valor){
+          registrarAlteracao(lanc, 'Valor da parcela '+(pi+1)+' alterado de R$ '+formatMoney(p.valor)+' para R$ '+formatMoney(novo));
+          p.valor = novo;
+          saveProgress();
+        }
+      };
       linha1.appendChild(valorInput);
 
       const dataVencInput = el('input', { type:'date', value: p.data||'', style:'font-size:12px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;' });
-      dataVencInput.oninput = (e) => { p.data = e.target.value; saveProgressDebounced(); refreshPanel(); };
+      dataVencInput.onchange = (e) => {
+        const novo = e.target.value;
+        if(novo !== p.data){
+          registrarAlteracao(lanc, 'Vencimento da parcela '+(pi+1)+' alterado de '+(p.data?formatDateBR(p.data):'—')+' para '+formatDateBR(novo));
+          p.data = novo;
+          saveProgress(); refreshPanel();
+        }
+      };
       linha1.appendChild(dataVencInput);
 
       const formaSelect = el('select', { style:'font-size:12px;border:1px solid var(--line-light);border-radius:6px;padding:3px 6px;font-family:inherit;' });
@@ -833,7 +922,14 @@ function renderLancamentoExpandido(container, lanc){
         if(p.forma===f) opt.setAttribute('selected','selected');
         formaSelect.appendChild(opt);
       });
-      formaSelect.onchange = (e) => { p.forma = e.target.value; saveProgress(); };
+      formaSelect.onchange = (e) => {
+        const novo = e.target.value;
+        if(novo !== p.forma){
+          registrarAlteracao(lanc, 'Forma de pagamento da parcela '+(pi+1)+' alterada de "'+(p.forma||'—')+'" para "'+(novo||'—')+'"');
+          p.forma = novo;
+          saveProgress();
+        }
+      };
       linha1.appendChild(formaSelect);
       info.appendChild(linha1);
 
@@ -854,6 +950,7 @@ function renderLancamentoExpandido(container, lanc){
         const toggle = el('div', { class:'parcela-toggle marcado' }, document.createTextNode('✓ Pago'));
         toggle.onclick = () => {
           if(!confirm('Desmarcar esse pagamento?')) return;
+          registrarAlteracao(lanc, 'Pagamento da parcela '+(pi+1)+' (R$ '+formatMoney(p.valor)+') desmarcado — estava pago em '+formatDateBR(p.dataRecebimento));
           p.pago = false; p.dataRecebimento = '';
           saveProgress(); refreshPanel();
         };
@@ -862,6 +959,7 @@ function renderLancamentoExpandido(container, lanc){
       const removerParcelaBtn = el('span', { style:'font-size:11px;color:var(--red);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Remover parcela'));
       removerParcelaBtn.onclick = () => {
         if(!confirm('Remover esta parcela de R$ '+formatMoney(p.valor)+'?')) return;
+        registrarAlteracao(lanc, 'Parcela '+(pi+1)+' removida (R$ '+formatMoney(p.valor)+', vencimento '+(p.data?formatDateBR(p.data):'—')+')');
         lanc.parcelas.splice(pi,1);
         saveProgress(); refreshPanel();
       };
@@ -874,8 +972,10 @@ function renderLancamentoExpandido(container, lanc){
         const dataPagoInput = el('input', { type:'date', value: hojeISOParcela });
         const btnConfirmar = el('div', { class:'add-row-btn', style:'margin-top:8px;background:var(--green);color:#fff;border:none;' }, document.createTextNode('Confirmar'));
         btnConfirmar.onclick = () => {
+          const dataFinal = dataPagoInput.value || hojeISOParcela;
+          registrarAlteracao(lanc, 'Parcela '+(pi+1)+' (R$ '+formatMoney(p.valor)+') marcada como paga em '+formatDateBR(dataFinal));
           p.pago = true;
-          p.dataRecebimento = dataPagoInput.value || hojeISOParcela;
+          p.dataRecebimento = dataFinal;
           parcelaPagandoId = null;
           saveProgress(); refreshPanel();
         };
@@ -889,13 +989,35 @@ function renderLancamentoExpandido(container, lanc){
   const addParcelaBtn = el('div', { class:'add-row-btn', style:'margin-top:4px;' }, document.createTextNode('+ Adicionar parcela'));
   addParcelaBtn.onclick = () => {
     lanc.parcelas.push({ id: uid(), valor:0, data:'', forma:'', pago:false, dataRecebimento:'' });
+    registrarAlteracao(lanc, 'Nova parcela adicionada');
     saveProgress(); refreshPanel();
   };
   wrap.appendChild(addParcelaBtn);
 
+  // ---- Histórico de alterações (quem mudou o quê e quando) ----
+  if((lanc.historicoAlteracoes||[]).length){
+    const histWrap = el('div', { style:'margin-top:16px;padding-top:12px;border-top:1px solid var(--line-light);' });
+    const histToggle = el('div', { style:'font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;' },
+      document.createTextNode((historicoAlteracoesAberto[lanc.id]?'▾':'▸')+' Histórico de alterações ('+lanc.historicoAlteracoes.length+')'));
+    histToggle.onclick = () => { historicoAlteracoesAberto[lanc.id] = !historicoAlteracoesAberto[lanc.id]; refreshPanel(); };
+    histWrap.appendChild(histToggle);
+    if(historicoAlteracoesAberto[lanc.id]){
+      const lista = el('div', { style:'margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;' });
+      lanc.historicoAlteracoes.forEach(h => {
+        lista.appendChild(el('div', { style:'background:#F4F8FB;border-radius:8px;padding:8px 10px;font-size:11.5px;' }, [
+          el('div', { style:'font-weight:700;' }, document.createTextNode(h.quem + ' — ' + new Date(h.quando).toLocaleString('pt-BR'))),
+          el('div', { style:'margin-top:2px;color:var(--ink);' }, document.createTextNode(h.texto)),
+        ]));
+      });
+      histWrap.appendChild(lista);
+    }
+    wrap.appendChild(histWrap);
+  }
+
   container.appendChild(wrap);
 }
 let parcelaPagandoId = null;
+let historicoAlteracoesAberto = {};
 
 let visaoLancamentos = 'lista'; // 'lista' | 'planilha'
 let planilhaAno = new Date().getFullYear();
