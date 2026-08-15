@@ -634,6 +634,7 @@ function gerarParcelasProporcionais(parcelasBase, fracao){
 }
 
 let celulaValorAberta = null;   // lancId
+let confirmandoDesfazer = null; // chaveLinha, quando está pedindo confirmação de desfazer o desmembramento
 let celulaFormaAberta = null;   // lancId+linhaId
 let celulaProfAberta = null;    // lancId+linhaId
 let celulaParcelaAberta = null; // lancId+linhaId+parcelaIdx
@@ -726,20 +727,29 @@ function renderPlanilhaLancamentos(container){
     const tdQtd = el('td', { class:'fin-col-fixa fin-col-5' });
     tdQtd.appendChild(el('span', {}, document.createTextNode(qtdParcelasLinhaAtual<=1 ? 'Único' : qtdParcelasLinhaAtual+'x')));
     if(!linha.isPrincipal){
-      const desfazerBtn = el('span', { style:'margin-left:8px;color:var(--red);cursor:pointer;font-size:11px;text-decoration:underline;', title:'Desfaz o desmembramento — devolve os tratamentos e os valores pro profissional principal' },
-        document.createTextNode('↩ Desfazer'));
-      desfazerBtn.onclick = () => {
-        if(!confirm('Desfazer esse desmembramento? Os tratamentos e os valores voltam pro profissional principal.')) return;
-        const parcelasPrincipal = lanc.parcelas || [];
-        (linha.parcelas||[]).forEach((p,i) => {
-          if(parcelasPrincipal[i]) parcelasPrincipal[i].valor = Math.round((parcelasPrincipal[i].valor + p.valor)*100)/100;
-          else parcelasPrincipal.push({ id: uid(), valor: p.valor, data: p.data||'', forma: p.forma||'', pago:false, dataRecebimento:'', corManual:null });
-        });
-        lanc.linhasDerivadas = lanc.linhasDerivadas.filter(ld => ld.id !== linha.derivada.id);
-        registrarAlteracao(lanc, 'Desmembramento desfeito — tratamentos de "'+linha.profissionalNome+'" voltaram pro profissional principal');
-        saveProgress(); refreshPanel();
-      };
-      tdQtd.appendChild(desfazerBtn);
+      if(confirmandoDesfazer === chaveLinha){
+        const simBtn = el('span', { style:'margin-left:8px;color:#fff;background:var(--red);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:700;' }, document.createTextNode('Sim, desfazer'));
+        simBtn.onclick = () => {
+          const parcelasPrincipal = lanc.parcelas || (lanc.parcelas = []);
+          (linha.parcelas||[]).forEach((p,i) => {
+            if(parcelasPrincipal[i]) parcelasPrincipal[i].valor = Math.round((parcelasPrincipal[i].valor + p.valor)*100)/100;
+            else parcelasPrincipal.push({ id: uid(), valor: p.valor, data: p.data||'', forma: p.forma||'', pago:false, dataRecebimento:'', corManual:null });
+          });
+          lanc.linhasDerivadas = (lanc.linhasDerivadas||[]).filter(ld => ld.id !== linha.derivada.id);
+          registrarAlteracao(lanc, 'Desmembramento desfeito — tratamentos de "'+linha.profissionalNome+'" voltaram pro profissional principal');
+          confirmandoDesfazer = null;
+          saveProgress(); refreshPanel();
+        };
+        const naoBtn = el('span', { style:'margin-left:6px;color:var(--muted);cursor:pointer;font-size:11px;text-decoration:underline;' }, document.createTextNode('Cancelar'));
+        naoBtn.onclick = () => { confirmandoDesfazer = null; refreshPanel(); };
+        tdQtd.appendChild(simBtn);
+        tdQtd.appendChild(naoBtn);
+      } else {
+        const desfazerBtn = el('span', { style:'margin-left:8px;color:var(--red);cursor:pointer;font-size:11px;text-decoration:underline;', title:'Desfaz o desmembramento — devolve os tratamentos e os valores pro profissional principal' },
+          document.createTextNode('↩ Desfazer'));
+        desfazerBtn.onclick = () => { confirmandoDesfazer = chaveLinha; refreshPanel(); };
+        tdQtd.appendChild(desfazerBtn);
+      }
     }
     tr.appendChild(tdQtd);
 
