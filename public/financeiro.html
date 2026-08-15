@@ -233,6 +233,18 @@ function textField(label, store, key, opts={}){
 function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function formatDateBR(str){ if(!str) return '—'; const [y,m,d]=str.split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
 
+// Aceita tanto AAAA-MM-DD (formato atual) quanto DD/MM/AAAA (formato antigo, de registros
+// criados antes de uma correção anterior) — sem isso, parcelas mais velhas somem silenciosamente
+// da planilha. Função global porque é usada tanto na montagem das colunas quanto nos painéis.
+function extrairAnoMes(dataStr){
+  if(!dataStr) return null;
+  const iso = String(dataStr).match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if(iso) return { ano: parseInt(iso[1],10), mes: parseInt(iso[2],10) };
+  const br = String(dataStr).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(br) return { ano: parseInt(br[3],10), mes: parseInt(br[2],10) };
+  return null;
+}
+
 function getProfissional(id){ return state.profissionais.find(p=>p.id===id); }
 
 // ============ IMPORTAÇÃO DE PDF DA FICHA DE ANAMNESE ============
@@ -635,6 +647,8 @@ function gerarParcelasProporcionais(parcelasBase, fracao){
 
 let celulaValorAberta = null;   // lancId
 let confirmandoDesfazer = null; // chaveLinha, quando está pedindo confirmação de desfazer o desmembramento
+let celulaParcelasSemDataAberta = null; // chaveLinha
+let confirmandoResetTotal = null; // lancId
 let celulaFormaAberta = null;   // lancId+linhaId
 let celulaProfAberta = null;    // lancId+linhaId
 let celulaParcelaAberta = null; // lancId+linhaId+parcelaIdx
@@ -656,16 +670,6 @@ function renderPlanilhaLancamentos(container){
   const hoje = new Date();
   let minData = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   let maxData = new Date(hoje.getFullYear(), hoje.getMonth()+12, 1);
-  // Aceita tanto AAAA-MM-DD (formato atual) quanto DD/MM/AAAA (formato antigo, de registros
-  // criados antes da correção) — sem isso, parcelas mais velhas somem da planilha silenciosamente.
-  function extrairAnoMes(dataStr){
-    if(!dataStr) return null;
-    const iso = String(dataStr).match(/^(\d{4})-(\d{2})-\d{2}$/);
-    if(iso) return { ano: parseInt(iso[1],10), mes: parseInt(iso[2],10) };
-    const br = String(dataStr).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if(br) return { ano: parseInt(br[3],10), mes: parseInt(br[2],10) };
-    return null;
-  }
   todasLinhas.forEach(l => (l.parcelas||[]).forEach(p => {
     const am = extrairAnoMes(p.data);
     if(!am) return;
@@ -730,11 +734,20 @@ function renderPlanilhaLancamentos(container){
 
     // ---- Coluna extra: quantidade de parcelas (ou "Único"), e botão de desfazer pra linhas desmembradas ----
     const qtdParcelasLinhaAtual = (linha.parcelas||[]).length;
+    const parcelasSemData = (linha.parcelas||[]).filter(p => !extrairAnoMes(p.data));
     const tdQtd = el('td', { class:'fin-col-fixa fin-col-5' });
     const rotuloParcelas = qtdParcelasLinhaAtual<=1
       ? (divergeDoTotal ? '1x (parcial)' : 'Único')
       : qtdParcelasLinhaAtual+'x';
-    tdQtd.appendChild(el('span', {}, document.createTextNode(rotuloParcelas)));
+    const rotuloSpan = el('span', { style: parcelasSemData.length ? 'cursor:pointer;text-decoration:underline dotted;' : '' }, document.createTextNode(rotuloParcelas));
+    if(parcelasSemData.length) rotuloSpan.onclick = () => { celulaParcelasSemDataAberta = (celulaParcelasSemDataAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
+    tdQtd.appendChild(rotuloSpan);
+    if(parcelasSemData.length){
+      const avisoSemData = el('div', { style:'font-size:9.5px;color:var(--red);font-weight:700;cursor:pointer;', title:'Essas parcelas existem mas não têm data de vencimento, por isso não aparecem em nenhum mês.' },
+        document.createTextNode('⚠ '+parcelasSemData.length+' sem data — toque pra corrigir'));
+      avisoSemData.onclick = () => { celulaParcelasSemDataAberta = (celulaParcelasSemDataAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
+      tdQtd.appendChild(avisoSemData);
+    }
     if(divergeDoTotal){
       const corrigirBtn = el('span', { style:'margin-left:8px;color:var(--amber);cursor:pointer;font-size:11px;text-decoration:underline;', title:'Ajusta essa(s) parcela(s) pra somar exatamente o valor total, dividindo igualmente' },
         document.createTextNode('Corrigir valor'));
@@ -831,6 +844,9 @@ function renderPlanilhaLancamentos(container){
     if(celulaProfAberta === chaveLinha){
       tbody.appendChild(linhaPainel(totalColunas, renderPainelProfissional(lanc, linha)));
     }
+    if(celulaParcelasSemDataAberta === chaveLinha){
+      tbody.appendChild(linhaPainel(totalColunas, renderPainelParcelasSemData(lanc, linha)));
+    }
     const qtdParcelasLinha = Math.max((linha.parcelas||[]).length, 1);
     for(let i=0;i<qtdParcelasLinha;i++){
       if(celulaParcelaAberta === chaveLinha+'|'+i){
@@ -914,6 +930,36 @@ function renderPainelValorTotal(lanc){
     tabela.appendChild(tbodyT);
     wrap.appendChild(tabela);
   }
+  if(lanc.linhasDerivadas && lanc.linhasDerivadas.length){
+    const resetWrap = el('div', { style:'margin-top:14px;padding-top:10px;border-top:1px solid var(--line-light);' });
+    resetWrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:0 0 6px;' },
+      document.createTextNode('Se as divisões desse paciente estiverem com valores estranhos ou inconsistentes, use isso pra apagar TODAS as divisões e recomeçar do zero, limpo.')));
+    if(confirmandoResetTotal === lanc.id){
+      const confirmaRow = el('div', { style:'display:flex;gap:8px;' });
+      const simBtn = el('span', { style:'color:#fff;background:var(--red);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700;' }, document.createTextNode('Sim, apagar tudo e recomeçar'));
+      simBtn.onclick = () => {
+        lanc.linhasDerivadas = [];
+        (lanc.tratamentos||[]).forEach(t => { delete t.profissionalAvaliadorId; });
+        const parcelasAtuais = lanc.parcelas && lanc.parcelas.length ? lanc.parcelas : [{ id: uid(), valor:0, data:'', forma: lanc.formaResumo||'', pago:false, dataRecebimento:'', corManual:null }];
+        const n = parcelasAtuais.length;
+        const valorCada = Math.round((lanc.valorTotal/n)*100)/100;
+        parcelasAtuais.forEach((p,i) => { p.valor = (i===n-1) ? Math.round((lanc.valorTotal - valorCada*(n-1))*100)/100 : valorCada; p.pago=false; p.dataRecebimento=''; p.corManual=null; });
+        lanc.parcelas = parcelasAtuais;
+        registrarAlteracao(lanc, 'Todas as divisões entre profissionais foram apagadas e as parcelas foram recalculadas do zero (reset total)');
+        confirmandoResetTotal = null;
+        saveProgress(); refreshPanel();
+      };
+      const naoBtn = el('span', { style:'color:var(--muted);cursor:pointer;font-size:12px;text-decoration:underline;align-self:center;' }, document.createTextNode('Cancelar'));
+      naoBtn.onclick = () => { confirmandoResetTotal = null; refreshPanel(); };
+      confirmaRow.appendChild(simBtn); confirmaRow.appendChild(naoBtn);
+      resetWrap.appendChild(confirmaRow);
+    } else {
+      const resetBtn = el('span', { style:'color:var(--red);cursor:pointer;font-size:12px;font-weight:700;text-decoration:underline;' }, document.createTextNode('🔄 Apagar todas as divisões e recomeçar do zero'));
+      resetBtn.onclick = () => { confirmandoResetTotal = lanc.id; refreshPanel(); };
+      resetWrap.appendChild(resetBtn);
+    }
+    wrap.appendChild(resetWrap);
+  }
   const fecharBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
   fecharBtn.onclick = () => { celulaValorAberta = null; refreshPanel(); };
   wrap.appendChild(fecharBtn);
@@ -943,6 +989,53 @@ function renderPainelForma(lanc, linha){
 }
 
 // ---- Painel 3: reatribuir profissional por tratamento (clique na célula "Profissional executor") ----
+// ---- Painel especial: lista todas as parcelas de uma linha (inclusive as sem data), pra
+// corrigir rapidinho as que estão "invisíveis" na planilha por falta de vencimento ----
+function renderPainelParcelasSemData(lanc, linha){
+  const wrap = el('div', {});
+  wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:4px;' }, document.createTextNode('Todas as parcelas desta linha')));
+  wrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:0 0 10px;' },
+    document.createTextNode('Parcelas sem data de vencimento não aparecem em nenhum mês na planilha. Preencha a data pra elas aparecerem.')));
+
+  const tabela = el('table', { style:'width:100%;font-size:12px;border-collapse:collapse;' });
+  tabela.appendChild(el('thead',{}, el('tr',{},[
+    el('th', { style:'text-align:left;padding:4px;' }, document.createTextNode('#')),
+    el('th', { style:'text-align:right;padding:4px;' }, document.createTextNode('Valor')),
+    el('th', { style:'text-align:left;padding:4px;' }, document.createTextNode('Vencimento')),
+  ])));
+  const tbodyT = el('tbody', {});
+  (linha.parcelas||[]).forEach((p, i) => {
+    const semData = !extrairAnoMes(p.data);
+    const tr = el('tr', { style: semData ? 'background:#FFF3E0;' : '' });
+    tr.appendChild(el('td', { style:'padding:4px;' }, document.createTextNode('Parcela '+(i+1))));
+    const tdValor = el('td', { style:'padding:4px;text-align:right;' });
+    const inputValor = el('input', { type:'number', min:'0', step:'0.01', value: p.valor||0, style:'width:90px;padding:5px 6px;border:1.5px solid var(--line);border-radius:6px;font-family:inherit;text-align:right;' });
+    inputValor.onchange = (e) => {
+      const novo = parseFloat(e.target.value)||0;
+      if(novo !== p.valor){ registrarAlteracao(lanc, 'Valor da parcela '+(i+1)+' alterado de R$ '+formatMoney(p.valor)+' para R$ '+formatMoney(novo)); p.valor = novo; saveProgress(); refreshPanel(); }
+    };
+    tdValor.appendChild(inputValor);
+    tr.appendChild(tdValor);
+    const tdData = el('td', { style:'padding:4px;' });
+    const inputData = el('input', { type:'date', value: /^\d{4}-\d{2}-\d{2}$/.test(p.data||'') ? p.data : '', style:'padding:5px 6px;border:1.5px solid '+(semData?'var(--red)':'var(--line)')+';border-radius:6px;font-family:inherit;' });
+    inputData.onchange = (e) => {
+      const novo = e.target.value;
+      if(novo !== p.data){ registrarAlteracao(lanc, 'Vencimento da parcela '+(i+1)+' definido como '+formatDateBR(novo)); p.data = novo; saveProgress(); refreshPanel(); }
+    };
+    tdData.appendChild(inputData);
+    if(semData) tdData.appendChild(el('span', { style:'color:var(--red);font-size:10px;margin-left:6px;' }, document.createTextNode('⚠ sem data')));
+    tr.appendChild(tdData);
+    tbodyT.appendChild(tr);
+  });
+  tabela.appendChild(tbodyT);
+  wrap.appendChild(tabela);
+
+  const fecharBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
+  fecharBtn.onclick = () => { celulaParcelasSemDataAberta = null; refreshPanel(); };
+  wrap.appendChild(fecharBtn);
+  return wrap;
+}
+
 function renderPainelProfissional(lanc, linha){
   const wrap = el('div', {});
   wrap.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:4px;' }, document.createTextNode('Redistribuir tratamentos entre profissionais')));
