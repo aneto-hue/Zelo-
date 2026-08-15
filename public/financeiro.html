@@ -110,7 +110,8 @@
   .fin-col-1{ left:0; min-width:140px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
   .fin-col-2{ left:140px; min-width:95px; }
   .fin-col-3{ left:235px; min-width:110px; }
-  .fin-col-4{ left:345px; min-width:135px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
+  .fin-col-4{ left:345px; min-width:135px; }
+  .fin-col-5{ left:480px; min-width:110px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
   thead .fin-col-fixa{ background:var(--bg,#F4F8FB); z-index:2; }
   .parcela-row{
     display:flex; align-items:flex-start; gap:8px; padding:10px; border:1.5px solid var(--line-light); border-radius:8px;
@@ -685,6 +686,7 @@ function renderPlanilhaLancamentos(container){
     el('th', { class:'fin-col-fixa fin-col-2' }, document.createTextNode('Valor total')),
     el('th', { class:'fin-col-fixa fin-col-3' }, document.createTextNode('Forma de pgto')),
     el('th', { class:'fin-col-fixa fin-col-4' }, document.createTextNode('Profissional')),
+    el('th', { class:'fin-col-fixa fin-col-5' }, document.createTextNode('Parcelas')),
   ];
   mesesColunas.forEach(c => theadCells.push(el('th', { style:'text-align:center;min-width:86px;' }, document.createTextNode(MESES_ABREV[c.mes-1]+'/'+String(c.ano).slice(2)))));
   table.appendChild(el('thead', {}, el('tr', {}, theadCells)));
@@ -718,6 +720,28 @@ function renderPlanilhaLancamentos(container){
       document.createTextNode(linha.profissionalNome || 'Definir...'));
     tdProf.onclick = () => { celulaProfAberta = (celulaProfAberta===chaveLinha) ? null : chaveLinha; celulaValorAberta=null; celulaFormaAberta=null; celulaParcelaAberta=null; refreshPanel(); };
     tr.appendChild(tdProf);
+
+    // ---- Coluna extra: quantidade de parcelas (ou "Único"), e botão de desfazer pra linhas desmembradas ----
+    const qtdParcelasLinhaAtual = (linha.parcelas||[]).length;
+    const tdQtd = el('td', { class:'fin-col-fixa fin-col-5' });
+    tdQtd.appendChild(el('span', {}, document.createTextNode(qtdParcelasLinhaAtual<=1 ? 'Único' : qtdParcelasLinhaAtual+'x')));
+    if(!linha.isPrincipal){
+      const desfazerBtn = el('span', { style:'margin-left:8px;color:var(--red);cursor:pointer;font-size:11px;text-decoration:underline;', title:'Desfaz o desmembramento — devolve os tratamentos e os valores pro profissional principal' },
+        document.createTextNode('↩ Desfazer'));
+      desfazerBtn.onclick = () => {
+        if(!confirm('Desfazer esse desmembramento? Os tratamentos e os valores voltam pro profissional principal.')) return;
+        const parcelasPrincipal = lanc.parcelas || [];
+        (linha.parcelas||[]).forEach((p,i) => {
+          if(parcelasPrincipal[i]) parcelasPrincipal[i].valor = Math.round((parcelasPrincipal[i].valor + p.valor)*100)/100;
+          else parcelasPrincipal.push({ id: uid(), valor: p.valor, data: p.data||'', forma: p.forma||'', pago:false, dataRecebimento:'', corManual:null });
+        });
+        lanc.linhasDerivadas = lanc.linhasDerivadas.filter(ld => ld.id !== linha.derivada.id);
+        registrarAlteracao(lanc, 'Desmembramento desfeito — tratamentos de "'+linha.profissionalNome+'" voltaram pro profissional principal');
+        saveProgress(); refreshPanel();
+      };
+      tdQtd.appendChild(desfazerBtn);
+    }
+    tr.appendChild(tdQtd);
 
     // ---- 4) Parcelas — uma célula por mês (coluna), colorida, com o número da parcela dentro ----
     // Mapeia cada parcela dessa linha pro seu mês/ano de vencimento, guardando também a posição
@@ -762,7 +786,7 @@ function renderPlanilhaLancamentos(container){
     tbody.appendChild(tr);
 
     // ---- Painéis abertos (aparecem numa linha logo abaixo, ocupando a largura toda) ----
-    const totalColunas = 4 + mesesColunas.length;
+    const totalColunas = 5 + mesesColunas.length;
     if(celulaValorAberta === lanc.id && linha.isPrincipal){
       tbody.appendChild(linhaPainel(totalColunas, renderPainelValorTotal(lanc)));
     }
