@@ -150,6 +150,7 @@ async function loadProgress(){
 let novoGastoAberto = false;
 let gastoEditandoId = null;
 let gastoPagandoId = null;
+let boletoAnexandoId = null;
 
 // Retorna a data de vencimento do gasto NO MÊS ATUAL (ou no mês indicado), como objeto Date.
 function dataVencimentoNoMes(gasto, ano, mes){
@@ -166,9 +167,9 @@ function statusDoGasto(gasto, hoje){
   if(pagamento && pagamento.pago) return { status:'pago', pagamento };
   const venc = dataVencimentoNoMes(gasto, ano, mes);
   const diffDias = Math.round((venc - new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())) / (1000*60*60*24));
-  if(diffDias < 0) return { status:'vencido', diffDias, venc };
-  if(diffDias <= 5) return { status:'proximo', diffDias, venc };
-  return { status:'normal', diffDias, venc };
+  if(diffDias < 0) return { status:'vencido', diffDias, venc, pagamento };
+  if(diffDias <= 5) return { status:'proximo', diffDias, venc, pagamento };
+  return { status:'normal', diffDias, venc, pagamento };
 }
 
 function renderMain(){
@@ -261,29 +262,39 @@ function renderMain(){
     row.appendChild(el('div', { class:'status-chip status-'+sit.status }, document.createTextNode(statusLabel)));
     card.appendChild(row);
 
+    function linkVerArquivo(dataUrl, nome, tipo, rotulo){
+      const wrap = el('div', { style:'margin-top:4px;' });
+      const link = el('span', { class:'acao-link', style:'font-size:11.5px;' },
+        document.createTextNode((tipo==='pdf'?'📄 ':'🖼 ')+rotulo+': '+(nome||'arquivo')));
+      link.onclick = () => {
+        const janela = window.open();
+        if(tipo==='pdf') janela.location.href = dataUrl;
+        else janela.document.write('<img src="'+dataUrl+'" style="max-width:100%;">');
+      };
+      wrap.appendChild(link);
+      return wrap;
+    }
+
+    if(sit.pagamento && sit.pagamento.boletoDataUrl){
+      card.appendChild(linkVerArquivo(sit.pagamento.boletoDataUrl, sit.pagamento.boletoNome, sit.pagamento.boletoTipo, 'Boleto'));
+    }
     if(sit.status==='pago' && sit.pagamento){
       card.appendChild(el('div', { class:'gasto-sub', style:'margin-top:6px;' }, document.createTextNode(
         'Pago em '+formatDateBR(sit.pagamento.dataPagamento)+' — R$ '+formatMoney(sit.pagamento.valorPago)
       )));
-      if(sit.pagamento.anexoDataUrl){
-        const linkAnexo = el('div', { style:'margin-top:4px;' });
-        const abrirLink = el('span', { class:'acao-link', style:'font-size:11.5px;' },
-          document.createTextNode((sit.pagamento.anexoTipo==='pdf'?'📄 ':'🖼 ')+'Ver '+(sit.pagamento.anexoNome||'anexo')));
-        abrirLink.onclick = () => {
-          const janela = window.open();
-          if(sit.pagamento.anexoTipo==='pdf') janela.location.href = sit.pagamento.anexoDataUrl;
-          else janela.document.write('<img src="'+sit.pagamento.anexoDataUrl+'" style="max-width:100%;">');
-        };
-        linkAnexo.appendChild(abrirLink);
-        card.appendChild(linkAnexo);
+      if(sit.pagamento.comprovanteDataUrl){
+        card.appendChild(linkVerArquivo(sit.pagamento.comprovanteDataUrl, sit.pagamento.comprovanteNome, sit.pagamento.comprovanteTipo, 'Comprovante'));
       }
     }
 
     const acoes = el('div', { class:'acoes-gasto' });
     if(sit.status !== 'pago'){
       const pagarLink = el('span', { class:'acao-link' }, document.createTextNode('Marcar como pago'));
-      pagarLink.onclick = () => { gastoPagandoId = (gastoPagandoId===gasto.id)?null:gasto.id; gastoEditandoId=null; renderMain(); };
+      pagarLink.onclick = () => { gastoPagandoId = (gastoPagandoId===gasto.id)?null:gasto.id; gastoEditandoId=null; boletoAnexandoId=null; renderMain(); };
       acoes.appendChild(pagarLink);
+      const anexarBoletoLink = el('span', { class:'acao-link' }, document.createTextNode('📎 Anexar boleto'));
+      anexarBoletoLink.onclick = () => { boletoAnexandoId = (boletoAnexandoId===gasto.id)?null:gasto.id; gastoPagandoId=null; gastoEditandoId=null; renderMain(); };
+      acoes.appendChild(anexarBoletoLink);
     } else {
       const desmarcarLink = el('span', { class:'acao-link' }, document.createTextNode('Desmarcar pagamento'));
       desmarcarLink.onclick = async () => {
@@ -310,7 +321,8 @@ function renderMain(){
       const hojeISO = new Date().toISOString().slice(0,10);
       const pagamentoAnterior = pagamentoDoMes(gasto, new Date().getFullYear(), new Date().getMonth()+1);
       const dadosPagto = { valorPago: gasto.valorEstimado||0, dataPagamento: hojeISO,
-        anexoDataUrl: (pagamentoAnterior&&pagamentoAnterior.anexoDataUrl)||'', anexoNome: (pagamentoAnterior&&pagamentoAnterior.anexoNome)||'', anexoTipo: (pagamentoAnterior&&pagamentoAnterior.anexoTipo)||'' };
+        boletoDataUrl: (pagamentoAnterior&&pagamentoAnterior.boletoDataUrl)||'', boletoNome: (pagamentoAnterior&&pagamentoAnterior.boletoNome)||'', boletoTipo: (pagamentoAnterior&&pagamentoAnterior.boletoTipo)||'',
+        comprovanteDataUrl: '', comprovanteNome: '', comprovanteTipo: '' };
       const rowPagto = el('div', { class:'row' });
       const campoValor = el('div', { class:'field', style:'margin-bottom:0;' });
       campoValor.appendChild(el('label', {}, document.createTextNode('Valor pago')));
@@ -326,25 +338,43 @@ function renderMain(){
       rowPagto.appendChild(campoData);
       form.appendChild(rowPagto);
 
-      const campoAnexo = el('div', { class:'field', style:'margin-top:10px;' });
-      campoAnexo.appendChild(el('label', {}, document.createTextNode('Foto do boleto/comprovante ou PDF (opcional)')));
-      const anexoStatus = el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:6px;' },
-        document.createTextNode(dadosPagto.anexoNome ? ('Anexado: '+dadosPagto.anexoNome) : 'Nenhum arquivo anexado ainda.'));
-      campoAnexo.appendChild(anexoStatus);
-      const inputAnexo = el('input', { type:'file', accept:'image/*,application/pdf' });
-      inputAnexo.onchange = (e) => {
+      // Campo 1: boleto (a conta em si) — se já foi anexado antes de pagar, já vem preenchido aqui
+      const campoBoleto = el('div', { class:'field', style:'margin-top:10px;' });
+      campoBoleto.appendChild(el('label', {}, document.createTextNode('Boleto (foto ou PDF)')));
+      const boletoStatus = el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:6px;' },
+        document.createTextNode(dadosPagto.boletoNome ? ('Anexado: '+dadosPagto.boletoNome) : 'Nenhum boleto anexado ainda.'));
+      campoBoleto.appendChild(boletoStatus);
+      const inputBoleto = el('input', { type:'file', accept:'image/*,application/pdf' });
+      inputBoleto.onchange = (e) => {
         const file = e.target.files[0];
         if(!file) return;
         processarArquivoAnexo(file, (dataUrl, tipo) => {
-          dadosPagto.anexoDataUrl = dataUrl;
-          dadosPagto.anexoNome = file.name;
-          dadosPagto.anexoTipo = tipo;
-          anexoStatus.textContent = 'Anexado: '+file.name;
-          toast('Arquivo carregado!');
+          dadosPagto.boletoDataUrl = dataUrl; dadosPagto.boletoNome = file.name; dadosPagto.boletoTipo = tipo;
+          boletoStatus.textContent = 'Anexado: '+file.name;
+          toast('Boleto carregado!');
         });
       };
-      campoAnexo.appendChild(inputAnexo);
-      form.appendChild(campoAnexo);
+      campoBoleto.appendChild(inputBoleto);
+      form.appendChild(campoBoleto);
+
+      // Campo 2: comprovante de pagamento — separado do boleto
+      const campoComprovante = el('div', { class:'field', style:'margin-top:10px;' });
+      campoComprovante.appendChild(el('label', {}, document.createTextNode('Comprovante de pagamento (foto ou PDF)')));
+      const comprovanteStatus = el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:6px;' },
+        document.createTextNode('Nenhum comprovante anexado ainda.'));
+      campoComprovante.appendChild(comprovanteStatus);
+      const inputComprovante = el('input', { type:'file', accept:'image/*,application/pdf' });
+      inputComprovante.onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        processarArquivoAnexo(file, (dataUrl, tipo) => {
+          dadosPagto.comprovanteDataUrl = dataUrl; dadosPagto.comprovanteNome = file.name; dadosPagto.comprovanteTipo = tipo;
+          comprovanteStatus.textContent = 'Anexado: '+file.name;
+          toast('Comprovante carregado!');
+        });
+      };
+      campoComprovante.appendChild(inputComprovante);
+      form.appendChild(campoComprovante);
 
       const confirmarBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:var(--green);' }, document.createTextNode('Confirmar pagamento'));
       confirmarBtn.onclick = async () => {
@@ -353,13 +383,47 @@ function renderMain(){
         gasto.pagamentos = gasto.pagamentos.filter(p => !(p.ano===hoje2.getFullYear() && p.mes===hoje2.getMonth()+1));
         gasto.pagamentos.push({
           ano:hoje2.getFullYear(), mes:hoje2.getMonth()+1, pago:true, valorPago:dadosPagto.valorPago, dataPagamento:dadosPagto.dataPagamento,
-          anexoDataUrl: dadosPagto.anexoDataUrl, anexoNome: dadosPagto.anexoNome, anexoTipo: dadosPagto.anexoTipo,
+          boletoDataUrl: dadosPagto.boletoDataUrl, boletoNome: dadosPagto.boletoNome, boletoTipo: dadosPagto.boletoTipo,
+          comprovanteDataUrl: dadosPagto.comprovanteDataUrl, comprovanteNome: dadosPagto.comprovanteNome, comprovanteTipo: dadosPagto.comprovanteTipo,
         });
         gastoPagandoId = null;
         await saveProgress(); renderMain();
         toast('Pagamento registrado!');
       };
       form.appendChild(confirmarBtn);
+      card.appendChild(form);
+    }
+
+    if(boletoAnexandoId === gasto.id){
+      const form = el('div', { class:'mini-form' });
+      const hoje2 = new Date();
+      const pagamentoAtual = pagamentoDoMes(gasto, hoje2.getFullYear(), hoje2.getMonth()+1);
+      form.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:6px;' }, document.createTextNode('Anexar boleto (antes mesmo de pagar)')));
+      const statusBoletoSolo = el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:6px;' },
+        document.createTextNode((pagamentoAtual&&pagamentoAtual.boletoNome) ? ('Anexado: '+pagamentoAtual.boletoNome) : 'Nenhum boleto anexado ainda esse mês.'));
+      form.appendChild(statusBoletoSolo);
+      const inputBoletoSolo = el('input', { type:'file', accept:'image/*,application/pdf' });
+      inputBoletoSolo.onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        processarArquivoAnexo(file, async (dataUrl, tipo) => {
+          if(!gasto.pagamentos) gasto.pagamentos = [];
+          let pagto = pagamentoDoMes(gasto, hoje2.getFullYear(), hoje2.getMonth()+1);
+          if(!pagto){
+            pagto = { ano:hoje2.getFullYear(), mes:hoje2.getMonth()+1, pago:false, valorPago:0, dataPagamento:'' };
+            gasto.pagamentos.push(pagto);
+          }
+          pagto.boletoDataUrl = dataUrl; pagto.boletoNome = file.name; pagto.boletoTipo = tipo;
+          await saveProgress();
+          boletoAnexandoId = null;
+          renderMain();
+          toast('Boleto anexado!');
+        });
+      };
+      form.appendChild(inputBoletoSolo);
+      const fecharBoletoBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
+      fecharBoletoBtn.onclick = () => { boletoAnexandoId = null; renderMain(); };
+      form.appendChild(fecharBoletoBtn);
       card.appendChild(form);
     }
 
