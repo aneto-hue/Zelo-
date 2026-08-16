@@ -244,6 +244,16 @@ function extrairAnoMes(dataStr){
   if(br) return { ano: parseInt(br[3],10), mes: parseInt(br[2],10) };
   return null;
 }
+// Mesma ideia acima, mas devolve a data completa (com dia) já normalizada em AAAA-MM-DD, pra
+// comparações de período (dataIni/dataFim) e de "já venceu" que precisam do dia exato.
+function dataParaISO(dataStr){
+  if(!dataStr) return '';
+  const iso = String(dataStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(iso) return iso[1]+'-'+iso[2]+'-'+iso[3];
+  const br = String(dataStr).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(br) return br[3]+'-'+br[2]+'-'+br[1];
+  return '';
+}
 
 function getProfissional(id){ return state.profissionais.find(p=>p.id===id); }
 
@@ -776,11 +786,11 @@ function renderPlanilhaLancamentos(container){
       const corAutoApuracao = (p.pago || ehCartaoApuracao) ? 'verde' : 'outra';
       const corFinalApuracao = p.corManual || corAutoApuracao;
       const foiRecebidaApuracao = corFinalApuracao === 'verde';
-      const dataParaPeriodo = p.data;
+      const dataParaPeriodo = dataParaISO(p.data);
       if(filtroApuracao.dataIni && (!dataParaPeriodo || dataParaPeriodo < filtroApuracao.dataIni)) return;
       if(filtroApuracao.dataFim && (!dataParaPeriodo || dataParaPeriodo > filtroApuracao.dataFim)) return;
       if(filtroApuracao.status){
-        const vencidaAuto = !p.pago && !ehCartaoApuracao && p.data && p.data < hojeISOFiltro;
+        const vencidaAuto = !p.pago && !ehCartaoApuracao && dataParaPeriodo && dataParaPeriodo < hojeISOFiltro;
         const vencida = p.corManual ? (p.corManual === 'vermelho') : vencidaAuto;
         if(filtroApuracao.status === 'recebidos' && !foiRecebidaApuracao) return;
         if(filtroApuracao.status === 'vencidos' && !vencida) return;
@@ -1016,7 +1026,8 @@ function renderPlanilhaLancamentos(container){
       }
       const { p, i } = achado;
       const hojeISOCor = new Date().toISOString().slice(0,10);
-      const vencida = !p.pago && p.data && p.data < hojeISOCor;
+      const dataParcelaIso = dataParaISO(p.data);
+      const vencida = !p.pago && dataParcelaIso && dataParcelaIso < hojeISOCor;
       const ehCartao = /cart[ãa]o/i.test(p.forma||linha.forma||'');
       let corAuto;
       if(p.pago || ehCartao) corAuto = 'verde';       // quitada, ou cartão (praticamente garantido)
@@ -1650,7 +1661,7 @@ function renderLancamentoExpandido(container, lanc){
     const hojeISOParcela = new Date().toISOString().slice(0,10);
     const FORMAS_PAGAMENTO = ['', 'Cartão de crédito', 'Cartão de Débito', 'Pix', 'Dinheiro', 'Promissória', 'Boleto'];
     lanc.parcelas.forEach((p, pi) => {
-      const atrasada = !p.pago && p.data && p.data < hojeISOParcela;
+      const atrasada = !p.pago && dataParaISO(p.data) && dataParaISO(p.data) < hojeISOParcela;
       const row = el('div', { class:'parcela-row'+(p.pago?' pago':''), style: atrasada ? 'border-color:var(--red);' : '' });
       const info = el('div', { class:'parcela-info', style:'flex:1;' });
 

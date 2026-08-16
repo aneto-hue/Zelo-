@@ -422,6 +422,18 @@ async function render(){
   const mesAtual = hojeISO.slice(0,7);
   const diaSemana = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'][hoje.getDay()];
 
+  // Aceita tanto AAAA-MM-DD (formato atual) quanto DD/MM/AAAA (formato antigo, de registros
+  // criados antes de uma correção anterior) — sem isso, parcelas mais antigas somem
+  // silenciosamente dos cálculos de "recebido este mês" e "atrasadas".
+  function dataParaISO(dataStr){
+    if(!dataStr) return '';
+    const iso = String(dataStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso) return iso[1]+'-'+iso[2]+'-'+iso[3];
+    const br = String(dataStr).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(br) return br[3]+'-'+br[2]+'-'+br[1];
+    return '';
+  }
+
   const [dadosAgenda, dadosFinanceiro] = await Promise.all([
     ClinicaStorage.load('controle_agendamento_progresso_v1'),
     ClinicaStorage.load('controle_pagamentos_comissoes_v1'),
@@ -448,18 +460,19 @@ async function render(){
       // VENCIMENTO da parcela (a coluna em que ela aparece), nunca pela data em que foi
       // confirmada depois. Cartão conta como garantido mesmo sem confirmar; cor manual
       // (verde/vermelho), quando definida à mão, sempre tem a palavra final.
+      const dataVencIso = dataParaISO(p.data);
       const ehCartao = /cart[ãa]o/i.test(p.forma||'');
       const corAutoRecebido = (p.pago || ehCartao) ? 'verde' : 'outra';
       const corFinalRecebido = p.corManual || corAutoRecebido;
-      const mesDaParcela = (p.data || '').slice(0,7);
+      const mesDaParcela = dataVencIso.slice(0,7);
       if(corFinalRecebido === 'verde' && mesDaParcela === mesAtual) faturamentoMes += parseFloat(p.valor)||0;
       // Mesma regra visual do Financeiro: cor manual sempre manda: "verde" nunca conta como
       // atrasada, "vermelho" sempre conta. Sem cor manual, considera atrasada só quem já
       // venceu e ainda não foi paga (forma cartão de crédito não entra aqui, pois lá no
       // Financeiro ela já é tratada como praticamente garantida assim que aprovada).
-      const vencidaBase = !p.pago && p.data && p.data < hojeISO && !ehCartao;
+      const vencidaBase = !p.pago && dataVencIso && dataVencIso < hojeISO && !ehCartao;
       const estaAtrasada = p.corManual ? (p.corManual === 'vermelho') : vencidaBase;
-      if(estaAtrasada){ atrasados++; parcelasAtrasadas.push({ paciente:l.paciente, valor:p.valor, data:p.data }); }
+      if(estaAtrasada){ atrasados++; parcelasAtrasadas.push({ paciente:l.paciente, valor:p.valor, data:dataVencIso }); }
     });
   });
 
