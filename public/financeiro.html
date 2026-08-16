@@ -534,7 +534,7 @@ let lancamentoExpandido = null;
 
 function renderNovoLancamentoForm(container){
   const form = el('div', { class:'card', style:'border-color:var(--blue-dark);' });
-  const dadosTemp = { paciente:'', profissionalId:'', valorTotal:'' };
+  const dadosTemp = { paciente:'', profissionalId: restricaoProfissionalId||'', valorTotal:'' };
   const pacField = el('div', { class:'field' });
   pacField.appendChild(el('label', {}, document.createTextNode('Paciente')));
   const pacDatalistId = typeof clinicaGarantirDatalist === 'function' ? clinicaGarantirDatalist() : null;
@@ -546,11 +546,17 @@ function renderNovoLancamentoForm(container){
 
   const profField = el('div', { class:'field' });
   profField.appendChild(el('label', {}, document.createTextNode('Profissional')));
-  const profSelect = el('select', {});
-  profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Selecione...')));
-  state.profissionais.forEach(p => profSelect.appendChild(el('option', { value:p.id }, document.createTextNode(p.nome))));
-  profSelect.onchange = (e) => { dadosTemp.profissionalId = e.target.value; };
-  profField.appendChild(profSelect);
+  if(restricaoProfissionalId){
+    // Quem não é admin só lança em nome de si mesmo — nem mostra a escolha.
+    profField.appendChild(el('div', { style:'padding:9px 10px;font-size:14px;font-weight:700;color:var(--blue-dark);' },
+      document.createTextNode(window._clinicaMe.nome + ' (você)')));
+  } else {
+    const profSelect = el('select', {});
+    profSelect.appendChild(el('option', { value:'' }, document.createTextNode('Selecione...')));
+    state.profissionais.forEach(p => profSelect.appendChild(el('option', { value:p.id }, document.createTextNode(p.nome))));
+    profSelect.onchange = (e) => { dadosTemp.profissionalId = e.target.value; };
+    profField.appendChild(profSelect);
+  }
   form.appendChild(profField);
 
   const valorField = el('div', { class:'field' });
@@ -661,14 +667,21 @@ function renderPlanilhaLancamentos(container){
     return;
   }
 
-  // Monta todas as linhas de todos os lançamentos.
+  // Monta todas as linhas de todos os lançamentos. Quando o usuário logado não é admin, já
+  // corta aqui mesmo pra só as linhas dele — os dados dos outros profissionais nem chegam a
+  // ser processados ou exibidos em lugar nenhum desta tela.
   const todasLinhasCompletas = [];
-  state.lancamentos.forEach(lanc => getLinhasDaPlanilha(lanc).forEach(linha => todasLinhasCompletas.push(linha)));
+  state.lancamentos.forEach(lanc => getLinhasDaPlanilha(lanc).forEach(linha => {
+    if(restricaoProfissionalId && linha.profissionalId !== restricaoProfissionalId) return;
+    todasLinhasCompletas.push(linha);
+  }));
 
   // ===================== FILTROS DE APURAÇÃO =====================
   const hojeISOFiltro = new Date().toISOString().slice(0,10);
   const filtrosWrap = el('div', { style:'background:#F4F8FB;border-radius:12px;padding:12px 14px;margin-bottom:16px;' });
-  filtrosWrap.appendChild(el('div', { style:'font-weight:700;font-size:13px;margin-bottom:10px;' }, document.createTextNode('Filtros pra apurar valores')));
+  filtrosWrap.appendChild(el('div', { style:'font-weight:700;font-size:13px;margin-bottom:10px;' }, document.createTextNode(
+    restricaoProfissionalId ? 'Filtros pra apurar seus valores' : 'Filtros pra apurar valores'
+  )));
 
   const linhaFiltro1 = el('div', { style:'display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;' });
   const campoDe = el('div', {});
@@ -685,18 +698,28 @@ function renderPlanilhaLancamentos(container){
   campoAte.appendChild(inputAte);
   linhaFiltro1.appendChild(campoAte);
 
-  const campoProf = el('div', {});
-  campoProf.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Profissional')));
-  const selectProfFiltro = el('select', { style:'padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
-  selectProfFiltro.appendChild(el('option', { value:'' }, document.createTextNode('Todos')));
-  state.profissionais.forEach(pr => {
-    const opt = el('option', { value:pr.id }, document.createTextNode(pr.nome));
-    if(filtroApuracao.profissionalId===pr.id) opt.setAttribute('selected','selected');
-    selectProfFiltro.appendChild(opt);
-  });
-  selectProfFiltro.onchange = (e) => { filtroApuracao.profissionalId = e.target.value; refreshPanel(); };
-  campoProf.appendChild(selectProfFiltro);
-  linhaFiltro1.appendChild(campoProf);
+  // Quem não é admin não escolhe profissional — já está travado no próprio, então só mostra
+  // um texto informativo em vez do seletor.
+  if(restricaoProfissionalId){
+    const campoProfTravado = el('div', {});
+    campoProfTravado.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Profissional')));
+    campoProfTravado.appendChild(el('div', { style:'padding:6px 8px;font-size:13px;font-weight:700;color:var(--blue-dark);' },
+      document.createTextNode(window._clinicaMe.nome + ' (você)')));
+    linhaFiltro1.appendChild(campoProfTravado);
+  } else {
+    const campoProf = el('div', {});
+    campoProf.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Profissional')));
+    const selectProfFiltro = el('select', { style:'padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+    selectProfFiltro.appendChild(el('option', { value:'' }, document.createTextNode('Todos')));
+    state.profissionais.forEach(pr => {
+      const opt = el('option', { value:pr.id }, document.createTextNode(pr.nome));
+      if(filtroApuracao.profissionalId===pr.id) opt.setAttribute('selected','selected');
+      selectProfFiltro.appendChild(opt);
+    });
+    selectProfFiltro.onchange = (e) => { filtroApuracao.profissionalId = e.target.value; refreshPanel(); };
+    campoProf.appendChild(selectProfFiltro);
+    linhaFiltro1.appendChild(campoProf);
+  }
 
   const campoForma = el('div', {});
   campoForma.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Forma de pagamento')));
@@ -728,7 +751,7 @@ function renderPlanilhaLancamentos(container){
   const temFiltroAtivo = filtroApuracao.dataIni || filtroApuracao.dataFim || filtroApuracao.profissionalId || filtroApuracao.forma || filtroApuracao.status;
   if(temFiltroAtivo){
     const limparBtn = el('span', { style:'color:var(--blue-dark);text-decoration:underline;cursor:pointer;font-size:12.5px;' }, document.createTextNode('Limpar filtros'));
-    limparBtn.onclick = () => { filtroApuracao = { dataIni:'', dataFim:'', profissionalId:'', forma:'', status:'' }; refreshPanel(); };
+    limparBtn.onclick = () => { filtroApuracao = { dataIni:'', dataFim:'', profissionalId: restricaoProfissionalId||'', forma:'', status:'' }; refreshPanel(); };
     linhaFiltro2.appendChild(limparBtn);
   }
   filtrosWrap.appendChild(linhaFiltro2);
@@ -743,17 +766,21 @@ function renderPlanilhaLancamentos(container){
   linhasFiltradas.forEach(linha => {
     (linha.parcelas||[]).forEach(p => {
       if(filtroApuracao.forma && p.forma !== filtroApuracao.forma) return;
-      // Cartão de crédito conta como praticamente garantido (sem risco de inadimplência), então
-      // entra em "Recebidos" mesmo sem confirmação mês a mês — mas só no mês da própria parcela,
-      // nunca vazando pra outro mês. Pra quitada de verdade, o período compara com a data em que
-      // o dinheiro realmente entrou; sem essa data (comum no cartão), cai pra data de vencimento.
+      // "Recebidos" deve bater exatamente com o que aparece VERDE na coluna do mês na
+      // planilha — e essa cor é sempre definida pela data de VENCIMENTO da parcela (a coluna
+      // em que ela aparece), nunca pela data em que foi confirmada depois. Cartão conta como
+      // garantido mesmo sem confirmar; cor manual, quando definida à mão, sempre tem a
+      // palavra final — igual ao painel principal.
       const ehCartaoApuracao = /cart[ãa]o/i.test(p.forma||'');
-      const foiRecebidaApuracao = p.pago || ehCartaoApuracao;
-      const dataParaPeriodo = (filtroApuracao.status === 'recebidos') ? (p.dataRecebimento || p.data) : p.data;
+      const corAutoApuracao = (p.pago || ehCartaoApuracao) ? 'verde' : 'outra';
+      const corFinalApuracao = p.corManual || corAutoApuracao;
+      const foiRecebidaApuracao = corFinalApuracao === 'verde';
+      const dataParaPeriodo = p.data;
       if(filtroApuracao.dataIni && (!dataParaPeriodo || dataParaPeriodo < filtroApuracao.dataIni)) return;
       if(filtroApuracao.dataFim && (!dataParaPeriodo || dataParaPeriodo > filtroApuracao.dataFim)) return;
       if(filtroApuracao.status){
-        const vencida = !p.pago && !ehCartaoApuracao && p.data && p.data < hojeISOFiltro;
+        const vencidaAuto = !p.pago && !ehCartaoApuracao && p.data && p.data < hojeISOFiltro;
+        const vencida = p.corManual ? (p.corManual === 'vermelho') : vencidaAuto;
         if(filtroApuracao.status === 'recebidos' && !foiRecebidaApuracao) return;
         if(filtroApuracao.status === 'vencidos' && !vencida) return;
         if(filtroApuracao.status === 'naoRecebidos' && (foiRecebidaApuracao || vencida)) return;
@@ -1705,6 +1732,7 @@ let historicoAlteracoesAberto = {};
 
 let visaoLancamentos = 'lista'; // 'lista' | 'planilha' — não usado mais na navegação, mantido por compatibilidade
 let filtroApuracao = { dataIni:'', dataFim:'', profissionalId:'', forma:'', status:'' }; // status: '' | 'recebidos' | 'naoRecebidos' | 'vencidos'
+let restricaoProfissionalId = null; // quando definido, o usuário logado só pode ver esse profissional (não é admin)
 let planilhaAno = new Date().getFullYear();
 let filtroBuscaLancamento = '';
 
@@ -2755,6 +2783,17 @@ function refreshPanel(){ renderPanel(currentStep, { keepScroll:true }); }
   await clinicaInitPacientes();
   await loadProgress();
   await carregarProfissionaisCompartilhados();
+
+  // Cada profissional só vê os PRÓPRIOS números no Financeiro; só o administrador (gestor da
+  // clínica) vê todos. A lista de profissionais do Financeiro é separada da lista de login, então
+  // a identificação é feita pelo nome (mesmo padrão já usado em outras partes do sistema).
+  if(window._clinicaMe && window._clinicaMe.papel !== 'admin'){
+    const meuNomeNormalizado = (window._clinicaMe.nome||'').trim().toLowerCase();
+    const meuProfissional = state.profissionais.find(p => (p.nome||'').trim().toLowerCase() === meuNomeNormalizado);
+    restricaoProfissionalId = meuProfissional ? meuProfissional.id : '__nenhum__'; // sem cadastro correspondente = não vê ninguém
+    filtroApuracao.profissionalId = restricaoProfissionalId;
+  }
+
   renderPanel(currentStep);
 })();
 </script>
