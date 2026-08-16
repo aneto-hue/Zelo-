@@ -482,7 +482,7 @@ function renderProfissionais(container){
       if(profissionalEditandoId === p.id){
         const souEuMesmo = window._clinicaMe && window._clinicaMe.id === p.id;
         const souAdminLogado = window._clinicaMe && window._clinicaMe.papel === 'admin';
-        const dadosEdicao = { nome: p.nome, cargo: p.cargo||'', cro: p.cro||'', telefone: p.telefone||'', modulosPermitidos: (p.modulosPermitidos||[]).slice() };
+        const dadosEdicao = { nome: p.nome, papel: p.papel, cargo: p.cargo||'', cro: p.cro||'', telefone: p.telefone||'', modulosPermitidos: (p.modulosPermitidos||[]).slice() };
         const editCampo = el('div', { style:'margin-top:12px;padding-top:12px;border-top:1px solid var(--line-light);' });
         editCampo.appendChild(textField('Nome', dadosEdicao, 'nome', ()=>{}));
         const rowEditExtra = el('div', { class:'row' });
@@ -501,7 +501,9 @@ function renderProfissionais(container){
         cargoEditField.appendChild(cargoEditSelect);
         editCampo.appendChild(cargoEditField);
         if(souAdminLogado){
-          renderSeletorModulos(dadosEdicao, editCampo);
+          const modulosWrap = el('div', {});
+          editCampo.appendChild(modulosWrap);
+          renderSeletorModulos(dadosEdicao, modulosWrap);
         }
         card.appendChild(editCampo);
         const salvarEdicaoBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;' }, document.createTextNode('Salvar'));
