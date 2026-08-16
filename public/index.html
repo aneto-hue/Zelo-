@@ -457,7 +457,17 @@ async function render(){
 
   // ---- Saudação ----
   const me = window._clinicaMe;
-  document.getElementById('saudacaoTitulo').textContent = 'Olá' + (me && me.nome ? (', '+me.nome.split(' ')[0]) : '') + '!';
+  // Pula títulos como "Dr"/"Dra"/"Dr."/"Sr" etc. no início do nome, pra saudar pelo primeiro
+  // nome de verdade — "Dr João" deve virar "Olá, João", não "Olá, Dr".
+  function primeiroNomeDeVerdade(nomeCompleto){
+    const TITULOS = ['dr','dra','dr.','dra.','sr','sra','sr.','sra.'];
+    const partes = (nomeCompleto||'').trim().split(/\s+/);
+    let i = 0;
+    while(i < partes.length-1 && TITULOS.includes(partes[i].toLowerCase())) i++;
+    return partes[i] || '';
+  }
+  const primeiroNome = primeiroNomeDeVerdade(me && me.nome);
+  document.getElementById('saudacaoTitulo').textContent = 'Olá' + (primeiroNome ? (', '+primeiroNome) : '') + '!';
   const capitalizada = diaSemana.charAt(0).toUpperCase()+diaSemana.slice(1);
   document.getElementById('saudacaoSub').textContent = capitalizada + ', ' + consultasHoje.length + (consultasHoje.length===1?' consulta agendada':' consultas agendadas') + ' para hoje.';
 

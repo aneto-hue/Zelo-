@@ -743,8 +743,13 @@ function renderPlanilhaLancamentos(container){
   linhasFiltradas.forEach(linha => {
     (linha.parcelas||[]).forEach(p => {
       if(filtroApuracao.forma && p.forma !== filtroApuracao.forma) return;
-      if(filtroApuracao.dataIni && (!p.data || p.data < filtroApuracao.dataIni)) return;
-      if(filtroApuracao.dataFim && (!p.data || p.data > filtroApuracao.dataFim)) return;
+      // Quando o filtro de situação é "Recebidos", o período compara com a data em que o
+      // dinheiro REALMENTE entrou (dataRecebimento) — a mesma lógica do painel principal
+      // ("Recebido este mês"). Nos outros casos (vencidas, não recebidas, ou sem filtro de
+      // situação), o período compara com a data de VENCIMENTO, que é o que existe pra elas.
+      const dataParaPeriodo = (filtroApuracao.status === 'recebidos') ? p.dataRecebimento : p.data;
+      if(filtroApuracao.dataIni && (!dataParaPeriodo || dataParaPeriodo < filtroApuracao.dataIni)) return;
+      if(filtroApuracao.dataFim && (!dataParaPeriodo || dataParaPeriodo > filtroApuracao.dataFim)) return;
       if(filtroApuracao.status){
         const vencida = !p.pago && p.data && p.data < hojeISOFiltro;
         if(filtroApuracao.status === 'recebidos' && !p.pago) return;
