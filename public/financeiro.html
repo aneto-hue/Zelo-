@@ -763,6 +763,7 @@ function renderPlanilhaLancamentos(container){
     if(filtroApuracao.profissionalId && linha.profissionalId !== filtroApuracao.profissionalId) return false;
     return true;
   });
+  const totalPorProfissionalId = {}; // profissionalId (ou '__sem__') -> soma recebida com os filtros ativos
   linhasFiltradas.forEach(linha => {
     (linha.parcelas||[]).forEach(p => {
       if(filtroApuracao.forma && p.forma !== filtroApuracao.forma) return;
@@ -787,6 +788,8 @@ function renderPlanilhaLancamentos(container){
       }
       totalApurado += p.valor||0;
       qtdParcelasApuradas++;
+      const pid = linha.profissionalId || '__sem__';
+      totalPorProfissionalId[pid] = (totalPorProfissionalId[pid]||0) + (p.valor||0);
     });
   });
   const corResumo = filtroApuracao.status === 'vencidos' ? 'var(--red)' : (filtroApuracao.status === 'recebidos' ? 'var(--green)' : 'var(--blue-dark)');
@@ -796,6 +799,54 @@ function renderPlanilhaLancamentos(container){
   )));
   resumoWrap.appendChild(el('div', { style:'font-size:22px;font-weight:800;color:'+corResumo+';' },
     document.createTextNode('R$ '+formatMoney(totalApurado))));
+
+  // ---- Comissão do profissional (quando um profissional específico está selecionado) ----
+  const profSelecionadoId = filtroApuracao.profissionalId;
+  if(profSelecionadoId){
+    const profSelecionado = state.profissionais.find(p => p.id === profSelecionadoId);
+    if(profSelecionado){
+      const pctAtual = (profSelecionado.pagamento && profSelecionado.pagamento.percentual) || '';
+      const linhaComissaoProf = el('div', { style:'margin-top:12px;padding-top:12px;border-top:1px dashed rgba(0,0,0,0.1);display:flex;align-items:center;gap:10px;flex-wrap:wrap;' });
+      linhaComissaoProf.appendChild(el('span', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode('Comissão desse profissional (%):')));
+      if(window._clinicaMe && window._clinicaMe.papel === 'admin'){
+        const inputPctProf = el('input', { type:'number', min:'0', max:'100', step:'0.1', value: pctAtual, placeholder:'ex: 45',
+          style:'width:70px;padding:5px 7px;border:1.5px solid var(--line);border-radius:6px;font-family:inherit;' });
+        inputPctProf.onchange = (e) => {
+          if(!profSelecionado.pagamento) profSelecionado.pagamento = {};
+          profSelecionado.pagamento.percentual = e.target.value;
+          ClinicaStorage.save(CHAVE_PROFISSIONAIS_COMPARTILHADA, state.profissionais);
+          refreshPanel();
+        };
+        linhaComissaoProf.appendChild(inputPctProf);
+      } else {
+        linhaComissaoProf.appendChild(el('span', { style:'font-weight:700;' }, document.createTextNode((pctAtual||'—')+'%')));
+      }
+      const pctNum = parseFloat(pctAtual)||0;
+      const comissaoCalculada = totalApurado * pctNum/100;
+      linhaComissaoProf.appendChild(el('span', { style:'font-size:15px;font-weight:800;color:var(--green);margin-left:6px;' },
+        document.createTextNode('= R$ '+formatMoney(comissaoCalculada)+' de comissão')));
+      resumoWrap.appendChild(linhaComissaoProf);
+    }
+  } else if(window._clinicaMe && window._clinicaMe.papel === 'admin' && Object.keys(totalPorProfissionalId).length){
+    // ---- Lucro da clínica (só faz sentido vendo todos os profissionais de uma vez, e só admin) ----
+    let totalComissoesTodos = 0;
+    Object.keys(totalPorProfissionalId).forEach(pid => {
+      const prof = state.profissionais.find(p => p.id === pid);
+      const pct = prof && prof.pagamento ? parseFloat(prof.pagamento.percentual)||0 : 0;
+      totalComissoesTodos += totalPorProfissionalId[pid] * pct/100;
+    });
+    const lucroClinica = totalApurado - totalComissoesTodos;
+    const linhaLucro = el('div', { style:'margin-top:12px;padding-top:12px;border-top:1px dashed rgba(0,0,0,0.1);' });
+    linhaLucro.appendChild(el('div', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode(
+      'Lucro da clínica (total recebido menos comissão de cada profissional, pelo % de cada um):'
+    )));
+    linhaLucro.appendChild(el('div', { style:'font-size:18px;font-weight:800;color:var(--blue-dark);' },
+      document.createTextNode('R$ '+formatMoney(lucroClinica))));
+    linhaLucro.appendChild(el('div', { style:'font-size:11px;color:var(--muted);margin-top:2px;' },
+      document.createTextNode('(comissões somadas: R$ '+formatMoney(totalComissoesTodos)+')')));
+    resumoWrap.appendChild(linhaLucro);
+  }
+
   filtrosWrap.appendChild(resumoWrap);
   container.appendChild(filtrosWrap);
 
