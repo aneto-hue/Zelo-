@@ -110,6 +110,33 @@ function toast(msg){
 function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function uid(){ return 'gasto'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
+// Processa o arquivo anexado: se for imagem, redimensiona e comprime (fica bem mais leve pra
+// guardar); se for PDF, lê direto como está. Chama callback(dataUrl, tipo) quando terminar.
+function processarArquivoAnexo(file, callback){
+  if(file.type === 'application/pdf'){
+    const reader = new FileReader();
+    reader.onload = () => callback(reader.result, 'pdf');
+    reader.readAsDataURL(file);
+    return;
+  }
+  // Imagem: redimensiona pro tamanho máximo e comprime em JPEG, igual ao resto do sistema.
+  const maxDim = 1400;
+  const img = new Image();
+  const readerImg = new FileReader();
+  readerImg.onload = () => {
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim){ const scale = maxDim/Math.max(w,h); w = Math.round(w*scale); h = Math.round(h*scale); }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', 0.9), 'imagem');
+    };
+    img.src = readerImg.result;
+  };
+  readerImg.readAsDataURL(file);
+}
+
 const STORAGE_KEY = 'gastos_fixos_v1';
 const CATEGORIAS = ['Água','Luz','Internet','Telefone','Aluguel','Condomínio','Software/Sistema','Contabilidade','Segurança','Limpeza','Outro'];
 let state = { gastos: [] };
@@ -238,6 +265,18 @@ function renderMain(){
       card.appendChild(el('div', { class:'gasto-sub', style:'margin-top:6px;' }, document.createTextNode(
         'Pago em '+formatDateBR(sit.pagamento.dataPagamento)+' — R$ '+formatMoney(sit.pagamento.valorPago)
       )));
+      if(sit.pagamento.anexoDataUrl){
+        const linkAnexo = el('div', { style:'margin-top:4px;' });
+        const abrirLink = el('span', { class:'acao-link', style:'font-size:11.5px;' },
+          document.createTextNode((sit.pagamento.anexoTipo==='pdf'?'📄 ':'🖼 ')+'Ver '+(sit.pagamento.anexoNome||'anexo')));
+        abrirLink.onclick = () => {
+          const janela = window.open();
+          if(sit.pagamento.anexoTipo==='pdf') janela.location.href = sit.pagamento.anexoDataUrl;
+          else janela.document.write('<img src="'+sit.pagamento.anexoDataUrl+'" style="max-width:100%;">');
+        };
+        linkAnexo.appendChild(abrirLink);
+        card.appendChild(linkAnexo);
+      }
     }
 
     const acoes = el('div', { class:'acoes-gasto' });
@@ -269,7 +308,9 @@ function renderMain(){
     if(gastoPagandoId === gasto.id){
       const form = el('div', { class:'mini-form' });
       const hojeISO = new Date().toISOString().slice(0,10);
-      const dadosPagto = { valorPago: gasto.valorEstimado||0, dataPagamento: hojeISO };
+      const pagamentoAnterior = pagamentoDoMes(gasto, new Date().getFullYear(), new Date().getMonth()+1);
+      const dadosPagto = { valorPago: gasto.valorEstimado||0, dataPagamento: hojeISO,
+        anexoDataUrl: (pagamentoAnterior&&pagamentoAnterior.anexoDataUrl)||'', anexoNome: (pagamentoAnterior&&pagamentoAnterior.anexoNome)||'', anexoTipo: (pagamentoAnterior&&pagamentoAnterior.anexoTipo)||'' };
       const rowPagto = el('div', { class:'row' });
       const campoValor = el('div', { class:'field', style:'margin-bottom:0;' });
       campoValor.appendChild(el('label', {}, document.createTextNode('Valor pago')));
@@ -284,12 +325,36 @@ function renderMain(){
       campoData.appendChild(inputData);
       rowPagto.appendChild(campoData);
       form.appendChild(rowPagto);
+
+      const campoAnexo = el('div', { class:'field', style:'margin-top:10px;' });
+      campoAnexo.appendChild(el('label', {}, document.createTextNode('Foto do boleto/comprovante ou PDF (opcional)')));
+      const anexoStatus = el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:6px;' },
+        document.createTextNode(dadosPagto.anexoNome ? ('Anexado: '+dadosPagto.anexoNome) : 'Nenhum arquivo anexado ainda.'));
+      campoAnexo.appendChild(anexoStatus);
+      const inputAnexo = el('input', { type:'file', accept:'image/*,application/pdf' });
+      inputAnexo.onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        processarArquivoAnexo(file, (dataUrl, tipo) => {
+          dadosPagto.anexoDataUrl = dataUrl;
+          dadosPagto.anexoNome = file.name;
+          dadosPagto.anexoTipo = tipo;
+          anexoStatus.textContent = 'Anexado: '+file.name;
+          toast('Arquivo carregado!');
+        });
+      };
+      campoAnexo.appendChild(inputAnexo);
+      form.appendChild(campoAnexo);
+
       const confirmarBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:var(--green);' }, document.createTextNode('Confirmar pagamento'));
       confirmarBtn.onclick = async () => {
         const hoje2 = new Date();
         if(!gasto.pagamentos) gasto.pagamentos = [];
         gasto.pagamentos = gasto.pagamentos.filter(p => !(p.ano===hoje2.getFullYear() && p.mes===hoje2.getMonth()+1));
-        gasto.pagamentos.push({ ano:hoje2.getFullYear(), mes:hoje2.getMonth()+1, pago:true, valorPago:dadosPagto.valorPago, dataPagamento:dadosPagto.dataPagamento });
+        gasto.pagamentos.push({
+          ano:hoje2.getFullYear(), mes:hoje2.getMonth()+1, pago:true, valorPago:dadosPagto.valorPago, dataPagamento:dadosPagto.dataPagamento,
+          anexoDataUrl: dadosPagto.anexoDataUrl, anexoNome: dadosPagto.anexoNome, anexoTipo: dadosPagto.anexoTipo,
+        });
         gastoPagandoId = null;
         await saveProgress(); renderMain();
         toast('Pagamento registrado!');
