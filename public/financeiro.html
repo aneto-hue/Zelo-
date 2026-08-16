@@ -743,18 +743,20 @@ function renderPlanilhaLancamentos(container){
   linhasFiltradas.forEach(linha => {
     (linha.parcelas||[]).forEach(p => {
       if(filtroApuracao.forma && p.forma !== filtroApuracao.forma) return;
-      // Quando o filtro de situação é "Recebidos", o período compara com a data em que o
-      // dinheiro REALMENTE entrou (dataRecebimento) — a mesma lógica do painel principal
-      // ("Recebido este mês"). Nos outros casos (vencidas, não recebidas, ou sem filtro de
-      // situação), o período compara com a data de VENCIMENTO, que é o que existe pra elas.
-      const dataParaPeriodo = (filtroApuracao.status === 'recebidos') ? p.dataRecebimento : p.data;
+      // Cartão de crédito conta como praticamente garantido (sem risco de inadimplência), então
+      // entra em "Recebidos" mesmo sem confirmação mês a mês — mas só no mês da própria parcela,
+      // nunca vazando pra outro mês. Pra quitada de verdade, o período compara com a data em que
+      // o dinheiro realmente entrou; sem essa data (comum no cartão), cai pra data de vencimento.
+      const ehCartaoApuracao = /cart[ãa]o/i.test(p.forma||'');
+      const foiRecebidaApuracao = p.pago || ehCartaoApuracao;
+      const dataParaPeriodo = (filtroApuracao.status === 'recebidos') ? (p.dataRecebimento || p.data) : p.data;
       if(filtroApuracao.dataIni && (!dataParaPeriodo || dataParaPeriodo < filtroApuracao.dataIni)) return;
       if(filtroApuracao.dataFim && (!dataParaPeriodo || dataParaPeriodo > filtroApuracao.dataFim)) return;
       if(filtroApuracao.status){
-        const vencida = !p.pago && p.data && p.data < hojeISOFiltro;
-        if(filtroApuracao.status === 'recebidos' && !p.pago) return;
+        const vencida = !p.pago && !ehCartaoApuracao && p.data && p.data < hojeISOFiltro;
+        if(filtroApuracao.status === 'recebidos' && !foiRecebidaApuracao) return;
         if(filtroApuracao.status === 'vencidos' && !vencida) return;
-        if(filtroApuracao.status === 'naoRecebidos' && (p.pago || vencida)) return;
+        if(filtroApuracao.status === 'naoRecebidos' && (foiRecebidaApuracao || vencida)) return;
       }
       totalApurado += p.valor||0;
       qtdParcelasApuradas++;

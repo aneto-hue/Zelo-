@@ -443,12 +443,19 @@ async function render(){
       ...((l.linhasDerivadas||[]).flatMap(ld => ld.parcelas||[])),
     ];
     todasParcelasDoLancamento.forEach(p => {
-      if(p.pago && p.dataRecebimento && p.dataRecebimento.slice(0,7) === mesAtual) faturamentoMes += parseFloat(p.valor)||0;
+      // Cartão de crédito conta como praticamente garantido (sem risco de inadimplência), então
+      // entra no "recebido" mesmo sem confirmação mês a mês — mas só no mês em que a PARCELA
+      // dela mesma vence, nunca contando pra outro mês. Pra quitada de verdade, usa a data em
+      // que o dinheiro realmente entrou; sem essa data (comum no cartão), cai pra data de
+      // vencimento — que é, de qualquer forma, o mês da própria coluna dela na planilha.
+      const ehCartao = /cart[ãa]o/i.test(p.forma||'');
+      const foiRecebida = p.pago || ehCartao;
+      const mesDaParcela = (p.dataRecebimento || p.data || '').slice(0,7);
+      if(foiRecebida && mesDaParcela === mesAtual) faturamentoMes += parseFloat(p.valor)||0;
       // Mesma regra visual do Financeiro: cor manual sempre manda: "verde" nunca conta como
       // atrasada, "vermelho" sempre conta. Sem cor manual, considera atrasada só quem já
       // venceu e ainda não foi paga (forma cartão de crédito não entra aqui, pois lá no
       // Financeiro ela já é tratada como praticamente garantida assim que aprovada).
-      const ehCartao = /cart[ãa]o/i.test(p.forma||'');
       const vencidaBase = !p.pago && p.data && p.data < hojeISO && !ehCartao;
       const estaAtrasada = p.corManual ? (p.corManual === 'vermelho') : vencidaBase;
       if(estaAtrasada){ atrasados++; parcelasAtrasadas.push({ paciente:l.paciente, valor:p.valor, data:p.data }); }
