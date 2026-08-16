@@ -434,10 +434,26 @@ async function render(){
   const lancamentos = (dadosFinanceiro && dadosFinanceiro.lancamentos) || [];
   let faturamentoMes = 0, atrasados = 0;
   const parcelasAtrasadas = [];
-  lancamentos.forEach(l => (l.parcelas||[]).forEach(p => {
-    if(p.pago && p.dataRecebimento && p.dataRecebimento.slice(0,7) === mesAtual) faturamentoMes += parseFloat(p.valor)||0;
-    if(!p.pago && p.data && p.data < hojeISO){ atrasados++; parcelasAtrasadas.push({ paciente:l.paciente, valor:p.valor, data:p.data }); }
-  }));
+  // Junta as parcelas do lançamento "principal" com as de qualquer linha derivada (quando um
+  // tratamento foi atribuído a outro profissional) — sem isso, tudo que estava numa linha
+  // desmembrada ficava de fora da conta, e os números não batiam com os da tela do Financeiro.
+  lancamentos.forEach(l => {
+    const todasParcelasDoLancamento = [
+      ...(l.parcelas||[]),
+      ...((l.linhasDerivadas||[]).flatMap(ld => ld.parcelas||[])),
+    ];
+    todasParcelasDoLancamento.forEach(p => {
+      if(p.pago && p.dataRecebimento && p.dataRecebimento.slice(0,7) === mesAtual) faturamentoMes += parseFloat(p.valor)||0;
+      // Mesma regra visual do Financeiro: cor manual sempre manda: "verde" nunca conta como
+      // atrasada, "vermelho" sempre conta. Sem cor manual, considera atrasada só quem já
+      // venceu e ainda não foi paga (forma cartão de crédito não entra aqui, pois lá no
+      // Financeiro ela já é tratada como praticamente garantida assim que aprovada).
+      const ehCartao = /cart[ãa]o/i.test(p.forma||'');
+      const vencidaBase = !p.pago && p.data && p.data < hojeISO && !ehCartao;
+      const estaAtrasada = p.corManual ? (p.corManual === 'vermelho') : vencidaBase;
+      if(estaAtrasada){ atrasados++; parcelasAtrasadas.push({ paciente:l.paciente, valor:p.valor, data:p.data }); }
+    });
+  });
 
   // ---- Saudação ----
   const me = window._clinicaMe;
