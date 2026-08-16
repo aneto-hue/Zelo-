@@ -67,6 +67,7 @@ function el(tag, attrs={}, children=[]){
 
 let novoPacienteAberto = false;
 let filtroPacientes = '';
+let confirmandoExcluirPacienteId = null;
 
 function maskCPF(v){
   v = v.replace(/\D/g,'').slice(0,11);
@@ -380,15 +381,33 @@ function render(){
         }
       };
       card.appendChild(linkBtn);
-      const del = el('span', { class:'pac-del' }, document.createTextNode('✕'));
-      del.onclick = (e) => {
-        e.stopPropagation();
-        if(confirm('Remover "'+p.nome+'" do cadastro compartilhado? Isso não apaga fichas ou consultas já criadas, só o cadastro central.')){
-          clinicaRemovePaciente(p.id);
-          render();
+      const souAdminPac = window._clinicaMe && window._clinicaMe.papel === 'admin';
+      if(souAdminPac){
+        if(confirmandoExcluirPacienteId === p.id){
+          const avisoExcluir = el('div', { style:'width:100%;font-size:11px;color:var(--muted);margin:4px 0;' },
+            document.createTextNode('Isso não apaga fichas ou consultas já criadas, só o cadastro central. Confirma?'));
+          card.appendChild(avisoExcluir);
+          const simBtn = el('span', { style:'color:#fff;background:var(--red);border-radius:6px;padding:3px 9px;cursor:pointer;font-weight:700;font-size:11.5px;margin-right:6px;' }, document.createTextNode('Sim, excluir'));
+          simBtn.onclick = (e) => {
+            e.stopPropagation();
+            clinicaRemovePaciente(p.id);
+            confirmandoExcluirPacienteId = null;
+            render();
+          };
+          card.appendChild(simBtn);
+          const naoBtn = el('span', { style:'color:var(--muted);cursor:pointer;font-size:11.5px;text-decoration:underline;' }, document.createTextNode('Cancelar'));
+          naoBtn.onclick = (e) => { e.stopPropagation(); confirmandoExcluirPacienteId = null; render(); };
+          card.appendChild(naoBtn);
+        } else {
+          const del = el('span', { class:'pac-del', title:'Excluir cadastro (apenas gestor da clínica)' }, document.createTextNode('✕'));
+          del.onclick = (e) => {
+            e.stopPropagation();
+            confirmandoExcluirPacienteId = p.id;
+            render();
+          };
+          card.appendChild(del);
         }
-      };
-      card.appendChild(del);
+      }
       listaWrap.appendChild(card);
     });
   }
@@ -398,6 +417,7 @@ function render(){
   await aplicarIdentidadeClinica();
   const meResp = await fetch('/api/me', { credentials:'same-origin' });
   if(meResp.status === 401){ window.location.href = '/login.html'; return; }
+  window._clinicaMe = await meResp.json();
   await clinicaInitPacientes();
   const params = new URLSearchParams(window.location.search);
   const buscaDaUrl = params.get('busca');
