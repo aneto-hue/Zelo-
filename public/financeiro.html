@@ -662,8 +662,107 @@ function renderPlanilhaLancamentos(container){
   }
 
   // Monta todas as linhas de todos os lançamentos.
-  const todasLinhas = [];
-  state.lancamentos.forEach(lanc => getLinhasDaPlanilha(lanc).forEach(linha => todasLinhas.push(linha)));
+  const todasLinhasCompletas = [];
+  state.lancamentos.forEach(lanc => getLinhasDaPlanilha(lanc).forEach(linha => todasLinhasCompletas.push(linha)));
+
+  // ===================== FILTROS DE APURAÇÃO =====================
+  const hojeISOFiltro = new Date().toISOString().slice(0,10);
+  const filtrosWrap = el('div', { style:'background:#F4F8FB;border-radius:12px;padding:12px 14px;margin-bottom:16px;' });
+  filtrosWrap.appendChild(el('div', { style:'font-weight:700;font-size:13px;margin-bottom:10px;' }, document.createTextNode('Filtros pra apurar valores')));
+
+  const linhaFiltro1 = el('div', { style:'display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;' });
+  const campoDe = el('div', {});
+  campoDe.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Entradas de')));
+  const inputDe = el('input', { type:'date', value: filtroApuracao.dataIni||'', style:'padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  inputDe.onchange = (e) => { filtroApuracao.dataIni = e.target.value; refreshPanel(); };
+  campoDe.appendChild(inputDe);
+  linhaFiltro1.appendChild(campoDe);
+
+  const campoAte = el('div', {});
+  campoAte.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('até')));
+  const inputAte = el('input', { type:'date', value: filtroApuracao.dataFim||'', style:'padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  inputAte.onchange = (e) => { filtroApuracao.dataFim = e.target.value; refreshPanel(); };
+  campoAte.appendChild(inputAte);
+  linhaFiltro1.appendChild(campoAte);
+
+  const campoProf = el('div', {});
+  campoProf.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Profissional')));
+  const selectProfFiltro = el('select', { style:'padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  selectProfFiltro.appendChild(el('option', { value:'' }, document.createTextNode('Todos')));
+  state.profissionais.forEach(pr => {
+    const opt = el('option', { value:pr.id }, document.createTextNode(pr.nome));
+    if(filtroApuracao.profissionalId===pr.id) opt.setAttribute('selected','selected');
+    selectProfFiltro.appendChild(opt);
+  });
+  selectProfFiltro.onchange = (e) => { filtroApuracao.profissionalId = e.target.value; refreshPanel(); };
+  campoProf.appendChild(selectProfFiltro);
+  linhaFiltro1.appendChild(campoProf);
+
+  const campoForma = el('div', {});
+  campoForma.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);' }, document.createTextNode('Forma de pagamento')));
+  const selectFormaFiltro = el('select', { style:'padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
+  selectFormaFiltro.appendChild(el('option', { value:'' }, document.createTextNode('Todas')));
+  FORMAS_PAGAMENTO_PLANILHA.forEach(f => {
+    const opt = el('option', { value:f }, document.createTextNode(f));
+    if(filtroApuracao.forma===f) opt.setAttribute('selected','selected');
+    selectFormaFiltro.appendChild(opt);
+  });
+  selectFormaFiltro.onchange = (e) => { filtroApuracao.forma = e.target.value; refreshPanel(); };
+  campoForma.appendChild(selectFormaFiltro);
+  linhaFiltro1.appendChild(campoForma);
+  filtrosWrap.appendChild(linhaFiltro1);
+
+  const linhaFiltro2 = el('div', { style:'display:flex;align-items:center;gap:10px;flex-wrap:wrap;' });
+  const chipVencidas = el('div', { class:'filter-chip'+(filtroApuracao.soVencidas?' selected':''), style:'background:'+(filtroApuracao.soVencidas?'var(--red)':'#fff') },
+    document.createTextNode('⚠ Só parcelas vencidas'));
+  chipVencidas.onclick = () => { filtroApuracao.soVencidas = !filtroApuracao.soVencidas; refreshPanel(); };
+  linhaFiltro2.appendChild(chipVencidas);
+  const temFiltroAtivo = filtroApuracao.dataIni || filtroApuracao.dataFim || filtroApuracao.profissionalId || filtroApuracao.forma || filtroApuracao.soVencidas;
+  if(temFiltroAtivo){
+    const limparBtn = el('span', { style:'color:var(--blue-dark);text-decoration:underline;cursor:pointer;font-size:12.5px;' }, document.createTextNode('Limpar filtros'));
+    limparBtn.onclick = () => { filtroApuracao = { dataIni:'', dataFim:'', profissionalId:'', forma:'', soVencidas:false }; refreshPanel(); };
+    linhaFiltro2.appendChild(limparBtn);
+  }
+  filtrosWrap.appendChild(linhaFiltro2);
+
+  // Calcula o total apurado com base nos filtros ativos, somando as parcelas que combinam
+  // com TODOS os filtros marcados ao mesmo tempo.
+  let totalApurado = 0, qtdParcelasApuradas = 0;
+  const linhasFiltradas = todasLinhasCompletas.filter(linha => {
+    if(filtroApuracao.profissionalId && linha.profissionalId !== filtroApuracao.profissionalId) return false;
+    return true;
+  });
+  linhasFiltradas.forEach(linha => {
+    (linha.parcelas||[]).forEach(p => {
+      if(filtroApuracao.forma && p.forma !== filtroApuracao.forma) return;
+      if(filtroApuracao.dataIni && (!p.data || p.data < filtroApuracao.dataIni)) return;
+      if(filtroApuracao.dataFim && (!p.data || p.data > filtroApuracao.dataFim)) return;
+      if(filtroApuracao.soVencidas){
+        const vencida = !p.pago && p.data && p.data < hojeISOFiltro;
+        if(!vencida) return;
+      }
+      totalApurado += p.valor||0;
+      qtdParcelasApuradas++;
+    });
+  });
+  const resumoWrap = el('div', { style:'margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,0.08);' });
+  resumoWrap.appendChild(el('div', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode(
+    (temFiltroAtivo ? 'Total apurado com esses filtros' : 'Total de todas as parcelas') + ' ('+qtdParcelasApuradas+' parcela(s)):'
+  )));
+  resumoWrap.appendChild(el('div', { style:'font-size:22px;font-weight:800;color:'+(filtroApuracao.soVencidas?'var(--red)':'var(--blue-dark)')+';' },
+    document.createTextNode('R$ '+formatMoney(totalApurado))));
+  filtrosWrap.appendChild(resumoWrap);
+  container.appendChild(filtrosWrap);
+
+  // A tabela abaixo mostra só as linhas que combinam com o filtro de profissional (os outros
+  // filtros — período, forma, vencidas — afetam o total acima, mas continuam mostrando a linha
+  // inteira do paciente na tabela, pra não perder o contexto do que tem parcela em outro mês/forma).
+  const todasLinhas = linhasFiltradas;
+  if(!todasLinhas.length){
+    container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum lançamento combina com esse filtro de profissional.')));
+    return;
+  }
+  // ===================== FIM DOS FILTROS =====================
 
   // Descobre o intervalo de meses a mostrar como coluna: do mês mais antigo com parcela até o
   // mais recente. Começa sempre no mês atual (sem mostrar meses que já passaram) e vai pelo
@@ -1586,27 +1685,26 @@ function renderLancamentoExpandido(container, lanc){
 let parcelaPagandoId = null;
 let historicoAlteracoesAberto = {};
 
-let visaoLancamentos = 'lista'; // 'lista' | 'planilha'
+let visaoLancamentos = 'lista'; // 'lista' | 'planilha' — não usado mais na navegação, mantido por compatibilidade
+let filtroApuracao = { dataIni:'', dataFim:'', profissionalId:'', forma:'', soVencidas:false };
 let planilhaAno = new Date().getFullYear();
 let filtroBuscaLancamento = '';
 
 function renderLancamentos(container){
   container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Lançamentos')));
 
-  const toggleRow = el('div', { class:'filter-row', style:'margin-bottom:12px;' });
-  [['lista','📋 Lista'],['planilha','📊 Planilha (por mês)']].forEach(([key,label]) => {
-    const chip = el('div', { class:'filter-chip'+(visaoLancamentos===key?' selected':'') }, document.createTextNode(label));
-    chip.onclick = () => { visaoLancamentos = key; refreshPanel(); };
-    toggleRow.appendChild(chip);
-  });
-  container.appendChild(toggleRow);
-
-  if(visaoLancamentos === 'planilha'){
-    renderPlanilhaLancamentos(container);
-    return;
+  if(novoLancamentoAberto){
+    renderNovoLancamentoForm(container);
+  } else {
+    const addBtn = el('div', { class:'add-row-btn', style:'margin-bottom:14px;' }, document.createTextNode('+ Novo lançamento manual'));
+    addBtn.onclick = () => { novoLancamentoAberto = true; refreshPanel(); };
+    container.appendChild(addBtn);
   }
 
-  if(novoLancamentoAberto){
+  renderPlanilhaLancamentos(container);
+}
+
+function renderLancamentos_LISTA_ANTIGA(container){  if(novoLancamentoAberto){
     renderNovoLancamentoForm(container);
   } else {
     const addBtn = el('div', { class:'add-row-btn' }, document.createTextNode('+ Novo lançamento manual'));
