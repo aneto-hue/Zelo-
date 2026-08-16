@@ -21,7 +21,7 @@
   }
   header.topbar h1{font-size:18px; margin:0; color:var(--blue-dark); font-weight:700;}
   header.topbar p{margin:2px 0 0; font-size:12px; color:var(--muted); font-style:italic;}
-  main{max-width:900px; margin:0 auto; padding:16px;}
+  main{max-width:1100px; margin:0 auto; padding:16px;}
   .section-title{font-size:16px; font-weight:700; color:var(--blue-dark); margin:0 0 4px;}
   .hint{font-size:12px; color:var(--muted); margin:0 0 14px;}
   .empty-hint{font-size:13px; color:var(--muted); background:#fff; border-radius:10px; padding:16px; text-align:center;}
@@ -35,37 +35,39 @@
     width:100%; padding:9px 10px; font-size:14px; border:1.5px solid var(--line); border-radius:8px;
     font-family:inherit; background:#fff;
   }
-  .row{display:flex; gap:10px;}
-  .row > *{flex:1;}
-  .card{background:#fff; border-radius:12px; padding:14px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06);}
-  .alert-banner{
-    background:#FDECEA; border:1.5px solid var(--red); border-radius:12px; padding:12px 14px; margin-bottom:16px;
-  }
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .row > *{flex:1; min-width:140px;}
+  .card{background:#fff; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+  .alert-banner{ background:#FDECEA; border:1.5px solid var(--red); border-radius:12px; padding:12px 14px; margin-bottom:16px; }
   .alert-banner.amber{ background:#FFF6E5; border-color:var(--amber); }
   .alert-banner .titulo{font-weight:700; font-size:13.5px; margin-bottom:6px;}
   .alert-banner.red .titulo{color:var(--red);}
   .alert-banner.amber .titulo{color:var(--amber);}
   .alert-item{font-size:13px; padding:4px 0;}
-  .gasto-row{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
-  .gasto-nome{font-weight:700; font-size:14.5px;}
-  .gasto-sub{font-size:12px; color:var(--muted); margin-top:2px;}
-  .status-chip{
-    padding:5px 11px; border-radius:8px; font-size:11.5px; font-weight:700; white-space:nowrap;
-  }
-  .status-pago{background:#E8F5E9; color:var(--green);}
-  .status-vencido{background:#FFEBEE; color:var(--red);}
-  .status-proximo{background:#FFF3E0; color:var(--amber);}
-  .status-normal{background:#E3F2FD; color:#1565C0;}
-  .acoes-gasto{display:flex; gap:14px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line-light);}
-  .acao-link{font-size:12.5px; font-weight:700; color:var(--blue-dark); cursor:pointer; text-decoration:underline;}
-  .acao-link.red{color:var(--red);}
-  .mini-form{background:#F4F8FB; border-radius:10px; padding:12px; margin-top:10px;}
   .summary-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
   .summary-card{background:#fff; border-radius:12px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.06);}
   .summary-num{font-size:20px; font-weight:800; color:var(--blue-dark);}
   .summary-num.green{color:var(--green);}
-  .summary-num.red{color:var(--red);}
   .summary-label{font-size:11px; color:var(--muted); margin-top:2px;}
+  .filtros-wrap{background:#F4F8FB; border-radius:12px; padding:12px 14px; margin-bottom:16px;}
+  .filtros-wrap .titulo{font-weight:700; font-size:13px; margin-bottom:10px;}
+  .gasto-table-wrap{overflow-x:auto; background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+  table.gasto-table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:900px;}
+  table.gasto-table th{
+    background:var(--blue-head); color:var(--blue-dark); text-align:left; padding:9px 10px;
+    font-size:11px; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap;
+  }
+  table.gasto-table td{padding:9px 10px; border-bottom:1px solid var(--line-light); vertical-align:middle;}
+  table.gasto-table tr:last-child td{border-bottom:none;}
+  table.gasto-table tr:hover td{background:#FAFBFC;}
+  .status-chip{padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; white-space:nowrap; display:inline-block;}
+  .status-pago{background:#E8F5E9; color:var(--green);}
+  .status-vencido{background:#FFEBEE; color:var(--red);}
+  .status-proximo{background:#FFF3E0; color:var(--amber);}
+  .status-normal{background:#E3F2FD; color:#1565C0;}
+  .link-arquivo{color:var(--blue-dark); font-weight:700; cursor:pointer; text-decoration:underline; font-size:12px; white-space:nowrap;}
+  .link-acao{color:var(--blue-dark); font-weight:700; cursor:pointer; text-decoration:underline; font-size:12px; white-space:nowrap;}
+  .link-acao.red{color:var(--red);}
   .toast{
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff;
     padding:10px 18px; border-radius:8px; font-size:13px; z-index:999; opacity:0; transition:opacity .3s;
@@ -95,9 +97,7 @@ function el(tag, attrs={}, children){
     else e.setAttribute(k, attrs[k]);
   });
   if(children){
-    (Array.isArray(children) ? children : [children]).forEach(c => {
-      if(c) e.appendChild(c);
-    });
+    (Array.isArray(children) ? children : [children]).forEach(c => { if(c) e.appendChild(c); });
   }
   return e;
 }
@@ -110,8 +110,48 @@ function toast(msg){
 function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function uid(){ return 'gasto'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
-// Processa o arquivo anexado: se for imagem, redimensiona e comprime (fica bem mais leve pra
-// guardar); se for PDF, lê direto como está. Chama callback(dataUrl, tipo) quando terminar.
+// Máscara de data dd/mm/aaaa enquanto digita, e conversão pros dois formatos.
+function maskData(v){
+  v = String(v).replace(/\D/g,'').slice(0,8);
+  if(v.length>=5) return v.slice(0,2)+'/'+v.slice(2,4)+'/'+v.slice(4);
+  if(v.length>=3) return v.slice(0,2)+'/'+v.slice(2);
+  return v;
+}
+function dataBRparaISO(br){
+  const m = String(br||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? (m[3]+'-'+m[2]+'-'+m[1]) : '';
+}
+function dataISOparaBR(iso){
+  if(!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3]+'/'+m[2]+'/'+m[1]) : '';
+}
+
+const STORAGE_KEY = 'gastos_fixos_v1';
+const CATEGORIAS = ['Água','Luz','Internet','Telefone','Aluguel','Condomínio','Software/Sistema','Contabilidade','Segurança','Limpeza','Outro'];
+let state = { gastos: [] };
+
+async function saveProgress(){ await ClinicaStorage.save(STORAGE_KEY, state); }
+async function loadProgress(){
+  const saved = await ClinicaStorage.load(STORAGE_KEY);
+  if(saved && saved.gastos) state.gastos = saved.gastos;
+}
+
+let novoGastoAberto = false;
+let anexoAbertoId = null; // id do gasto cujo formulário de edição está aberto na planilha
+let filtroPeriodo = { dataIni:'', dataFim:'' };
+
+function statusDoGasto(g, hojeISO){
+  if(g.pagamentoDia) return 'pago';
+  if(g.vencimento && g.vencimento < hojeISO) return 'vencido';
+  if(g.vencimento){
+    const diffDias = Math.round((new Date(g.vencimento) - new Date(hojeISO)) / (1000*60*60*24));
+    if(diffDias <= 5) return 'proximo';
+  }
+  return 'normal';
+}
+
+// Processa o arquivo anexado: se for imagem, redimensiona e comprime; se for PDF, lê direto.
 function processarArquivoAnexo(file, callback){
   if(file.type === 'application/pdf'){
     const reader = new FileReader();
@@ -119,7 +159,6 @@ function processarArquivoAnexo(file, callback){
     reader.readAsDataURL(file);
     return;
   }
-  // Imagem: redimensiona pro tamanho máximo e comprime em JPEG, igual ao resto do sistema.
   const maxDim = 1400;
   const img = new Image();
   const readerImg = new FileReader();
@@ -137,392 +176,381 @@ function processarArquivoAnexo(file, callback){
   readerImg.readAsDataURL(file);
 }
 
-const STORAGE_KEY = 'gastos_fixos_v1';
-const CATEGORIAS = ['Água','Luz','Internet','Telefone','Aluguel','Condomínio','Software/Sistema','Contabilidade','Segurança','Limpeza','Outro'];
-let state = { gastos: [] };
-
-async function saveProgress(){ await ClinicaStorage.save(STORAGE_KEY, state); }
-async function loadProgress(){
-  const saved = await ClinicaStorage.load(STORAGE_KEY);
-  if(saved && saved.gastos) state.gastos = saved.gastos;
-}
-
-let novoGastoAberto = false;
-let gastoEditandoId = null;
-let gastoPagandoId = null;
-let boletoAnexandoId = null;
-
-// Retorna a data de vencimento do gasto NO MÊS ATUAL (ou no mês indicado), como objeto Date.
-function dataVencimentoNoMes(gasto, ano, mes){
-  const ultimoDiaDoMes = new Date(ano, mes, 0).getDate();
-  const dia = Math.min(gasto.diaVencimento, ultimoDiaDoMes);
-  return new Date(ano, mes-1, dia);
-}
-function pagamentoDoMes(gasto, ano, mes){
-  return (gasto.pagamentos||[]).find(p => p.ano===ano && p.mes===mes);
-}
-function statusDoGasto(gasto, hoje){
-  const ano = hoje.getFullYear(), mes = hoje.getMonth()+1;
-  const pagamento = pagamentoDoMes(gasto, ano, mes);
-  if(pagamento && pagamento.pago) return { status:'pago', pagamento };
-  const venc = dataVencimentoNoMes(gasto, ano, mes);
-  const diffDias = Math.round((venc - new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())) / (1000*60*60*24));
-  if(diffDias < 0) return { status:'vencido', diffDias, venc, pagamento };
-  if(diffDias <= 5) return { status:'proximo', diffDias, venc, pagamento };
-  return { status:'normal', diffDias, venc, pagamento };
+function abrirArquivo(dataUrl, tipo){
+  const janela = window.open();
+  if(tipo==='pdf') janela.location.href = dataUrl;
+  else janela.document.write('<img src="'+dataUrl+'" style="max-width:100%;">');
 }
 
 function renderMain(){
   const main = document.getElementById('main');
   main.innerHTML = '';
   const hoje = new Date();
+  const hojeISO = hoje.toISOString().slice(0,10);
 
   main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Gastos Fixos Mensais')));
-  main.appendChild(el('p', { class:'hint' }, document.createTextNode('Contas que se repetem todo mês — água, luz, internet, aluguel, sistemas, etc. Avisa quando estiver perto de vencer.')));
-
-  const gastosAtivos = state.gastos.filter(g => g.ativo !== false);
-  const situacoes = gastosAtivos.map(g => ({ gasto:g, sit: statusDoGasto(g, hoje) }));
-  const vencidos = situacoes.filter(s => s.sit.status==='vencido');
-  const proximos = situacoes.filter(s => s.sit.status==='proximo');
+  main.appendChild(el('p', { class:'hint' }, document.createTextNode('Água, luz, internet, aluguel e outras contas recorrentes — com aviso quando estiver perto de vencer.')));
 
   // ---- Avisos ----
+  const naoPagos = state.gastos.filter(g => !g.pagamentoDia);
+  const vencidos = naoPagos.filter(g => statusDoGasto(g,hojeISO)==='vencido');
+  const proximos = naoPagos.filter(g => statusDoGasto(g,hojeISO)==='proximo');
   if(vencidos.length){
     const banner = el('div', { class:'alert-banner red' });
     banner.appendChild(el('div', { class:'titulo' }, document.createTextNode('⚠ '+vencidos.length+' conta(s) vencida(s), ainda não paga(s)')));
-    vencidos.forEach(({gasto,sit}) => {
-      banner.appendChild(el('div', { class:'alert-item' }, document.createTextNode(
-        gasto.nome+' — venceu há '+Math.abs(sit.diffDias)+' dia(s) (dia '+String(gasto.diaVencimento).padStart(2,'0')+')'
-      )));
-    });
+    vencidos.forEach(g => banner.appendChild(el('div', { class:'alert-item' }, document.createTextNode(
+      g.empresa+' ('+g.especie+') — venceu em '+dataISOparaBR(g.vencimento)+' — R$ '+formatMoney(g.valor)
+    ))));
     main.appendChild(banner);
   }
   if(proximos.length){
     const banner = el('div', { class:'alert-banner amber' });
     banner.appendChild(el('div', { class:'titulo' }, document.createTextNode('🔔 '+proximos.length+' conta(s) vencendo nos próximos 5 dias')));
-    proximos.forEach(({gasto,sit}) => {
-      banner.appendChild(el('div', { class:'alert-item' }, document.createTextNode(
-        gasto.nome+' — vence '+(sit.diffDias===0?'hoje':(sit.diffDias===1?'amanhã':'em '+sit.diffDias+' dias'))+' (dia '+String(gasto.diaVencimento).padStart(2,'0')+')'
-      )));
-    });
+    proximos.forEach(g => banner.appendChild(el('div', { class:'alert-item' }, document.createTextNode(
+      g.empresa+' ('+g.especie+') — vence em '+dataISOparaBR(g.vencimento)+' — R$ '+formatMoney(g.valor)
+    ))));
     main.appendChild(banner);
   }
-
-  // ---- Resumo do mês ----
-  const totalMes = gastosAtivos.reduce((s,g) => {
-    const pagamento = pagamentoDoMes(g, hoje.getFullYear(), hoje.getMonth()+1);
-    return s + (pagamento && pagamento.pago ? pagamento.valorPago : g.valorEstimado||0);
-  }, 0);
-  const totalPago = gastosAtivos.reduce((s,g) => {
-    const pagamento = pagamentoDoMes(g, hoje.getFullYear(), hoje.getMonth()+1);
-    return s + (pagamento && pagamento.pago ? pagamento.valorPago : 0);
-  }, 0);
-  const summary = el('div', { class:'summary-grid' });
-  summary.appendChild(el('div', { class:'summary-card' }, [
-    el('div', { class:'summary-num' }, document.createTextNode('R$ '+formatMoney(totalMes))),
-    el('div', { class:'summary-label' }, document.createTextNode('Total previsto este mês')),
-  ]));
-  summary.appendChild(el('div', { class:'summary-card' }, [
-    el('div', { class:'summary-num green' }, document.createTextNode('R$ '+formatMoney(totalPago))),
-    el('div', { class:'summary-label' }, document.createTextNode('Já pago este mês')),
-  ]));
-  main.appendChild(summary);
 
   // ---- Botão novo gasto ----
   if(novoGastoAberto){
     renderNovoGastoForm(main);
   } else {
-    const addBtn = el('div', { class:'add-row-btn', style:'margin-bottom:16px;' }, document.createTextNode('+ Novo gasto fixo'));
+    const addBtn = el('div', { class:'add-row-btn', style:'margin-bottom:16px;' }, document.createTextNode('+ Adicionar gasto fixo'));
     addBtn.onclick = () => { novoGastoAberto = true; renderMain(); };
     main.appendChild(addBtn);
   }
 
-  // ---- Lista de gastos ----
-  if(!gastosAtivos.length){
-    main.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum gasto fixo cadastrado ainda. Adicione água, luz, internet, aluguel...')));
+  // ---- Filtro de período ----
+  const filtrosWrap = el('div', { class:'filtros-wrap' });
+  filtrosWrap.appendChild(el('div', { class:'titulo' }, document.createTextNode('Filtrar por período (vencimento)')));
+  const linhaFiltro = el('div', { style:'display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;' });
+  const campoDe = el('div', {});
+  campoDe.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);margin-bottom:3px;' }, document.createTextNode('De')));
+  const inputDe = el('input', { type:'text', placeholder:'dd/mm/aaaa', value: dataISOparaBR(filtroPeriodo.dataIni), style:'padding:7px 9px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;width:120px;' });
+  inputDe.oninput = (e) => { e.target.value = maskData(e.target.value); };
+  inputDe.onblur = (e) => { filtroPeriodo.dataIni = dataBRparaISO(e.target.value); refreshTabela(); };
+  campoDe.appendChild(inputDe);
+  linhaFiltro.appendChild(campoDe);
+  const campoAte = el('div', {});
+  campoAte.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);margin-bottom:3px;' }, document.createTextNode('Até')));
+  const inputAte = el('input', { type:'text', placeholder:'dd/mm/aaaa', value: dataISOparaBR(filtroPeriodo.dataFim), style:'padding:7px 9px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;width:120px;' });
+  inputAte.oninput = (e) => { e.target.value = maskData(e.target.value); };
+  inputAte.onblur = (e) => { filtroPeriodo.dataFim = dataBRparaISO(e.target.value); refreshTabela(); };
+  campoAte.appendChild(inputAte);
+  linhaFiltro.appendChild(campoAte);
+  if(filtroPeriodo.dataIni || filtroPeriodo.dataFim){
+    const limparBtn = el('span', { class:'link-acao', style:'align-self:center;' }, document.createTextNode('Limpar'));
+    limparBtn.onclick = () => { filtroPeriodo = { dataIni:'', dataFim:'' }; renderMain(); };
+    linhaFiltro.appendChild(limparBtn);
+  }
+  filtrosWrap.appendChild(linhaFiltro);
+  main.appendChild(filtrosWrap);
+
+  // ---- Resumo (respeitando o filtro de período) ----
+  const resumoWrap = el('div', { class:'summary-grid', id:'resumoGastos' });
+  main.appendChild(resumoWrap);
+
+  // ---- Planilha ----
+  const tabelaWrap = el('div', { id:'tabelaGastosWrap' });
+  main.appendChild(tabelaWrap);
+
+  refreshTabela();
+}
+
+function gastosFiltrados(){
+  return state.gastos.filter(g => {
+    if(filtroPeriodo.dataIni && (!g.vencimento || g.vencimento < filtroPeriodo.dataIni)) return false;
+    if(filtroPeriodo.dataFim && (!g.vencimento || g.vencimento > filtroPeriodo.dataFim)) return false;
+    return true;
+  }).sort((a,b) => (a.vencimento||'').localeCompare(b.vencimento||''));
+}
+
+function refreshTabela(){
+  const hojeISO = new Date().toISOString().slice(0,10);
+  const lista = gastosFiltrados();
+
+  const resumoWrap = document.getElementById('resumoGastos');
+  if(resumoWrap){
+    resumoWrap.innerHTML = '';
+    const total = lista.reduce((s,g)=>s+(g.valor||0),0);
+    const totalPago = lista.filter(g=>g.pagamentoDia).reduce((s,g)=>s+(g.valor||0),0);
+    resumoWrap.appendChild(el('div', { class:'summary-card' }, [
+      el('div', { class:'summary-num' }, document.createTextNode('R$ '+formatMoney(total))),
+      el('div', { class:'summary-label' }, document.createTextNode('Total no período ('+lista.length+' conta(s))')),
+    ]));
+    resumoWrap.appendChild(el('div', { class:'summary-card' }, [
+      el('div', { class:'summary-num green' }, document.createTextNode('R$ '+formatMoney(totalPago))),
+      el('div', { class:'summary-label' }, document.createTextNode('Já pago no período')),
+    ]));
+  }
+
+  const wrap = document.getElementById('tabelaGastosWrap');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+
+  if(!lista.length){
+    wrap.appendChild(el('div', { class:'empty-hint' }, document.createTextNode(
+      state.gastos.length ? 'Nenhuma conta nesse período.' : 'Nenhum gasto fixo cadastrado ainda. Adicione água, luz, internet, aluguel...'
+    )));
     return;
   }
 
-  // Ordena: vencidos primeiro, depois próximos, depois o resto por dia de vencimento
-  const ordem = { vencido:0, proximo:1, normal:2, pago:3 };
-  situacoes.sort((a,b) => (ordem[a.sit.status]-ordem[b.sit.status]) || (a.gasto.diaVencimento-b.gasto.diaVencimento));
+  const tableWrap = el('div', { class:'gasto-table-wrap' });
+  const table = el('table', { class:'gasto-table' });
+  table.appendChild(el('thead', {}, el('tr', {}, [
+    'Empresa','Espécie','Valor','Vencimento','Documento','Pagamento dia','Comprovante','Status','Ações'
+  ].map(h => el('th', {}, document.createTextNode(h))))));
 
-  situacoes.forEach(({gasto, sit}) => {
-    const card = el('div', { class:'card' });
-    const row = el('div', { class:'gasto-row' });
-    const info = el('div', {});
-    info.appendChild(el('div', { class:'gasto-nome' }, document.createTextNode(gasto.nome)));
-    info.appendChild(el('div', { class:'gasto-sub' }, document.createTextNode(
-      (gasto.categoria?gasto.categoria+' • ':'')+'Vence todo dia '+String(gasto.diaVencimento).padStart(2,'0')+' • R$ '+formatMoney(gasto.valorEstimado)+' (estimado)'
-    )));
-    row.appendChild(info);
+  const tbody = el('tbody', {});
+  lista.forEach(g => {
+    const status = statusDoGasto(g, hojeISO);
+    const tr = el('tr', {});
+    tr.appendChild(el('td', { style:'font-weight:700;' }, document.createTextNode(g.empresa||'—')));
+    tr.appendChild(el('td', {}, document.createTextNode(g.especie||'—')));
+    tr.appendChild(el('td', { style:'font-weight:700;white-space:nowrap;' }, document.createTextNode('R$ '+formatMoney(g.valor))));
+    tr.appendChild(el('td', { style:'white-space:nowrap;' }, document.createTextNode(dataISOparaBR(g.vencimento)||'—')));
 
-    const statusLabel = {
-      pago: '✓ Pago', vencido: '⚠ Vencido', proximo: '🔔 Vence em breve', normal: 'Em dia',
-    }[sit.status];
-    row.appendChild(el('div', { class:'status-chip status-'+sit.status }, document.createTextNode(statusLabel)));
-    card.appendChild(row);
-
-    function linkVerArquivo(dataUrl, nome, tipo, rotulo){
-      const wrap = el('div', { style:'margin-top:4px;' });
-      const link = el('span', { class:'acao-link', style:'font-size:11.5px;' },
-        document.createTextNode((tipo==='pdf'?'📄 ':'🖼 ')+rotulo+': '+(nome||'arquivo')));
-      link.onclick = () => {
-        const janela = window.open();
-        if(tipo==='pdf') janela.location.href = dataUrl;
-        else janela.document.write('<img src="'+dataUrl+'" style="max-width:100%;">');
-      };
-      wrap.appendChild(link);
-      return wrap;
-    }
-
-    if(sit.pagamento && sit.pagamento.boletoDataUrl){
-      card.appendChild(linkVerArquivo(sit.pagamento.boletoDataUrl, sit.pagamento.boletoNome, sit.pagamento.boletoTipo, 'Boleto'));
-    }
-    if(sit.status==='pago' && sit.pagamento){
-      card.appendChild(el('div', { class:'gasto-sub', style:'margin-top:6px;' }, document.createTextNode(
-        'Pago em '+formatDateBR(sit.pagamento.dataPagamento)+' — R$ '+formatMoney(sit.pagamento.valorPago)
-      )));
-      if(sit.pagamento.comprovanteDataUrl){
-        card.appendChild(linkVerArquivo(sit.pagamento.comprovanteDataUrl, sit.pagamento.comprovanteNome, sit.pagamento.comprovanteTipo, 'Comprovante'));
-      }
-    }
-
-    const acoes = el('div', { class:'acoes-gasto' });
-    if(sit.status !== 'pago'){
-      const pagarLink = el('span', { class:'acao-link' }, document.createTextNode('Marcar como pago'));
-      pagarLink.onclick = () => { gastoPagandoId = (gastoPagandoId===gasto.id)?null:gasto.id; gastoEditandoId=null; boletoAnexandoId=null; renderMain(); };
-      acoes.appendChild(pagarLink);
-      const anexarBoletoLink = el('span', { class:'acao-link' }, document.createTextNode('📎 Anexar boleto'));
-      anexarBoletoLink.onclick = () => { boletoAnexandoId = (boletoAnexandoId===gasto.id)?null:gasto.id; gastoPagandoId=null; gastoEditandoId=null; renderMain(); };
-      acoes.appendChild(anexarBoletoLink);
+    const tdDoc = el('td', {});
+    if(g.documentoDataUrl){
+      const linkDoc = el('span', { class:'link-arquivo' }, document.createTextNode((g.documentoTipo==='pdf'?'📄':'🖼')+' Ver'));
+      linkDoc.onclick = () => abrirArquivo(g.documentoDataUrl, g.documentoTipo);
+      tdDoc.appendChild(linkDoc);
     } else {
-      const desmarcarLink = el('span', { class:'acao-link' }, document.createTextNode('Desmarcar pagamento'));
-      desmarcarLink.onclick = async () => {
-        const hoje2 = new Date();
-        gasto.pagamentos = (gasto.pagamentos||[]).filter(p => !(p.ano===hoje2.getFullYear() && p.mes===hoje2.getMonth()+1));
-        await saveProgress(); renderMain();
-      };
-      acoes.appendChild(desmarcarLink);
+      tdDoc.appendChild(el('span', { style:'color:var(--muted);' }, document.createTextNode('—')));
     }
-    const editarLink = el('span', { class:'acao-link' }, document.createTextNode('Editar'));
-    editarLink.onclick = () => { gastoEditandoId = (gastoEditandoId===gasto.id)?null:gasto.id; gastoPagandoId=null; renderMain(); };
-    acoes.appendChild(editarLink);
-    const excluirLink = el('span', { class:'acao-link red' }, document.createTextNode('Excluir'));
+    tr.appendChild(tdDoc);
+
+    tr.appendChild(el('td', { style:'white-space:nowrap;' }, document.createTextNode(dataISOparaBR(g.pagamentoDia)||'—')));
+
+    const tdComp = el('td', {});
+    if(g.comprovanteDataUrl){
+      const linkComp = el('span', { class:'link-arquivo' }, document.createTextNode((g.comprovanteTipo==='pdf'?'📄':'🖼')+' Ver'));
+      linkComp.onclick = () => abrirArquivo(g.comprovanteDataUrl, g.comprovanteTipo);
+      tdComp.appendChild(linkComp);
+    } else {
+      tdComp.appendChild(el('span', { style:'color:var(--muted);' }, document.createTextNode('—')));
+    }
+    tr.appendChild(tdComp);
+
+    const statusLabel = { pago:'✓ Pago', vencido:'⚠ Vencido', proximo:'🔔 Em breve', normal:'Em dia' }[status];
+    tr.appendChild(el('td', {}, el('span', { class:'status-chip status-'+status }, document.createTextNode(statusLabel))));
+
+    const tdAcoes = el('td', { style:'white-space:nowrap;' });
+    const editarLink = el('span', { class:'link-acao' }, document.createTextNode('Editar'));
+    editarLink.onclick = () => { anexoAbertoId = (anexoAbertoId===g.id) ? null : g.id; refreshTabela(); };
+    tdAcoes.appendChild(editarLink);
+    tdAcoes.appendChild(document.createTextNode('  '));
+    const excluirLink = el('span', { class:'link-acao red' }, document.createTextNode('Excluir'));
     excluirLink.onclick = async () => {
-      if(!confirm('Excluir "'+gasto.nome+'" da lista de gastos fixos?')) return;
-      gasto.ativo = false;
+      if(!confirm('Excluir a conta de "'+g.empresa+'"?')) return;
+      state.gastos = state.gastos.filter(x=>x.id!==g.id);
       await saveProgress(); renderMain();
     };
-    acoes.appendChild(excluirLink);
-    card.appendChild(acoes);
+    tdAcoes.appendChild(excluirLink);
+    tr.appendChild(tdAcoes);
 
-    if(gastoPagandoId === gasto.id){
-      const form = el('div', { class:'mini-form' });
-      const hojeISO = new Date().toISOString().slice(0,10);
-      const pagamentoAnterior = pagamentoDoMes(gasto, new Date().getFullYear(), new Date().getMonth()+1);
-      const dadosPagto = { valorPago: gasto.valorEstimado||0, dataPagamento: hojeISO,
-        boletoDataUrl: (pagamentoAnterior&&pagamentoAnterior.boletoDataUrl)||'', boletoNome: (pagamentoAnterior&&pagamentoAnterior.boletoNome)||'', boletoTipo: (pagamentoAnterior&&pagamentoAnterior.boletoTipo)||'',
-        comprovanteDataUrl: '', comprovanteNome: '', comprovanteTipo: '' };
-      const rowPagto = el('div', { class:'row' });
-      const campoValor = el('div', { class:'field', style:'margin-bottom:0;' });
-      campoValor.appendChild(el('label', {}, document.createTextNode('Valor pago')));
-      const inputValor = el('input', { type:'number', min:'0', step:'0.01', value: dadosPagto.valorPago });
-      inputValor.oninput = (e) => { dadosPagto.valorPago = parseFloat(e.target.value)||0; };
-      campoValor.appendChild(inputValor);
-      rowPagto.appendChild(campoValor);
-      const campoData = el('div', { class:'field', style:'margin-bottom:0;' });
-      campoData.appendChild(el('label', {}, document.createTextNode('Data do pagamento')));
-      const inputData = el('input', { type:'date', value: dadosPagto.dataPagamento });
-      inputData.oninput = (e) => { dadosPagto.dataPagamento = e.target.value; };
-      campoData.appendChild(inputData);
-      rowPagto.appendChild(campoData);
-      form.appendChild(rowPagto);
+    tbody.appendChild(tr);
 
-      // Campo 1: boleto (a conta em si) — se já foi anexado antes de pagar, já vem preenchido aqui
-      const campoBoleto = el('div', { class:'field', style:'margin-top:10px;' });
-      campoBoleto.appendChild(el('label', {}, document.createTextNode('Boleto (foto ou PDF)')));
-      const boletoStatus = el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:6px;' },
-        document.createTextNode(dadosPagto.boletoNome ? ('Anexado: '+dadosPagto.boletoNome) : 'Nenhum boleto anexado ainda.'));
-      campoBoleto.appendChild(boletoStatus);
-      const inputBoleto = el('input', { type:'file', accept:'image/*,application/pdf' });
-      inputBoleto.onchange = (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
-        processarArquivoAnexo(file, (dataUrl, tipo) => {
-          dadosPagto.boletoDataUrl = dataUrl; dadosPagto.boletoNome = file.name; dadosPagto.boletoTipo = tipo;
-          boletoStatus.textContent = 'Anexado: '+file.name;
-          toast('Boleto carregado!');
-        });
-      };
-      campoBoleto.appendChild(inputBoleto);
-      form.appendChild(campoBoleto);
-
-      // Campo 2: comprovante de pagamento — separado do boleto
-      const campoComprovante = el('div', { class:'field', style:'margin-top:10px;' });
-      campoComprovante.appendChild(el('label', {}, document.createTextNode('Comprovante de pagamento (foto ou PDF)')));
-      const comprovanteStatus = el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:6px;' },
-        document.createTextNode('Nenhum comprovante anexado ainda.'));
-      campoComprovante.appendChild(comprovanteStatus);
-      const inputComprovante = el('input', { type:'file', accept:'image/*,application/pdf' });
-      inputComprovante.onchange = (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
-        processarArquivoAnexo(file, (dataUrl, tipo) => {
-          dadosPagto.comprovanteDataUrl = dataUrl; dadosPagto.comprovanteNome = file.name; dadosPagto.comprovanteTipo = tipo;
-          comprovanteStatus.textContent = 'Anexado: '+file.name;
-          toast('Comprovante carregado!');
-        });
-      };
-      campoComprovante.appendChild(inputComprovante);
-      form.appendChild(campoComprovante);
-
-      const confirmarBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:var(--green);' }, document.createTextNode('Confirmar pagamento'));
-      confirmarBtn.onclick = async () => {
-        const hoje2 = new Date();
-        if(!gasto.pagamentos) gasto.pagamentos = [];
-        gasto.pagamentos = gasto.pagamentos.filter(p => !(p.ano===hoje2.getFullYear() && p.mes===hoje2.getMonth()+1));
-        gasto.pagamentos.push({
-          ano:hoje2.getFullYear(), mes:hoje2.getMonth()+1, pago:true, valorPago:dadosPagto.valorPago, dataPagamento:dadosPagto.dataPagamento,
-          boletoDataUrl: dadosPagto.boletoDataUrl, boletoNome: dadosPagto.boletoNome, boletoTipo: dadosPagto.boletoTipo,
-          comprovanteDataUrl: dadosPagto.comprovanteDataUrl, comprovanteNome: dadosPagto.comprovanteNome, comprovanteTipo: dadosPagto.comprovanteTipo,
-        });
-        gastoPagandoId = null;
-        await saveProgress(); renderMain();
-        toast('Pagamento registrado!');
-      };
-      form.appendChild(confirmarBtn);
-      card.appendChild(form);
+    if(anexoAbertoId === g.id){
+      const trExpand = el('tr', {});
+      const tdExpand = el('td', { colspan:'9', style:'background:#F4F8FB;padding:14px;' });
+      tdExpand.appendChild(renderEdicaoGasto(g));
+      trExpand.appendChild(tdExpand);
+      tbody.appendChild(trExpand);
     }
-
-    if(boletoAnexandoId === gasto.id){
-      const form = el('div', { class:'mini-form' });
-      const hoje2 = new Date();
-      const pagamentoAtual = pagamentoDoMes(gasto, hoje2.getFullYear(), hoje2.getMonth()+1);
-      form.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;margin-bottom:6px;' }, document.createTextNode('Anexar boleto (antes mesmo de pagar)')));
-      const statusBoletoSolo = el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:6px;' },
-        document.createTextNode((pagamentoAtual&&pagamentoAtual.boletoNome) ? ('Anexado: '+pagamentoAtual.boletoNome) : 'Nenhum boleto anexado ainda esse mês.'));
-      form.appendChild(statusBoletoSolo);
-      const inputBoletoSolo = el('input', { type:'file', accept:'image/*,application/pdf' });
-      inputBoletoSolo.onchange = (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
-        processarArquivoAnexo(file, async (dataUrl, tipo) => {
-          if(!gasto.pagamentos) gasto.pagamentos = [];
-          let pagto = pagamentoDoMes(gasto, hoje2.getFullYear(), hoje2.getMonth()+1);
-          if(!pagto){
-            pagto = { ano:hoje2.getFullYear(), mes:hoje2.getMonth()+1, pago:false, valorPago:0, dataPagamento:'' };
-            gasto.pagamentos.push(pagto);
-          }
-          pagto.boletoDataUrl = dataUrl; pagto.boletoNome = file.name; pagto.boletoTipo = tipo;
-          await saveProgress();
-          boletoAnexandoId = null;
-          renderMain();
-          toast('Boleto anexado!');
-        });
-      };
-      form.appendChild(inputBoletoSolo);
-      const fecharBoletoBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
-      fecharBoletoBtn.onclick = () => { boletoAnexandoId = null; renderMain(); };
-      form.appendChild(fecharBoletoBtn);
-      card.appendChild(form);
-    }
-
-    if(gastoEditandoId === gasto.id){
-      const form = el('div', { class:'mini-form' });
-      const dadosEdicao = { nome: gasto.nome, categoria: gasto.categoria||'', valorEstimado: gasto.valorEstimado, diaVencimento: gasto.diaVencimento };
-      const campoNome = el('div', { class:'field' });
-      campoNome.appendChild(el('label', {}, document.createTextNode('Nome')));
-      const inputNome = el('input', { type:'text', value: dadosEdicao.nome });
-      inputNome.oninput = (e) => { dadosEdicao.nome = e.target.value; };
-      campoNome.appendChild(inputNome);
-      form.appendChild(campoNome);
-
-      const campoCategoria = el('div', { class:'field' });
-      campoCategoria.appendChild(el('label', {}, document.createTextNode('Categoria')));
-      const selectCategoria = el('select', {});
-      CATEGORIAS.forEach(c => {
-        const opt = el('option', { value:c }, document.createTextNode(c));
-        if(dadosEdicao.categoria===c) opt.setAttribute('selected','selected');
-        selectCategoria.appendChild(opt);
-      });
-      selectCategoria.onchange = (e) => { dadosEdicao.categoria = e.target.value; };
-      campoCategoria.appendChild(selectCategoria);
-      form.appendChild(campoCategoria);
-
-      const rowEd = el('div', { class:'row' });
-      const campoValorEd = el('div', { class:'field' });
-      campoValorEd.appendChild(el('label', {}, document.createTextNode('Valor estimado')));
-      const inputValorEd = el('input', { type:'number', min:'0', step:'0.01', value: dadosEdicao.valorEstimado });
-      inputValorEd.oninput = (e) => { dadosEdicao.valorEstimado = parseFloat(e.target.value)||0; };
-      campoValorEd.appendChild(inputValorEd);
-      rowEd.appendChild(campoValorEd);
-      const campoDiaEd = el('div', { class:'field' });
-      campoDiaEd.appendChild(el('label', {}, document.createTextNode('Dia do vencimento')));
-      const inputDiaEd = el('input', { type:'number', min:'1', max:'31', value: dadosEdicao.diaVencimento });
-      inputDiaEd.oninput = (e) => { dadosEdicao.diaVencimento = Math.min(31,Math.max(1,parseInt(e.target.value,10)||1)); };
-      campoDiaEd.appendChild(inputDiaEd);
-      rowEd.appendChild(campoDiaEd);
-      form.appendChild(rowEd);
-
-      const salvarBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;' }, document.createTextNode('Salvar'));
-      salvarBtn.onclick = async () => {
-        gasto.nome = dadosEdicao.nome;
-        gasto.categoria = dadosEdicao.categoria;
-        gasto.valorEstimado = dadosEdicao.valorEstimado;
-        gasto.diaVencimento = dadosEdicao.diaVencimento;
-        gastoEditandoId = null;
-        await saveProgress(); renderMain();
-        toast('Alterações salvas!');
-      };
-      form.appendChild(salvarBtn);
-      card.appendChild(form);
-    }
-
-    main.appendChild(card);
   });
+  table.appendChild(tbody);
+  tableWrap.appendChild(table);
+  wrap.appendChild(tableWrap);
 }
 
-function formatDateBR(str){ if(!str) return '—'; const [y,m,d]=str.split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
+function renderEdicaoGasto(g){
+  const form = el('div', {});
+  const dados = { empresa:g.empresa, especie:g.especie, valor:g.valor, vencimento:g.vencimento, pagamentoDia:g.pagamentoDia||'',
+    documentoDataUrl:g.documentoDataUrl||'', documentoNome:g.documentoNome||'', documentoTipo:g.documentoTipo||'',
+    comprovanteDataUrl:g.comprovanteDataUrl||'', comprovanteNome:g.comprovanteNome||'', comprovanteTipo:g.comprovanteTipo||'' };
+
+  const row1 = el('div', { class:'row' });
+  const campoEmpresa = el('div', { class:'field' });
+  campoEmpresa.appendChild(el('label', {}, document.createTextNode('Empresa')));
+  const inputEmpresa = el('input', { type:'text', value: dados.empresa||'' });
+  inputEmpresa.oninput = (e) => { dados.empresa = e.target.value; };
+  campoEmpresa.appendChild(inputEmpresa);
+  row1.appendChild(campoEmpresa);
+
+  const campoEspecie = el('div', { class:'field' });
+  campoEspecie.appendChild(el('label', {}, document.createTextNode('Espécie')));
+  const selectEspecie = el('select', {});
+  CATEGORIAS.forEach(c => {
+    const opt = el('option', { value:c }, document.createTextNode(c));
+    if(dados.especie===c) opt.setAttribute('selected','selected');
+    selectEspecie.appendChild(opt);
+  });
+  selectEspecie.onchange = (e) => { dados.especie = e.target.value; };
+  campoEspecie.appendChild(selectEspecie);
+  row1.appendChild(campoEspecie);
+  form.appendChild(row1);
+
+  const row2 = el('div', { class:'row' });
+  const campoValor = el('div', { class:'field' });
+  campoValor.appendChild(el('label', {}, document.createTextNode('Valor (R$)')));
+  const inputValor = el('input', { type:'number', min:'0', step:'0.01', value: dados.valor });
+  inputValor.oninput = (e) => { dados.valor = parseFloat(e.target.value)||0; };
+  campoValor.appendChild(inputValor);
+  row2.appendChild(campoValor);
+
+  const campoVenc = el('div', { class:'field' });
+  campoVenc.appendChild(el('label', {}, document.createTextNode('Vencimento')));
+  const inputVenc = el('input', { type:'text', placeholder:'dd/mm/aaaa', value: dataISOparaBR(dados.vencimento) });
+  inputVenc.oninput = (e) => { e.target.value = maskData(e.target.value); dados.vencimento = dataBRparaISO(e.target.value); };
+  campoVenc.appendChild(inputVenc);
+  row2.appendChild(campoVenc);
+
+  const campoPagto = el('div', { class:'field' });
+  campoPagto.appendChild(el('label', {}, document.createTextNode('Pagamento dia (deixe vazio se ainda não pagou)')));
+  const inputPagto = el('input', { type:'text', placeholder:'dd/mm/aaaa', value: dataISOparaBR(dados.pagamentoDia) });
+  inputPagto.oninput = (e) => { e.target.value = maskData(e.target.value); dados.pagamentoDia = dataBRparaISO(e.target.value); };
+  campoPagto.appendChild(inputPagto);
+  row2.appendChild(campoPagto);
+  form.appendChild(row2);
+
+  const row3 = el('div', { class:'row' });
+  const campoDoc = el('div', { class:'field' });
+  campoDoc.appendChild(el('label', {}, document.createTextNode('Cópia do documento (foto ou PDF)')));
+  const statusDoc = el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:4px;' },
+    document.createTextNode(dados.documentoNome ? ('Anexado: '+dados.documentoNome) : 'Nenhum arquivo.'));
+  campoDoc.appendChild(statusDoc);
+  const inputDoc = el('input', { type:'file', accept:'image/*,application/pdf' });
+  inputDoc.onchange = (e) => {
+    const file = e.target.files[0]; if(!file) return;
+    processarArquivoAnexo(file, (dataUrl, tipo) => {
+      dados.documentoDataUrl = dataUrl; dados.documentoNome = file.name; dados.documentoTipo = tipo;
+      statusDoc.textContent = 'Anexado: '+file.name;
+      toast('Documento carregado!');
+    });
+  };
+  campoDoc.appendChild(inputDoc);
+  row3.appendChild(campoDoc);
+
+  const campoComp = el('div', { class:'field' });
+  campoComp.appendChild(el('label', {}, document.createTextNode('Comprovante do pagamento (foto ou PDF)')));
+  const statusComp = el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:4px;' },
+    document.createTextNode(dados.comprovanteNome ? ('Anexado: '+dados.comprovanteNome) : 'Nenhum arquivo.'));
+  campoComp.appendChild(statusComp);
+  const inputComp = el('input', { type:'file', accept:'image/*,application/pdf' });
+  inputComp.onchange = (e) => {
+    const file = e.target.files[0]; if(!file) return;
+    processarArquivoAnexo(file, (dataUrl, tipo) => {
+      dados.comprovanteDataUrl = dataUrl; dados.comprovanteNome = file.name; dados.comprovanteTipo = tipo;
+      statusComp.textContent = 'Anexado: '+file.name;
+      toast('Comprovante carregado!');
+    });
+  };
+  campoComp.appendChild(inputComp);
+  row3.appendChild(campoComp);
+  form.appendChild(row3);
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Salvar alterações'));
+  salvarBtn.onclick = async () => {
+    Object.assign(g, dados);
+    anexoAbertoId = null;
+    await saveProgress(); renderMain();
+    toast('Alterações salvas!');
+  };
+  const fecharBtn = el('div', { class:'add-row-btn', style:'flex:1;background:#fff;color:var(--muted);border:1.5px solid var(--line);' }, document.createTextNode('Fechar'));
+  fecharBtn.onclick = () => { anexoAbertoId = null; refreshTabela(); };
+  btnRow.appendChild(salvarBtn); btnRow.appendChild(fecharBtn);
+  form.appendChild(btnRow);
+  return form;
+}
 
 function renderNovoGastoForm(main){
   const form = el('div', { class:'card' });
-  const dados = { nome:'', categoria:'Água', valorEstimado:0, diaVencimento:10 };
+  const dados = { empresa:'', especie:'Água', valor:0, vencimento:'', pagamentoDia:'',
+    documentoDataUrl:'', documentoNome:'', documentoTipo:'', comprovanteDataUrl:'', comprovanteNome:'', comprovanteTipo:'' };
 
-  const campoNome = el('div', { class:'field' });
-  campoNome.appendChild(el('label', {}, document.createTextNode('Nome (ex: Água, Luz, Internet)')));
-  const inputNome = el('input', { type:'text', placeholder:'ex: Conta de luz' });
-  inputNome.oninput = (e) => { dados.nome = e.target.value; };
-  campoNome.appendChild(inputNome);
-  form.appendChild(campoNome);
+  const row1 = el('div', { class:'row' });
+  const campoEmpresa = el('div', { class:'field' });
+  campoEmpresa.appendChild(el('label', {}, document.createTextNode('Empresa')));
+  const inputEmpresa = el('input', { type:'text', placeholder:'ex: CPFL Energia' });
+  inputEmpresa.oninput = (e) => { dados.empresa = e.target.value; };
+  campoEmpresa.appendChild(inputEmpresa);
+  row1.appendChild(campoEmpresa);
 
-  const campoCategoria = el('div', { class:'field' });
-  campoCategoria.appendChild(el('label', {}, document.createTextNode('Categoria')));
-  const selectCategoria = el('select', {});
-  CATEGORIAS.forEach(c => selectCategoria.appendChild(el('option', { value:c }, document.createTextNode(c))));
-  selectCategoria.onchange = (e) => { dados.categoria = e.target.value; };
-  campoCategoria.appendChild(selectCategoria);
-  form.appendChild(campoCategoria);
+  const campoEspecie = el('div', { class:'field' });
+  campoEspecie.appendChild(el('label', {}, document.createTextNode('Espécie')));
+  const selectEspecie = el('select', {});
+  CATEGORIAS.forEach(c => selectEspecie.appendChild(el('option', { value:c }, document.createTextNode(c))));
+  selectEspecie.onchange = (e) => { dados.especie = e.target.value; };
+  campoEspecie.appendChild(selectEspecie);
+  row1.appendChild(campoEspecie);
+  form.appendChild(row1);
 
-  const row = el('div', { class:'row' });
+  const row2 = el('div', { class:'row' });
   const campoValor = el('div', { class:'field' });
-  campoValor.appendChild(el('label', {}, document.createTextNode('Valor estimado (R$)')));
+  campoValor.appendChild(el('label', {}, document.createTextNode('Valor (R$)')));
   const inputValor = el('input', { type:'number', min:'0', step:'0.01', placeholder:'0,00' });
-  inputValor.oninput = (e) => { dados.valorEstimado = parseFloat(e.target.value)||0; };
+  inputValor.oninput = (e) => { dados.valor = parseFloat(e.target.value)||0; };
   campoValor.appendChild(inputValor);
-  row.appendChild(campoValor);
-  const campoDia = el('div', { class:'field' });
-  campoDia.appendChild(el('label', {}, document.createTextNode('Dia do vencimento')));
-  const inputDia = el('input', { type:'number', min:'1', max:'31', value:'10' });
-  inputDia.oninput = (e) => { dados.diaVencimento = Math.min(31,Math.max(1,parseInt(e.target.value,10)||1)); };
-  campoDia.appendChild(inputDia);
-  row.appendChild(campoDia);
-  form.appendChild(row);
+  row2.appendChild(campoValor);
+
+  const campoVenc = el('div', { class:'field' });
+  campoVenc.appendChild(el('label', {}, document.createTextNode('Vencimento')));
+  const inputVenc = el('input', { type:'text', placeholder:'dd/mm/aaaa' });
+  inputVenc.oninput = (e) => { e.target.value = maskData(e.target.value); dados.vencimento = dataBRparaISO(e.target.value); };
+  campoVenc.appendChild(inputVenc);
+  row2.appendChild(campoVenc);
+
+  const campoPagto = el('div', { class:'field' });
+  campoPagto.appendChild(el('label', {}, document.createTextNode('Pagamento dia (opcional)')));
+  const inputPagto = el('input', { type:'text', placeholder:'dd/mm/aaaa' });
+  inputPagto.oninput = (e) => { e.target.value = maskData(e.target.value); dados.pagamentoDia = dataBRparaISO(e.target.value); };
+  campoPagto.appendChild(inputPagto);
+  row2.appendChild(campoPagto);
+  form.appendChild(row2);
+
+  const row3 = el('div', { class:'row' });
+  const campoDoc = el('div', { class:'field' });
+  campoDoc.appendChild(el('label', {}, document.createTextNode('Cópia do documento (foto ou PDF)')));
+  const statusDoc = el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:4px;' }, document.createTextNode('Nenhum arquivo.'));
+  campoDoc.appendChild(statusDoc);
+  const inputDoc = el('input', { type:'file', accept:'image/*,application/pdf' });
+  inputDoc.onchange = (e) => {
+    const file = e.target.files[0]; if(!file) return;
+    processarArquivoAnexo(file, (dataUrl, tipo) => {
+      dados.documentoDataUrl = dataUrl; dados.documentoNome = file.name; dados.documentoTipo = tipo;
+      statusDoc.textContent = 'Anexado: '+file.name;
+      toast('Documento carregado!');
+    });
+  };
+  campoDoc.appendChild(inputDoc);
+  row3.appendChild(campoDoc);
+
+  const campoComp = el('div', { class:'field' });
+  campoComp.appendChild(el('label', {}, document.createTextNode('Comprovante do pagamento (foto ou PDF)')));
+  const statusComp = el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:4px;' }, document.createTextNode('Nenhum arquivo.'));
+  campoComp.appendChild(statusComp);
+  const inputComp = el('input', { type:'file', accept:'image/*,application/pdf' });
+  inputComp.onchange = (e) => {
+    const file = e.target.files[0]; if(!file) return;
+    processarArquivoAnexo(file, (dataUrl, tipo) => {
+      dados.comprovanteDataUrl = dataUrl; dados.comprovanteNome = file.name; dados.comprovanteTipo = tipo;
+      statusComp.textContent = 'Anexado: '+file.name;
+      toast('Comprovante carregado!');
+    });
+  };
+  campoComp.appendChild(inputComp);
+  row3.appendChild(campoComp);
+  form.appendChild(row3);
 
   const btnRow = el('div', { class:'row' });
   const salvarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Adicionar'));
   salvarBtn.onclick = async () => {
-    if(!dados.nome.trim()){ alert('Digite um nome para esse gasto.'); return; }
-    state.gastos.push({ id: uid(), nome: dados.nome.trim(), categoria: dados.categoria, valorEstimado: dados.valorEstimado, diaVencimento: dados.diaVencimento, ativo:true, pagamentos:[] });
+    if(!dados.empresa.trim()){ alert('Digite o nome da empresa.'); return; }
+    if(!dados.vencimento){ alert('Preencha a data de vencimento (dd/mm/aaaa).'); return; }
+    state.gastos.push({ id: uid(), ...dados, empresa: dados.empresa.trim() });
     novoGastoAberto = false;
     await saveProgress(); renderMain();
     toast('Gasto fixo adicionado!');
