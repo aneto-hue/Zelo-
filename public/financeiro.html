@@ -713,14 +713,22 @@ function renderPlanilhaLancamentos(container){
   filtrosWrap.appendChild(linhaFiltro1);
 
   const linhaFiltro2 = el('div', { style:'display:flex;align-items:center;gap:10px;flex-wrap:wrap;' });
-  const chipVencidas = el('div', { class:'filter-chip'+(filtroApuracao.soVencidas?' selected':''), style:'background:'+(filtroApuracao.soVencidas?'var(--red)':'#fff') },
-    document.createTextNode('⚠ Só parcelas vencidas'));
-  chipVencidas.onclick = () => { filtroApuracao.soVencidas = !filtroApuracao.soVencidas; refreshPanel(); };
-  linhaFiltro2.appendChild(chipVencidas);
-  const temFiltroAtivo = filtroApuracao.dataIni || filtroApuracao.dataFim || filtroApuracao.profissionalId || filtroApuracao.forma || filtroApuracao.soVencidas;
+  linhaFiltro2.appendChild(el('span', { style:'font-size:11px;color:var(--muted);' }, document.createTextNode('Situação:')));
+  const OPCOES_STATUS = [
+    ['recebidos', '✓ Recebidos', 'var(--green)'],
+    ['naoRecebidos', 'Não recebidos', 'var(--blue-dark)'],
+    ['vencidos', '⚠ Vencidos', 'var(--red)'],
+  ];
+  OPCOES_STATUS.forEach(([valor,label,cor]) => {
+    const ativo = filtroApuracao.status === valor;
+    const chip = el('div', { class:'filter-chip'+(ativo?' selected':''), style:'background:'+(ativo?cor:'#fff')+';'+(ativo?'color:#fff;':'') }, document.createTextNode(label));
+    chip.onclick = () => { filtroApuracao.status = ativo ? '' : valor; refreshPanel(); };
+    linhaFiltro2.appendChild(chip);
+  });
+  const temFiltroAtivo = filtroApuracao.dataIni || filtroApuracao.dataFim || filtroApuracao.profissionalId || filtroApuracao.forma || filtroApuracao.status;
   if(temFiltroAtivo){
     const limparBtn = el('span', { style:'color:var(--blue-dark);text-decoration:underline;cursor:pointer;font-size:12.5px;' }, document.createTextNode('Limpar filtros'));
-    limparBtn.onclick = () => { filtroApuracao = { dataIni:'', dataFim:'', profissionalId:'', forma:'', soVencidas:false }; refreshPanel(); };
+    limparBtn.onclick = () => { filtroApuracao = { dataIni:'', dataFim:'', profissionalId:'', forma:'', status:'' }; refreshPanel(); };
     linhaFiltro2.appendChild(limparBtn);
   }
   filtrosWrap.appendChild(linhaFiltro2);
@@ -737,19 +745,22 @@ function renderPlanilhaLancamentos(container){
       if(filtroApuracao.forma && p.forma !== filtroApuracao.forma) return;
       if(filtroApuracao.dataIni && (!p.data || p.data < filtroApuracao.dataIni)) return;
       if(filtroApuracao.dataFim && (!p.data || p.data > filtroApuracao.dataFim)) return;
-      if(filtroApuracao.soVencidas){
+      if(filtroApuracao.status){
         const vencida = !p.pago && p.data && p.data < hojeISOFiltro;
-        if(!vencida) return;
+        if(filtroApuracao.status === 'recebidos' && !p.pago) return;
+        if(filtroApuracao.status === 'vencidos' && !vencida) return;
+        if(filtroApuracao.status === 'naoRecebidos' && (p.pago || vencida)) return;
       }
       totalApurado += p.valor||0;
       qtdParcelasApuradas++;
     });
   });
+  const corResumo = filtroApuracao.status === 'vencidos' ? 'var(--red)' : (filtroApuracao.status === 'recebidos' ? 'var(--green)' : 'var(--blue-dark)');
   const resumoWrap = el('div', { style:'margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,0.08);' });
   resumoWrap.appendChild(el('div', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode(
     (temFiltroAtivo ? 'Total apurado com esses filtros' : 'Total de todas as parcelas') + ' ('+qtdParcelasApuradas+' parcela(s)):'
   )));
-  resumoWrap.appendChild(el('div', { style:'font-size:22px;font-weight:800;color:'+(filtroApuracao.soVencidas?'var(--red)':'var(--blue-dark)')+';' },
+  resumoWrap.appendChild(el('div', { style:'font-size:22px;font-weight:800;color:'+corResumo+';' },
     document.createTextNode('R$ '+formatMoney(totalApurado))));
   filtrosWrap.appendChild(resumoWrap);
   container.appendChild(filtrosWrap);
@@ -1686,7 +1697,7 @@ let parcelaPagandoId = null;
 let historicoAlteracoesAberto = {};
 
 let visaoLancamentos = 'lista'; // 'lista' | 'planilha' — não usado mais na navegação, mantido por compatibilidade
-let filtroApuracao = { dataIni:'', dataFim:'', profissionalId:'', forma:'', soVencidas:false };
+let filtroApuracao = { dataIni:'', dataFim:'', profissionalId:'', forma:'', status:'' }; // status: '' | 'recebidos' | 'naoRecebidos' | 'vencidos'
 let planilhaAno = new Date().getFullYear();
 let filtroBuscaLancamento = '';
 
