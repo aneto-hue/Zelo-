@@ -714,7 +714,7 @@ function renderPlanilhaLancamentos(container){
     const tdValor = el('td', { class:'fin-col-fixa fin-col-2', style:'cursor:pointer;color:var(--blue-dark);font-weight:700;' });
     tdValor.appendChild(el('span', { style:'text-decoration:underline dotted;' }, document.createTextNode('R$ '+formatMoney(linha.valor))));
     if(divergeDoTotal){
-      tdValor.appendChild(el('div', { style:'font-size:9.5px;color:var(--red);font-weight:700;', title:'A soma das parcelas cadastradas (R$ '+formatMoney(somaParcelasLinha)+') não bate com o valor total. Toque em Parcelas pra corrigir.' },
+      tdValor.appendChild(el('div', { style:'font-size:9.5px;color:var(--red);font-weight:700;', title:'O "Valor total" vem da soma dos tratamentos desta linha (toque em "Profissional executor" pra ver/mudar quais tratamentos são). As parcelas cadastradas (R$ '+formatMoney(somaParcelasLinha)+') não batem com esse valor — toque na coluna "Parcelas" pra corrigi-las. Se o "Valor total" em si é que está errado, o problema está em quais tratamentos foram atribuídos a esta linha, não nas parcelas.' },
         document.createTextNode('⚠ parcelas somam R$ '+formatMoney(somaParcelasLinha))));
     }
     tdValor.onclick = () => { celulaValorAberta = (celulaValorAberta===lanc.id) ? null : lanc.id; celulaFormaAberta=null; celulaProfAberta=null; celulaParcelaAberta=null; refreshPanel(); };
@@ -1110,7 +1110,7 @@ function renderPainelProfissional(lanc, linha){
   wrap.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin:0 0 8px;' },
     document.createTextNode('Ao indicar um profissional diferente pra um tratamento específico, ele vira uma linha nova na planilha, com valor e parcelas próprias.')));
 
-  const temTratamentos = linha.tratamentos && linha.tratamentos.length > 0;
+  const temTratamentos = lanc.tratamentos && lanc.tratamentos.length > 0;
   if(!temTratamentos){
     const selectUnico = el('select', { style:'padding:7px 8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;' });
     selectUnico.appendChild(el('option', { value:'' }, document.createTextNode('Não atribuído')));
@@ -1126,6 +1126,9 @@ function renderPainelProfissional(lanc, linha){
       saveProgress(); refreshPanel();
     };
     wrap.appendChild(selectUnico);
+  } else if(!linha.tratamentos || !linha.tratamentos.length){
+    wrap.appendChild(el('p', { style:'font-size:12px;color:var(--muted);' },
+      document.createTextNode('Essa linha não tem nenhum tratamento no momento (foram todos movidos pra outra linha). Abra o "Profissional executor" de outra linha desse mesmo paciente pra trazer algum tratamento de volta pra cá.')));
   } else {
     const tabela = el('table', { style:'width:100%;font-size:12px;border-collapse:collapse;' });
     tabela.appendChild(el('thead',{}, el('tr',{},[
