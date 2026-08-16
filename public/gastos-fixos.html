@@ -139,6 +139,7 @@ async function loadProgress(){
 
 let novoGastoAberto = false;
 let anexoAbertoId = null; // id do gasto cujo formulário de edição está aberto na planilha
+let confirmandoExcluirId = null;
 let filtroPeriodo = { dataIni:'', dataFim:'' };
 
 function statusDoGasto(g, hojeISO){
@@ -341,13 +342,24 @@ function refreshTabela(){
     editarLink.onclick = () => { anexoAbertoId = (anexoAbertoId===g.id) ? null : g.id; refreshTabela(); };
     tdAcoes.appendChild(editarLink);
     tdAcoes.appendChild(document.createTextNode('  '));
-    const excluirLink = el('span', { class:'link-acao red' }, document.createTextNode('Excluir'));
-    excluirLink.onclick = async () => {
-      if(!confirm('Excluir a conta de "'+g.empresa+'"?')) return;
-      state.gastos = state.gastos.filter(x=>x.id!==g.id);
-      await saveProgress(); renderMain();
-    };
-    tdAcoes.appendChild(excluirLink);
+    if(confirmandoExcluirId === g.id){
+      const simBtn = el('span', { class:'link-acao red', style:'font-weight:800;' }, document.createTextNode('Sim, excluir'));
+      simBtn.onclick = async () => {
+        state.gastos = state.gastos.filter(x=>x.id!==g.id);
+        confirmandoExcluirId = null;
+        await saveProgress(); renderMain();
+        toast('Conta excluída.');
+      };
+      tdAcoes.appendChild(simBtn);
+      tdAcoes.appendChild(document.createTextNode('  '));
+      const naoBtn = el('span', { class:'link-acao' }, document.createTextNode('Cancelar'));
+      naoBtn.onclick = () => { confirmandoExcluirId = null; refreshTabela(); };
+      tdAcoes.appendChild(naoBtn);
+    } else {
+      const excluirLink = el('span', { class:'link-acao red' }, document.createTextNode('Excluir'));
+      excluirLink.onclick = () => { confirmandoExcluirId = g.id; refreshTabela(); };
+      tdAcoes.appendChild(excluirLink);
+    }
     tr.appendChild(tdAcoes);
 
     tbody.appendChild(tr);
