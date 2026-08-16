@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Gastos Fixos Mensais — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="nav-home.js"></script>
+<style>
+  :root{
+    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
+    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{
+    background:#fff; border-bottom:3px solid var(--blue-dark); padding:14px 16px;
+    display:flex; align-items:center; gap:14px; position:sticky; top:0; z-index:20;
+  }
+  header.topbar h1{font-size:18px; margin:0; color:var(--blue-dark); font-weight:700;}
+  header.topbar p{margin:2px 0 0; font-size:12px; color:var(--muted); font-style:italic;}
+  main{max-width:900px; margin:0 auto; padding:16px;}
+  .section-title{font-size:16px; font-weight:700; color:var(--blue-dark); margin:0 0 4px;}
+  .hint{font-size:12px; color:var(--muted); margin:0 0 14px;}
+  .empty-hint{font-size:13px; color:var(--muted); background:#fff; border-radius:10px; padding:16px; text-align:center;}
+  .add-row-btn{
+    background:var(--blue-med); color:#fff; text-align:center; padding:11px; border-radius:10px;
+    font-weight:700; font-size:13.5px; cursor:pointer; user-select:none;
+  }
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; color:var(--blue-dark); margin-bottom:4px;}
+  .field input, .field select{
+    width:100%; padding:9px 10px; font-size:14px; border:1.5px solid var(--line); border-radius:8px;
+    font-family:inherit; background:#fff;
+  }
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+  .card{background:#fff; border-radius:12px; padding:14px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+  .alert-banner{
+    background:#FDECEA; border:1.5px solid var(--red); border-radius:12px; padding:12px 14px; margin-bottom:16px;
+  }
+  .alert-banner.amber{ background:#FFF6E5; border-color:var(--amber); }
+  .alert-banner .titulo{font-weight:700; font-size:13.5px; margin-bottom:6px;}
+  .alert-banner.red .titulo{color:var(--red);}
+  .alert-banner.amber .titulo{color:var(--amber);}
+  .alert-item{font-size:13px; padding:4px 0;}
+  .gasto-row{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
+  .gasto-nome{font-weight:700; font-size:14.5px;}
+  .gasto-sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .status-chip{
+    padding:5px 11px; border-radius:8px; font-size:11.5px; font-weight:700; white-space:nowrap;
+  }
+  .status-pago{background:#E8F5E9; color:var(--green);}
+  .status-vencido{background:#FFEBEE; color:var(--red);}
+  .status-proximo{background:#FFF3E0; color:var(--amber);}
+  .status-normal{background:#E3F2FD; color:#1565C0;}
+  .acoes-gasto{display:flex; gap:14px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line-light);}
+  .acao-link{font-size:12.5px; font-weight:700; color:var(--blue-dark); cursor:pointer; text-decoration:underline;}
+  .acao-link.red{color:var(--red);}
+  .mini-form{background:#F4F8FB; border-radius:10px; padding:12px; margin-top:10px;}
+  .summary-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
+  .summary-card{background:#fff; border-radius:12px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+  .summary-num{font-size:20px; font-weight:800; color:var(--blue-dark);}
+  .summary-num.green{color:var(--green);}
+  .summary-num.red{color:var(--red);}
+  .summary-label{font-size:11px; color:var(--muted); margin-top:2px;}
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff;
+    padding:10px 18px; border-radius:8px; font-size:13px; z-index:999; opacity:0; transition:opacity .3s;
+    pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>Gastos Fixos Mensais</h1>
+    <p>Água, luz, internet e outras contas recorrentes</p>
+  </div>
+</header>
+
+<main id="main"></main>
+<div class="toast" id="toast"></div>
+
+<script>
+function el(tag, attrs={}, children){
+  const e = document.createElement(tag);
+  Object.keys(attrs).forEach(k => {
+    if(k==='class') e.className = attrs[k];
+    else if(k==='style') e.setAttribute('style', attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  });
+  if(children){
+    (Array.isArray(children) ? children : [children]).forEach(c => {
+      if(c) e.appendChild(c);
+    });
+  }
+  return e;
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function uid(){ return 'gasto'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+const STORAGE_KEY = 'gastos_fixos_v1';
+const CATEGORIAS = ['Água','Luz','Internet','Telefone','Aluguel','Condomínio','Software/Sistema','Contabilidade','Segurança','Limpeza','Outro'];
+let state = { gastos: [] };
+
+async function saveProgress(){ await ClinicaStorage.save(STORAGE_KEY, state); }
+async function loadProgress(){
+  const saved = await ClinicaStorage.load(STORAGE_KEY);
+  if(saved && saved.gastos) state.gastos = saved.gastos;
+}
+
+let novoGastoAberto = false;
+let gastoEditandoId = null;
+let gastoPagandoId = null;
+
+// Retorna a data de vencimento do gasto NO MÊS ATUAL (ou no mês indicado), como objeto Date.
+function dataVencimentoNoMes(gasto, ano, mes){
+  const ultimoDiaDoMes = new Date(ano, mes, 0).getDate();
+  const dia = Math.min(gasto.diaVencimento, ultimoDiaDoMes);
+  return new Date(ano, mes-1, dia);
+}
+function pagamentoDoMes(gasto, ano, mes){
+  return (gasto.pagamentos||[]).find(p => p.ano===ano && p.mes===mes);
+}
+function statusDoGasto(gasto, hoje){
+  const ano = hoje.getFullYear(), mes = hoje.getMonth()+1;
+  const pagamento = pagamentoDoMes(gasto, ano, mes);
+  if(pagamento && pagamento.pago) return { status:'pago', pagamento };
+  const venc = dataVencimentoNoMes(gasto, ano, mes);
+  const diffDias = Math.round((venc - new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())) / (1000*60*60*24));
+  if(diffDias < 0) return { status:'vencido', diffDias, venc };
+  if(diffDias <= 5) return { status:'proximo', diffDias, venc };
+  return { status:'normal', diffDias, venc };
+}
+
+function renderMain(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  const hoje = new Date();
+
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Gastos Fixos Mensais')));
+  main.appendChild(el('p', { class:'hint' }, document.createTextNode('Contas que se repetem todo mês — água, luz, internet, aluguel, sistemas, etc. Avisa quando estiver perto de vencer.')));
+
+  const gastosAtivos = state.gastos.filter(g => g.ativo !== false);
+  const situacoes = gastosAtivos.map(g => ({ gasto:g, sit: statusDoGasto(g, hoje) }));
+  const vencidos = situacoes.filter(s => s.sit.status==='vencido');
+  const proximos = situacoes.filter(s => s.sit.status==='proximo');
+
+  // ---- Avisos ----
+  if(vencidos.length){
+    const banner = el('div', { class:'alert-banner red' });
+    banner.appendChild(el('div', { class:'titulo' }, document.createTextNode('⚠ '+vencidos.length+' conta(s) vencida(s), ainda não paga(s)')));
+    vencidos.forEach(({gasto,sit}) => {
+      banner.appendChild(el('div', { class:'alert-item' }, document.createTextNode(
+        gasto.nome+' — venceu há '+Math.abs(sit.diffDias)+' dia(s) (dia '+String(gasto.diaVencimento).padStart(2,'0')+')'
+      )));
+    });
+    main.appendChild(banner);
+  }
+  if(proximos.length){
+    const banner = el('div', { class:'alert-banner amber' });
+    banner.appendChild(el('div', { class:'titulo' }, document.createTextNode('🔔 '+proximos.length+' conta(s) vencendo nos próximos 5 dias')));
+    proximos.forEach(({gasto,sit}) => {
+      banner.appendChild(el('div', { class:'alert-item' }, document.createTextNode(
+        gasto.nome+' — vence '+(sit.diffDias===0?'hoje':(sit.diffDias===1?'amanhã':'em '+sit.diffDias+' dias'))+' (dia '+String(gasto.diaVencimento).padStart(2,'0')+')'
+      )));
+    });
+    main.appendChild(banner);
+  }
+
+  // ---- Resumo do mês ----
+  const totalMes = gastosAtivos.reduce((s,g) => {
+    const pagamento = pagamentoDoMes(g, hoje.getFullYear(), hoje.getMonth()+1);
+    return s + (pagamento && pagamento.pago ? pagamento.valorPago : g.valorEstimado||0);
+  }, 0);
+  const totalPago = gastosAtivos.reduce((s,g) => {
+    const pagamento = pagamentoDoMes(g, hoje.getFullYear(), hoje.getMonth()+1);
+    return s + (pagamento && pagamento.pago ? pagamento.valorPago : 0);
+  }, 0);
+  const summary = el('div', { class:'summary-grid' });
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num' }, document.createTextNode('R$ '+formatMoney(totalMes))),
+    el('div', { class:'summary-label' }, document.createTextNode('Total previsto este mês')),
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num green' }, document.createTextNode('R$ '+formatMoney(totalPago))),
+    el('div', { class:'summary-label' }, document.createTextNode('Já pago este mês')),
+  ]));
+  main.appendChild(summary);
+
+  // ---- Botão novo gasto ----
+  if(novoGastoAberto){
+    renderNovoGastoForm(main);
+  } else {
+    const addBtn = el('div', { class:'add-row-btn', style:'margin-bottom:16px;' }, document.createTextNode('+ Novo gasto fixo'));
+    addBtn.onclick = () => { novoGastoAberto = true; renderMain(); };
+    main.appendChild(addBtn);
+  }
+
+  // ---- Lista de gastos ----
+  if(!gastosAtivos.length){
+    main.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum gasto fixo cadastrado ainda. Adicione água, luz, internet, aluguel...')));
+    return;
+  }
+
+  // Ordena: vencidos primeiro, depois próximos, depois o resto por dia de vencimento
+  const ordem = { vencido:0, proximo:1, normal:2, pago:3 };
+  situacoes.sort((a,b) => (ordem[a.sit.status]-ordem[b.sit.status]) || (a.gasto.diaVencimento-b.gasto.diaVencimento));
+
+  situacoes.forEach(({gasto, sit}) => {
+    const card = el('div', { class:'card' });
+    const row = el('div', { class:'gasto-row' });
+    const info = el('div', {});
+    info.appendChild(el('div', { class:'gasto-nome' }, document.createTextNode(gasto.nome)));
+    info.appendChild(el('div', { class:'gasto-sub' }, document.createTextNode(
+      (gasto.categoria?gasto.categoria+' • ':'')+'Vence todo dia '+String(gasto.diaVencimento).padStart(2,'0')+' • R$ '+formatMoney(gasto.valorEstimado)+' (estimado)'
+    )));
+    row.appendChild(info);
+
+    const statusLabel = {
+      pago: '✓ Pago', vencido: '⚠ Vencido', proximo: '🔔 Vence em breve', normal: 'Em dia',
+    }[sit.status];
+    row.appendChild(el('div', { class:'status-chip status-'+sit.status }, document.createTextNode(statusLabel)));
+    card.appendChild(row);
+
+    if(sit.status==='pago' && sit.pagamento){
+      card.appendChild(el('div', { class:'gasto-sub', style:'margin-top:6px;' }, document.createTextNode(
+        'Pago em '+formatDateBR(sit.pagamento.dataPagamento)+' — R$ '+formatMoney(sit.pagamento.valorPago)
+      )));
+    }
+
+    const acoes = el('div', { class:'acoes-gasto' });
+    if(sit.status !== 'pago'){
+      const pagarLink = el('span', { class:'acao-link' }, document.createTextNode('Marcar como pago'));
+      pagarLink.onclick = () => { gastoPagandoId = (gastoPagandoId===gasto.id)?null:gasto.id; gastoEditandoId=null; renderMain(); };
+      acoes.appendChild(pagarLink);
+    } else {
+      const desmarcarLink = el('span', { class:'acao-link' }, document.createTextNode('Desmarcar pagamento'));
+      desmarcarLink.onclick = async () => {
+        const hoje2 = new Date();
+        gasto.pagamentos = (gasto.pagamentos||[]).filter(p => !(p.ano===hoje2.getFullYear() && p.mes===hoje2.getMonth()+1));
+        await saveProgress(); renderMain();
+      };
+      acoes.appendChild(desmarcarLink);
+    }
+    const editarLink = el('span', { class:'acao-link' }, document.createTextNode('Editar'));
+    editarLink.onclick = () => { gastoEditandoId = (gastoEditandoId===gasto.id)?null:gasto.id; gastoPagandoId=null; renderMain(); };
+    acoes.appendChild(editarLink);
+    const excluirLink = el('span', { class:'acao-link red' }, document.createTextNode('Excluir'));
+    excluirLink.onclick = async () => {
+      if(!confirm('Excluir "'+gasto.nome+'" da lista de gastos fixos?')) return;
+      gasto.ativo = false;
+      await saveProgress(); renderMain();
+    };
+    acoes.appendChild(excluirLink);
+    card.appendChild(acoes);
+
+    if(gastoPagandoId === gasto.id){
+      const form = el('div', { class:'mini-form' });
+      const hojeISO = new Date().toISOString().slice(0,10);
+      const dadosPagto = { valorPago: gasto.valorEstimado||0, dataPagamento: hojeISO };
+      const rowPagto = el('div', { class:'row' });
+      const campoValor = el('div', { class:'field', style:'margin-bottom:0;' });
+      campoValor.appendChild(el('label', {}, document.createTextNode('Valor pago')));
+      const inputValor = el('input', { type:'number', min:'0', step:'0.01', value: dadosPagto.valorPago });
+      inputValor.oninput = (e) => { dadosPagto.valorPago = parseFloat(e.target.value)||0; };
+      campoValor.appendChild(inputValor);
+      rowPagto.appendChild(campoValor);
+      const campoData = el('div', { class:'field', style:'margin-bottom:0;' });
+      campoData.appendChild(el('label', {}, document.createTextNode('Data do pagamento')));
+      const inputData = el('input', { type:'date', value: dadosPagto.dataPagamento });
+      inputData.oninput = (e) => { dadosPagto.dataPagamento = e.target.value; };
+      campoData.appendChild(inputData);
+      rowPagto.appendChild(campoData);
+      form.appendChild(rowPagto);
+      const confirmarBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:var(--green);' }, document.createTextNode('Confirmar pagamento'));
+      confirmarBtn.onclick = async () => {
+        const hoje2 = new Date();
+        if(!gasto.pagamentos) gasto.pagamentos = [];
+        gasto.pagamentos = gasto.pagamentos.filter(p => !(p.ano===hoje2.getFullYear() && p.mes===hoje2.getMonth()+1));
+        gasto.pagamentos.push({ ano:hoje2.getFullYear(), mes:hoje2.getMonth()+1, pago:true, valorPago:dadosPagto.valorPago, dataPagamento:dadosPagto.dataPagamento });
+        gastoPagandoId = null;
+        await saveProgress(); renderMain();
+        toast('Pagamento registrado!');
+      };
+      form.appendChild(confirmarBtn);
+      card.appendChild(form);
+    }
+
+    if(gastoEditandoId === gasto.id){
+      const form = el('div', { class:'mini-form' });
+      const dadosEdicao = { nome: gasto.nome, categoria: gasto.categoria||'', valorEstimado: gasto.valorEstimado, diaVencimento: gasto.diaVencimento };
+      const campoNome = el('div', { class:'field' });
+      campoNome.appendChild(el('label', {}, document.createTextNode('Nome')));
+      const inputNome = el('input', { type:'text', value: dadosEdicao.nome });
+      inputNome.oninput = (e) => { dadosEdicao.nome = e.target.value; };
+      campoNome.appendChild(inputNome);
+      form.appendChild(campoNome);
+
+      const campoCategoria = el('div', { class:'field' });
+      campoCategoria.appendChild(el('label', {}, document.createTextNode('Categoria')));
+      const selectCategoria = el('select', {});
+      CATEGORIAS.forEach(c => {
+        const opt = el('option', { value:c }, document.createTextNode(c));
+        if(dadosEdicao.categoria===c) opt.setAttribute('selected','selected');
+        selectCategoria.appendChild(opt);
+      });
+      selectCategoria.onchange = (e) => { dadosEdicao.categoria = e.target.value; };
+      campoCategoria.appendChild(selectCategoria);
+      form.appendChild(campoCategoria);
+
+      const rowEd = el('div', { class:'row' });
+      const campoValorEd = el('div', { class:'field' });
+      campoValorEd.appendChild(el('label', {}, document.createTextNode('Valor estimado')));
+      const inputValorEd = el('input', { type:'number', min:'0', step:'0.01', value: dadosEdicao.valorEstimado });
+      inputValorEd.oninput = (e) => { dadosEdicao.valorEstimado = parseFloat(e.target.value)||0; };
+      campoValorEd.appendChild(inputValorEd);
+      rowEd.appendChild(campoValorEd);
+      const campoDiaEd = el('div', { class:'field' });
+      campoDiaEd.appendChild(el('label', {}, document.createTextNode('Dia do vencimento')));
+      const inputDiaEd = el('input', { type:'number', min:'1', max:'31', value: dadosEdicao.diaVencimento });
+      inputDiaEd.oninput = (e) => { dadosEdicao.diaVencimento = Math.min(31,Math.max(1,parseInt(e.target.value,10)||1)); };
+      campoDiaEd.appendChild(inputDiaEd);
+      rowEd.appendChild(campoDiaEd);
+      form.appendChild(rowEd);
+
+      const salvarBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;' }, document.createTextNode('Salvar'));
+      salvarBtn.onclick = async () => {
+        gasto.nome = dadosEdicao.nome;
+        gasto.categoria = dadosEdicao.categoria;
+        gasto.valorEstimado = dadosEdicao.valorEstimado;
+        gasto.diaVencimento = dadosEdicao.diaVencimento;
+        gastoEditandoId = null;
+        await saveProgress(); renderMain();
+        toast('Alterações salvas!');
+      };
+      form.appendChild(salvarBtn);
+      card.appendChild(form);
+    }
+
+    main.appendChild(card);
+  });
+}
+
+function formatDateBR(str){ if(!str) return '—'; const [y,m,d]=str.split('-'); if(!y||!m||!d) return str; return `${d}/${m}/${y}`; }
+
+function renderNovoGastoForm(main){
+  const form = el('div', { class:'card' });
+  const dados = { nome:'', categoria:'Água', valorEstimado:0, diaVencimento:10 };
+
+  const campoNome = el('div', { class:'field' });
+  campoNome.appendChild(el('label', {}, document.createTextNode('Nome (ex: Água, Luz, Internet)')));
+  const inputNome = el('input', { type:'text', placeholder:'ex: Conta de luz' });
+  inputNome.oninput = (e) => { dados.nome = e.target.value; };
+  campoNome.appendChild(inputNome);
+  form.appendChild(campoNome);
+
+  const campoCategoria = el('div', { class:'field' });
+  campoCategoria.appendChild(el('label', {}, document.createTextNode('Categoria')));
+  const selectCategoria = el('select', {});
+  CATEGORIAS.forEach(c => selectCategoria.appendChild(el('option', { value:c }, document.createTextNode(c))));
+  selectCategoria.onchange = (e) => { dados.categoria = e.target.value; };
+  campoCategoria.appendChild(selectCategoria);
+  form.appendChild(campoCategoria);
+
+  const row = el('div', { class:'row' });
+  const campoValor = el('div', { class:'field' });
+  campoValor.appendChild(el('label', {}, document.createTextNode('Valor estimado (R$)')));
+  const inputValor = el('input', { type:'number', min:'0', step:'0.01', placeholder:'0,00' });
+  inputValor.oninput = (e) => { dados.valorEstimado = parseFloat(e.target.value)||0; };
+  campoValor.appendChild(inputValor);
+  row.appendChild(campoValor);
+  const campoDia = el('div', { class:'field' });
+  campoDia.appendChild(el('label', {}, document.createTextNode('Dia do vencimento')));
+  const inputDia = el('input', { type:'number', min:'1', max:'31', value:'10' });
+  inputDia.oninput = (e) => { dados.diaVencimento = Math.min(31,Math.max(1,parseInt(e.target.value,10)||1)); };
+  campoDia.appendChild(inputDia);
+  row.appendChild(campoDia);
+  form.appendChild(row);
+
+  const btnRow = el('div', { class:'row' });
+  const salvarBtn = el('div', { class:'add-row-btn', style:'flex:1;' }, document.createTextNode('Adicionar'));
+  salvarBtn.onclick = async () => {
+    if(!dados.nome.trim()){ alert('Digite um nome para esse gasto.'); return; }
+    state.gastos.push({ id: uid(), nome: dados.nome.trim(), categoria: dados.categoria, valorEstimado: dados.valorEstimado, diaVencimento: dados.diaVencimento, ativo:true, pagamentos:[] });
+    novoGastoAberto = false;
+    await saveProgress(); renderMain();
+    toast('Gasto fixo adicionado!');
+  };
+  const cancelarBtn = el('div', { class:'add-row-btn', style:'flex:1;background:#fff;color:var(--muted);border:1.5px solid var(--line);' }, document.createTextNode('Cancelar'));
+  cancelarBtn.onclick = () => { novoGastoAberto = false; renderMain(); };
+  btnRow.appendChild(salvarBtn); btnRow.appendChild(cancelarBtn);
+  form.appendChild(btnRow);
+  main.appendChild(form);
+}
+
+// ============ INICIALIZAÇÃO ============
+(async function iniciarGastosFixos(){
+  await aplicarIdentidadeClinica();
+  const meResp = await fetch('/api/me', { credentials:'same-origin' });
+  if(meResp.status === 401){ window.location.href = '/login.html'; return; }
+  await loadProgress();
+  renderMain();
+})();
+</script>
+</body>
+</html>
