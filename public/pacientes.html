@@ -363,21 +363,44 @@ function render(){
       )));
       linhaEsquerda.appendChild(info);
       card.appendChild(linhaEsquerda);
-      const linkBtn = el('span', { style:'color:var(--blue-dark);cursor:pointer;font-weight:700;font-size:13px;margin-right:10px;', title:'Gerar link para o paciente preencher os dados' }, document.createTextNode('🔗'));
+      const linkBtn = el('span', {
+        style:'display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;font-size:22px;color:var(--blue-dark);cursor:pointer;border-radius:10px;background:var(--blue-light,#EFF6FB);margin-right:8px;flex-shrink:0;user-select:none;',
+        title:'Gerar link para o paciente preencher os dados'
+      }, document.createTextNode('🔗'));
+      let gerandoLink = false;
       linkBtn.onclick = async (e) => {
         e.stopPropagation();
-        const resp = await fetch('/api/portal/gerar-link', {
-          method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ pacienteId: p.id, fichaId: p.id })
-        });
-        const data = await resp.json();
-        if(!resp.ok){ alert(data.erro || 'Não foi possível gerar o link.'); return; }
-        const linkCompleto = window.location.origin + data.url;
+        if(gerandoLink) return; // evita cliques duplicados enquanto ainda está gerando
+        gerandoLink = true;
+        const textoOriginal = linkBtn.textContent;
+        linkBtn.textContent = '⏳';
         try{
-          await navigator.clipboard.writeText(linkCompleto);
-          alert('Link copiado! Envie para o paciente (ex: por WhatsApp):\n\n' + linkCompleto);
-        }catch(e){
-          prompt('Copie o link abaixo e envie para o paciente:', linkCompleto);
+          const resp = await fetch('/api/portal/gerar-link', {
+            method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ pacienteId: p.id, fichaId: p.id })
+          });
+          let data;
+          try{ data = await resp.json(); }catch(erroJson){ data = {}; }
+          if(!resp.ok){
+            alert(data.erro || 'Não foi possível gerar o link (erro '+resp.status+'). Tente novamente em instantes.');
+            return;
+          }
+          if(!data.url){
+            alert('O servidor não retornou o link. Tente novamente.');
+            return;
+          }
+          const linkCompleto = window.location.origin + data.url;
+          try{
+            await navigator.clipboard.writeText(linkCompleto);
+            alert('Link copiado! Envie para o paciente (ex: por WhatsApp):\n\n' + linkCompleto);
+          }catch(erroClip){
+            prompt('Copie o link abaixo e envie para o paciente:', linkCompleto);
+          }
+        }catch(erroRede){
+          alert('Não foi possível gerar o link agora — confira sua conexão com a internet e tente de novo.');
+        }finally{
+          gerandoLink = false;
+          linkBtn.textContent = textoOriginal;
         }
       };
       card.appendChild(linkBtn);

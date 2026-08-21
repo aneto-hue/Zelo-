@@ -2941,10 +2941,6 @@ async function generatePDF(){
     y += 4;
   }
 
-  newPage();
-  drawImageGallery('Imagens', state.images.clinicas, 'Espaço para inserir imagens clínicas');
-  drawImageGallery('Radiografias', state.images.radiografias, 'Espaço para inserir radiografias');
-
   // ---------- Plano de tratamento ----------
   newPage();
   sectionTitle('Odontograma e plano de tratamento');
@@ -2989,6 +2985,8 @@ async function generatePDF(){
   drawTable(['Valor','Data do pagamento','Forma do pagamento'], state.payRows, [contentW/3, contentW/3, contentW/3]);
 
   // ---------- Contrato ----------
+  // Fica numa função porque o contrato precisa ser impresso em DUAS vias (2 cópias iguais).
+  function desenharContratoCompleto(){
   newPage();
   const v = (val) => (val && String(val).trim()) ? String(val) : '________________________';
 
@@ -3123,11 +3121,19 @@ async function generatePDF(){
   doc.text(v(state.clinic.nome) + (nomeProfissionalEmitindo() ? (' — Dr.(a) '+nomeProfissionalEmitindo()) : ''), marginX, y+11);
   doc.text('CONTRATADO(A)', marginX, y+22);
   y += 30;
+  } // fim de desenharContratoCompleto()
+
+  // Duas vias do contrato — a segunda começa numa página nova (a própria função já chama newPage() no início).
+  desenharContratoCompleto();
+  desenharContratoCompleto();
 
   const safeName = (state.patient.nome||'paciente').trim().replace(/\s+/g,'_') || 'paciente';
   const fileName = 'ficha_anamnese_' + safeName + '.pdf';
-  // ---------- Nota Promissória (só quando a forma de pagamento escolhida for "Promissória") ----------
+  // ---------- Nota Promissória (duas vias, só quando a forma de pagamento escolhida for "Promissória") ----------
   if(state.payInfo.forma === 'Promissória'){
+    doc.addPage();
+    desenharMarcaDagua(doc, pageW, pageH, state.clinic);
+    drawPromissoryPage(doc, pageW, pageH);
     doc.addPage();
     desenharMarcaDagua(doc, pageW, pageH, state.clinic);
     drawPromissoryPage(doc, pageW, pageH);
