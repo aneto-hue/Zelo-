@@ -1081,7 +1081,41 @@ function renderViewDia(container){
             return;
           }
           const mini = el('div', { class:'mini-card' });
-          mini.appendChild(el('div', { class:'mc-hora' }, document.createTextNode((c.horaInicio||'--:--')+' — '+(c.paciente||'(sem nome)'))));
+          const horaLinha = el('div', { class:'mc-hora' });
+          horaLinha.appendChild(document.createTextNode((c.horaInicio||'--:--')+' — '));
+          if(c.pacienteId){
+            const nomeWrap = el('span', { style:'position:relative;display:inline-block;' });
+            const nomeLink = el('span', { style:'text-decoration:underline;cursor:pointer;' }, document.createTextNode(c.paciente||'(sem nome)'));
+            nomeLink.onclick = (e) => {
+              e.stopPropagation();
+              menuPacienteAbertoId = (menuPacienteAbertoId === c.id) ? null : c.id;
+              refreshPanel();
+            };
+            nomeWrap.appendChild(nomeLink);
+            if(menuPacienteAbertoId === c.id){
+              const menu = el('div', { style:'position:absolute;top:100%;left:0;background:#fff;border:1.5px solid var(--line);border-radius:10px;box-shadow:0 8px 24px -6px rgba(0,0,0,0.25);padding:6px;z-index:50;min-width:190px;font-weight:400;text-align:left;' });
+              const idParam = encodeURIComponent(c.pacienteId);
+              [
+                ['📋 Ficha de Anamnese', 'anamnese.html?paciente='+idParam],
+                ['🩺 Prontuário', 'prontuario.html?paciente='+idParam],
+                ['👤 Cadastro do paciente', 'paciente.html?id='+idParam],
+              ].forEach(([label, href]) => {
+                const item = el('a', { href, style:'display:block;padding:8px 10px;font-size:13px;color:var(--ink);text-decoration:none;border-radius:6px;white-space:nowrap;' }, document.createTextNode(label));
+                menu.appendChild(item);
+              });
+              nomeWrap.appendChild(menu);
+              setTimeout(() => {
+                document.addEventListener('click', function fechar(){
+                  menuPacienteAbertoId = null; refreshPanel();
+                  document.removeEventListener('click', fechar);
+                }, { once:true });
+              }, 0);
+            }
+            horaLinha.appendChild(nomeWrap);
+          } else {
+            horaLinha.appendChild(document.createTextNode(c.paciente||'(sem nome)'));
+          }
+          mini.appendChild(horaLinha);
           if(c.procedimento) mini.appendChild(el('div', { class:'mc-sub' }, document.createTextNode(c.procedimento)));
           mini.appendChild(el('div', { style:'margin-top:4px;' }, [
             el('span', { class:'badge status-'+c.status, style:'font-size:10px;padding:2px 7px;' }, document.createTextNode(STATUS_LABELS[c.status]||'Agendado'))
