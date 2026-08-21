@@ -813,9 +813,11 @@ function renderPlanilhaLancamentos(container){
 
   // ---- Comissão do profissional (quando um profissional específico está selecionado) ----
   const profSelecionadoId = filtroApuracao.profissionalId;
+  const dadosParaPdfApuracao = { profissionalNome:'', comissaoTexto:'', lucroTexto:'' };
   if(profSelecionadoId){
     const profSelecionado = state.profissionais.find(p => p.id === profSelecionadoId);
     if(profSelecionado){
+      dadosParaPdfApuracao.profissionalNome = profSelecionado.nome;
       const pctAtual = (profSelecionado.pagamento && profSelecionado.pagamento.percentual) || '';
       const linhaComissaoProf = el('div', { style:'margin-top:12px;padding-top:12px;border-top:1px dashed rgba(0,0,0,0.1);display:flex;align-items:center;gap:10px;flex-wrap:wrap;' });
       linhaComissaoProf.appendChild(el('span', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode('Comissão desse profissional (%):')));
@@ -834,6 +836,7 @@ function renderPlanilhaLancamentos(container){
       }
       const pctNum = parseFloat(pctAtual)||0;
       const comissaoCalculada = totalApurado * pctNum/100;
+      dadosParaPdfApuracao.comissaoTexto = pctNum+'% de R$ '+formatMoney(totalApurado)+' = R$ '+formatMoney(comissaoCalculada)+' de comissão';
       linhaComissaoProf.appendChild(el('span', { style:'font-size:15px;font-weight:800;color:var(--green);margin-left:6px;' },
         document.createTextNode('= R$ '+formatMoney(comissaoCalculada)+' de comissão')));
       resumoWrap.appendChild(linhaComissaoProf);
@@ -847,6 +850,7 @@ function renderPlanilhaLancamentos(container){
       totalComissoesTodos += totalPorProfissionalId[pid] * pct/100;
     });
     const lucroClinica = totalApurado - totalComissoesTodos;
+    dadosParaPdfApuracao.lucroTexto = 'Lucro da clínica: R$ '+formatMoney(lucroClinica)+' (comissões somadas: R$ '+formatMoney(totalComissoesTodos)+')';
     const linhaLucro = el('div', { style:'margin-top:12px;padding-top:12px;border-top:1px dashed rgba(0,0,0,0.1);' });
     linhaLucro.appendChild(el('div', { style:'font-size:12px;color:var(--muted);' }, document.createTextNode(
       'Lucro da clínica (total recebido menos comissão de cada profissional, pelo % de cada um):'
@@ -857,6 +861,20 @@ function renderPlanilhaLancamentos(container){
       document.createTextNode('(comissões somadas: R$ '+formatMoney(totalComissoesTodos)+')')));
     resumoWrap.appendChild(linhaLucro);
   }
+
+  // ---- Botão de gerar PDF com esses mesmos filtros ----
+  const pdfApuracaoBtn = el('div', { style:'margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,0.08);color:var(--blue-dark);font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;' },
+    [document.createTextNode('📄 Gerar PDF com esses filtros')]);
+  pdfApuracaoBtn.onclick = () => {
+    const linhasParaPdf = linhasFiltradas.map(linha => ({
+      nome: linha.lanc.paciente||'—', valorTotal: linha.valor, forma: linha.forma||'', profissional: linha.profissionalNome||'—',
+    }));
+    generateApuracaoPDF({
+      filtro: filtroApuracao, totalApurado, qtdParcelasApuradas, temFiltroAtivo, linhas: linhasParaPdf,
+      profissionalNome: dadosParaPdfApuracao.profissionalNome, comissaoTexto: dadosParaPdfApuracao.comissaoTexto, lucroTexto: dadosParaPdfApuracao.lucroTexto,
+    });
+  };
+  resumoWrap.appendChild(pdfApuracaoBtn);
 
   filtrosWrap.appendChild(resumoWrap);
   container.appendChild(filtrosWrap);
@@ -2880,6 +2898,130 @@ function generateComissoesPDF(porProfissional, semProfTotal, semProfRecebido, te
 
   doc.save('relatorio_comissoes_'+hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0')+'.pdf');
   toast('PDF do relatório gerado com sucesso!');
+}
+
+// Gera um PDF com o resultado exato dos filtros de apuração ativos no momento (período,
+// profissional, forma de pagamento, situação) — mesmos números mostrados na tela.
+function generateApuracaoPDF(dados){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW=595.28, pageH=841.89, marginX=40, contentW=pageW-marginX*2;
+  const BLUE=window._clinicaCorPrimariaRGB||[31,92,139], INK=[26,26,26], MUTED=[91,107,122], GREEN=[46,139,87], RED=[192,57,43], LINECOL=[155,187,212], BLUEHEAD=window.clarearCor(BLUE,0.85), BLUELIGHT=window.clarearCor(BLUE,0.93);
+  let y=50;
+  function ensureSpace(needed){ if(y+needed>pageH-50){ doc.addPage(); desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil); y=50; } }
+
+  desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil);
+
+  const perfil = window._clinicaPerfil;
+  if(perfil && (perfil.nome || perfil.logo)){
+    if(perfil.logo){
+      try{
+        const fmt = perfil.logo.includes('image/png') ? 'PNG' : 'JPEG';
+        doc.addImage(perfil.logo, fmt, marginX, y-14, 30, 30);
+      }catch(e){}
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+    doc.text(perfil.nome || '', marginX + (perfil.logo?36:0), y);
+    y += 22;
+  }
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...BLUE);
+  doc.text('Relatório Financeiro — Apuração de Valores', marginX, y);
+  y += 20;
+  const hoje = new Date();
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  doc.text('Gerado em '+String(hoje.getDate()).padStart(2,'0')+'/'+String(hoje.getMonth()+1).padStart(2,'0')+'/'+hoje.getFullYear()+' às '+String(hoje.getHours()).padStart(2,'0')+':'+String(hoje.getMinutes()).padStart(2,'0'), marginX, y);
+  y += 22;
+
+  // ---- Filtros aplicados ----
+  const f = dados.filtro;
+  const linhasFiltro = [];
+  if(f.dataIni || f.dataFim) linhasFiltro.push('Período: '+(f.dataIni?formatDateBR(f.dataIni):'—')+' até '+(f.dataFim?formatDateBR(f.dataFim):'—'));
+  if(dados.profissionalNome) linhasFiltro.push('Profissional: '+dados.profissionalNome);
+  if(f.forma) linhasFiltro.push('Forma de pagamento: '+f.forma);
+  if(f.status) linhasFiltro.push('Situação: '+({recebidos:'Recebidos', naoRecebidos:'Não recebidos', vencidos:'Vencidos'}[f.status]||f.status));
+  if(!linhasFiltro.length) linhasFiltro.push('Nenhum filtro aplicado — todas as parcelas.');
+
+  doc.setFillColor(...BLUELIGHT);
+  doc.setDrawColor(...LINECOL);
+  const alturaFiltros = 20 + linhasFiltro.length*13;
+  ensureSpace(alturaFiltros+10);
+  doc.rect(marginX, y, contentW, alturaFiltros, 'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...BLUE);
+  doc.text('Filtros aplicados', marginX+10, y+15);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...INK);
+  linhasFiltro.forEach((l,i) => doc.text('• '+l, marginX+10, y+30+i*13));
+  y += alturaFiltros + 18;
+
+  // ---- Total apurado (destaque) ----
+  ensureSpace(60);
+  const corTotal = f.status==='vencidos' ? RED : (f.status==='recebidos' ? GREEN : BLUE);
+  doc.setFillColor(...BLUEHEAD);
+  doc.setDrawColor(...LINECOL);
+  doc.rect(marginX, y, contentW, 50, 'FD');
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  doc.text((dados.temFiltroAtivo?'Total apurado com esses filtros':'Total de todas as parcelas')+' ('+dados.qtdParcelasApuradas+' parcela(s)):', marginX+12, y+18);
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...corTotal);
+  doc.text('R$ '+formatMoney(dados.totalApurado), marginX+12, y+40);
+  y += 62;
+
+  // ---- Comissão ou lucro, se aplicável ----
+  if(dados.comissaoTexto){
+    ensureSpace(30);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
+    doc.text(dados.comissaoTexto, marginX, y);
+    y += 24;
+  }
+  if(dados.lucroTexto){
+    ensureSpace(30);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+    doc.text(dados.lucroTexto, marginX, y);
+    y += 24;
+  }
+
+  // ---- Tabela com as linhas que combinam com o filtro ----
+  if(dados.linhas && dados.linhas.length){
+    ensureSpace(30);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+    doc.text('Lançamentos', marginX, y);
+    y += 14;
+
+    const headers = ['Paciente','Profissional','Forma','Valor'];
+    const colW = [contentW*0.36, contentW*0.28, contentW*0.16, contentW*0.20];
+    ensureSpace(20);
+    doc.setFillColor(...BLUEHEAD);
+    doc.setDrawColor(...LINECOL);
+    let cx = marginX;
+    headers.forEach((h,i) => { doc.rect(cx, y, colW[i], 18, 'FD'); cx += colW[i]; });
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...BLUE);
+    cx = marginX;
+    headers.forEach((h,i) => { doc.text(h, cx+5, y+12); cx += colW[i]; });
+    y += 18;
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...INK);
+    dados.linhas.forEach((linha, idx) => {
+      ensureSpace(18);
+      cx = marginX;
+      doc.setFillColor(idx%2===0 ? 255 : 248, idx%2===0 ? 255 : 250, idx%2===0 ? 255 : 253);
+      doc.setDrawColor(...LINECOL);
+      [linha.nome, linha.profissional, linha.forma, 'R$ '+formatMoney(linha.valorTotal)].forEach((val,i) => {
+        doc.rect(cx, y, colW[i], 16, 'FD');
+        const txt = doc.splitTextToSize(String(val||'—'), colW[i]-8)[0];
+        doc.text(txt, cx+5, y+11);
+        cx += colW[i];
+      });
+      y += 16;
+    });
+    y += 10;
+  }
+
+  const nomeArquivo = 'apuracao_financeiro_'+hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0')+'.pdf';
+  doc.save(nomeArquivo);
+  toast('PDF gerado com sucesso!');
 }
 
 // ============ NAVEGAÇÃO ============
