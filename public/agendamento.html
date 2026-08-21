@@ -813,6 +813,7 @@ let currentDate = (() => {
 let filtroProfissionalId = '';
 let novaConsultaAberta = false;
 let consultaEmEdicao = null;
+let menuPacienteAbertoId = null; // id da consulta cujo menu de "ir para" está aberto
 let consultaDataPreSelecionada = null;
 
 function renderFiltroProfissional(container){
@@ -836,11 +837,42 @@ function renderItemConsulta(container, consulta, contexto){
   const card = el('div', { class:'card'+(consulta.aguardando?' aguardando-piscando':''), style:'border-left:5px solid '+(prof?prof.cor:'#999')+';' });
   const top = el('div', { class:'card-top' });
   const info = el('div', {});
+
+  const nomeWrap = el('span', { style:'position:relative;display:inline-block;' });
+  if(consulta.pacienteId){
+    const nomeLink = el('span', { style:'color:inherit;text-decoration:underline;cursor:pointer;' }, document.createTextNode(consulta.paciente||'(sem nome)'));
+    nomeLink.onclick = (e) => {
+      e.stopPropagation();
+      menuPacienteAbertoId = (menuPacienteAbertoId === consulta.id) ? null : consulta.id;
+      refreshPanel();
+    };
+    nomeWrap.appendChild(nomeLink);
+    if(menuPacienteAbertoId === consulta.id){
+      const menu = el('div', { style:'position:absolute;top:100%;left:0;background:#fff;border:1.5px solid var(--line);border-radius:10px;box-shadow:0 8px 24px -6px rgba(0,0,0,0.25);padding:6px;z-index:50;min-width:190px;font-weight:400;text-decoration:none;' });
+      const idParam = encodeURIComponent(consulta.pacienteId);
+      [
+        ['📋 Ficha de Anamnese', 'anamnese.html?paciente='+idParam],
+        ['🩺 Prontuário', 'prontuario.html?paciente='+idParam],
+        ['👤 Cadastro do paciente', 'paciente.html?id='+idParam],
+      ].forEach(([label, href]) => {
+        const item = el('a', { href, style:'display:block;padding:8px 10px;font-size:13px;color:var(--ink);text-decoration:none;border-radius:6px;white-space:nowrap;' }, document.createTextNode(label));
+        item.onmouseenter = () => { item.style.background = 'var(--blue-light)'; };
+        item.onmouseleave = () => { item.style.background = 'transparent'; };
+        menu.appendChild(item);
+      });
+      nomeWrap.appendChild(menu);
+      // Fecha o menu se clicar em qualquer outro lugar da tela.
+      setTimeout(() => {
+        document.addEventListener('click', function fechar(){
+          menuPacienteAbertoId = null; refreshPanel();
+          document.removeEventListener('click', fechar);
+        }, { once:true });
+      }, 0);
+    }
+  }
   info.appendChild(el('div', { class:'card-title' }, [
     document.createTextNode((consulta.horaInicio||'--:--') + ' — '),
-    consulta.pacienteId
-      ? el('a', { href:'paciente.html?id='+encodeURIComponent(consulta.pacienteId), style:'color:inherit;text-decoration:underline;' }, document.createTextNode(consulta.paciente||'(sem nome)'))
-      : document.createTextNode(consulta.paciente||'(sem nome)')
+    consulta.pacienteId ? nomeWrap : document.createTextNode(consulta.paciente||'(sem nome)')
   ]));
   info.appendChild(el('div', { class:'card-sub' }, document.createTextNode(
     [prof?prof.nome:'(profissional removido)', consulta.procedimento].filter(Boolean).join(' • ')
