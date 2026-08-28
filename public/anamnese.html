@@ -1798,6 +1798,50 @@ function regenerateParcelas(){
 
 function renderPayment(container){
   container.appendChild(el('div', { class:'section-title' }, document.createTextNode('Plano de pagamento')));
+
+  if(planoPagamentoTravado()){
+    container.appendChild(el('p', { style:'font-size:12.5px;color:var(--amber);background:#FFF6E5;padding:10px 12px;border-radius:8px;margin-bottom:12px;' },
+      document.createTextNode('🔒 As condições de pagamento já foram fechadas e só podem ser alteradas pelo gestor da clínica.')));
+
+    const resumoTable = el('table', { class:'pay-info-table' });
+    [
+      ['Valor total do tratamento', state.payInfo.total||'—'],
+      ['Forma de pagamento (das parcelas)', state.payInfo.forma||'—'],
+      ['Número de parcelas', state.payInfo.parcelas||'—'],
+      ['Vencimento todo dia', state.payInfo.vencimento||'—'],
+    ].forEach(([label, valor]) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', { class:'label' }, document.createTextNode(label)));
+      tr.appendChild(el('td', {}, el('input', { type:'text', value: valor, readonly:'readonly', style:'background:#F4F4F4;color:var(--muted);cursor:not-allowed;' })));
+      resumoTable.appendChild(tr);
+    });
+    container.appendChild(resumoTable);
+
+    if(state.payInfo.temEntrada){
+      const entradaResumo = el('div', { style:'background:var(--blue-light);border-radius:10px;padding:12px;margin:12px 0;font-size:13px;' });
+      entradaResumo.appendChild(el('div', { style:'font-weight:700;margin-bottom:4px;' }, document.createTextNode('Entrada')));
+      entradaResumo.appendChild(document.createTextNode(
+        'R$ '+formatMoney(parseFloat(state.payInfo.valorEntrada)||0)+' — '+(state.payInfo.formaEntrada||'—')+
+        (state.payInfo.dataEntrada ? (' — '+formatDateBR(state.payInfo.dataEntrada)) : '')
+      ));
+      container.appendChild(entradaResumo);
+    }
+
+    const tabelaParcelas = el('table', { class:'tx-table' });
+    const thead = el('tr');
+    ['Valor','Data do pagamento','Forma do pagamento'].forEach(h => thead.appendChild(el('th', {}, document.createTextNode(h))));
+    tabelaParcelas.appendChild(thead);
+    (state.payRows||[]).forEach(row => {
+      const tr = el('tr');
+      row.forEach(val => tr.appendChild(el('td', {}, document.createTextNode(val||'—'))));
+      tabelaParcelas.appendChild(tr);
+    });
+    container.appendChild(tabelaParcelas);
+
+    refreshPaymentDisplay = () => {}; // no-op — nada editável nessa visão, então não há nada pra sincronizar ao vivo
+    return;
+  }
+
   const infoTable = el('table', { class:'pay-info-table' });
 
   // Guarda os inputs das colunas "Valor" (0), "Data do pagamento" (1) e "Forma do pagamento" (2) da tabela
@@ -2140,10 +2184,23 @@ function renderContract(container){
   }
 
   // Separador botões finais
-  const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:20px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
-    document.createTextNode('Concluir contrato e enviar para financeiro'));
-  pdfBtn.onclick = generatePDF;
-  container.appendChild(pdfBtn);
+  if(planoPagamentoTravado()){
+    container.appendChild(el('p', { style:'font-size:12.5px;color:var(--amber);background:#FFF6E5;padding:10px 12px;border-radius:8px;margin-top:16px;' },
+      document.createTextNode('🔒 Essa ficha já foi concluída e enviada ao Financeiro. As condições do plano de pagamento agora só podem ser alteradas pelo gestor da clínica.')));
+    const reimprimirBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:var(--blue-med,#2E75B6);border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
+      document.createTextNode('🖨 Reimprimir ficha e contrato'));
+    reimprimirBtn.onclick = generatePDF;
+    container.appendChild(reimprimirBtn);
+  } else {
+    const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:20px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
+      document.createTextNode(fichaJaConcluida() ? '💾 Salvar alterações e reimprimir' : 'Concluir contrato e enviar para financeiro'));
+    pdfBtn.onclick = generatePDF;
+    container.appendChild(pdfBtn);
+    if(fichaJaConcluida()){
+      container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:6px;' },
+        document.createTextNode('Essa ficha já foi enviada ao Financeiro antes. Como você é o gestor, ainda pode alterar as condições — ao salvar, o lançamento no Financeiro é atualizado.')));
+    }
+  }
 
   const newBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:transparent;border:1.5px solid #C0392B;color:#C0392B;text-align:center;font-size:13px;padding:11px;' },
     document.createTextNode('Iniciar nova ficha (limpar dados deste paciente)'));
@@ -2179,7 +2236,9 @@ function renderPanel(stepIndex, opts={}){
   const subtitleParts = [state.clinic.nome, nomeProfissionalEmitindo()].filter(Boolean);
   document.getElementById('clinicSubtitle').textContent = subtitleParts.length ? subtitleParts.join(' — ') : 'Nome da Clínica / Cirurgião-Dentista';
   document.getElementById('btnPrev').style.visibility = stepIndex===0 ? 'hidden' : 'visible';
-  document.getElementById('btnNext').textContent = stepIndex===STEPS.length-1 ? 'Concluir contrato e enviar para financeiro' : 'Avançar';
+  document.getElementById('btnNext').textContent = stepIndex===STEPS.length-1
+    ? (planoPagamentoTravado() ? '🖨 Reimprimir ficha e contrato' : (fichaJaConcluida() ? '💾 Salvar alterações e reimprimir' : 'Concluir contrato e enviar para financeiro'))
+    : 'Avançar';
   if(opts.keepScroll){
     window.scrollTo(0, scrollY);
   } else {
@@ -2209,6 +2268,12 @@ function formatDateBR(dateStr){
 
 // Nome de quem está DE FATO emitindo o documento agora (o profissional logado no momento),
 // não o "dentista responsável" fixo cadastrado no Perfil da Clínica.
+// Depois que a ficha já foi concluída e enviada ao Financeiro uma vez, as condições do plano
+// de pagamento ficam travadas pra profissionais comuns — só o gestor (admin) pode alterá-las.
+function fichaJaConcluida(){ return !!state.financeiroLancamentoId; }
+function souAdminAnamnese(){ return !!(window._clinicaMe && window._clinicaMe.papel === 'admin'); }
+function planoPagamentoTravado(){ return fichaJaConcluida() && !souAdminAnamnese(); }
+
 function nomeProfissionalEmitindo(){
   return (window._clinicaMe && window._clinicaMe.nome) || state.clinic.dentista || '';
 }

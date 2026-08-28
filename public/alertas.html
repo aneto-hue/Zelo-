@@ -93,6 +93,7 @@ const OPCOES_ORCAMENTO = [
 ];
 let filtroSemRetornoDias = 30; // padrão: mostra quem está sem retorno há mais de 1 mês
 let filtroOrcamentoDias = 3; // padrão: mostra orçamentos abertos há mais de 3 dias
+let buscaResumoPacientes = '';
 
 function seletorFiltro(opcoes, valorAtual, onChange){
   const sel = el('select', { style:'font-size:11.5px;font-weight:600;color:var(--blue-dark);border:1.5px solid var(--line-light);border-radius:8px;padding:4px 6px;background:#fff;text-transform:none;letter-spacing:normal;' });
@@ -123,7 +124,7 @@ function desfazerResolvido(chave){
 
 async function montarAlertas(){
   const hoje = hojeISO();
-  const alertas = { semRetorno: [], pagamentosAtraso: [], boletos: [], orcamentosAbertos: [], retornoProcedimento: [] };
+  const alertas = { semRetorno: [], pagamentosAtraso: [], boletos: [], orcamentosAbertos: [], retornoProcedimento: [], resumoPacientes: [] };
 
   const [perfil, pacientes, dadosAgenda, dadosFinanceiro, dadosEstoque] = await Promise.all([
     ClinicaStorage.load('clinica_perfil_v1'),
@@ -243,6 +244,25 @@ async function montarAlertas(){
         });
       });
     }
+
+    // 6) Resumo rápido por paciente: última visita (consulta confirmada mais recente, ou a data
+    // do contrato da ficha se não houver consulta confirmada) + último procedimento feito
+    // (o tratamento mais recente registrado na ficha, dentre odontograma e "outros tratamentos").
+    const todosOsTratamentos = [];
+    Object.values(ficha.toothData||{}).forEach((d,dente) => {
+      (d.tratamentos||[]).forEach(t => { if(t.tratamento) todosOsTratamentos.push({ nome:t.tratamento, data: t.data||ficha.dataContrato||'' }); });
+    });
+    (ficha.outrosTratamentos||[]).forEach(o => { if(o.descricao) todosOsTratamentos.push({ nome:o.descricao, data: o.data||ficha.dataContrato||'' }); });
+    todosOsTratamentos.sort((a,b) => (b.data||'').localeCompare(a.data||''));
+    const ultimoProcedimento = todosOsTratamentos.length ? todosOsTratamentos[0].nome : '';
+    const ultimaVisita = ultimaVisitaPorPaciente[p.id] || ficha.dataContrato || '';
+    if(ultimaVisita || ultimoProcedimento){
+      alertas.resumoPacientes.push({
+        pacienteId: p.id, nome: p.nome, telefone: p.telefone||'',
+        ultimaVisita, ultimoProcedimento,
+        diasSemVisita: ultimaVisita ? diasEntre(ultimaVisita, hoje) : null,
+      });
+    }
   });
 
   return alertas;
@@ -282,6 +302,7 @@ async function render(){
   const orcamentosTodos = alertas.orcamentosAbertos.filter(a => !estaResolvido(a.chave));
   const orcamentos = orcamentosTodos.filter(a => a.dias >= filtroOrcamentoDias);
   const retornoProc = alertas.retornoProcedimento.filter(a => !estaResolvido(a.chave));
+  const resumoPacientes = alertas.resumoPacientes || [];
   const totalPendencias = semRetorno.length + pagamentos.length + boletos.length + orcamentos.length + retornoProc.length;
 
   main.innerHTML = '';
@@ -329,6 +350,53 @@ async function render(){
   cardLembrete.appendChild(el('p', { style:'font-size:11px;color:var(--muted);margin-top:10px;' },
     document.createTextNode('O sistema verifica automaticamente, todos os dias, quais pacientes têm telefone cadastrado e não têm uma consulta confirmada há esse tempo, e envia uma mensagem de WhatsApp chamando para o retorno. Cada paciente só recebe uma vez por período de inatividade.')));
   main.appendChild(cardLembrete);
+
+  // ---- Consulta rápida: última visita e último procedimento por paciente ----
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Última visita e procedimento por paciente')));
+  const cardResumo = el('div', { class:'card' });
+  cardResumo.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin:0 0 10px;' },
+    document.createTextNode('Os "gatilhos" de retorno automático (ex: Clareamento → lembrar em 6 meses) são configurados no Estoque, ao cadastrar cada procedimento — no campo "Retorno em quantos meses".')));
+  const buscaInput = el('input', { type:'text', placeholder:'Buscar paciente pelo nome...', value: buscaResumoPacientes,
+    style:'width:100%;padding:9px 10px;border:1px solid var(--line-light);border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:10px;' });
+  buscaInput.oninput = (e) => { buscaResumoPacientes = e.target.value; renderTabelaResumo(); };
+  cardResumo.appendChild(buscaInput);
+  const tabelaResumoWrap = el('div', { id:'tabelaResumoWrap', style:'overflow-x:auto;' });
+  cardResumo.appendChild(tabelaResumoWrap);
+  main.appendChild(cardResumo);
+
+  function renderTabelaResumo(){
+    const wrap = document.getElementById('tabelaResumoWrap');
+    if(!wrap) return;
+    wrap.innerHTML = '';
+    const termo = buscaResumoPacientes.trim().toLowerCase();
+    const lista = resumoPacientes
+      .filter(r => !termo || (r.nome||'').toLowerCase().includes(termo))
+      .sort((a,b) => (b.ultimaVisita||'').localeCompare(a.ultimaVisita||''));
+    if(!lista.length){
+      wrap.appendChild(el('div', { class:'empty-hint' }, document.createTextNode(
+        resumoPacientes.length ? 'Nenhum paciente encontrado com esse nome.' : 'Nenhum paciente com ficha de anamnese preenchida ainda.'
+      )));
+      return;
+    }
+    const table = el('table', { style:'width:100%;border-collapse:collapse;font-size:12.5px;min-width:520px;' });
+    const thead = el('tr');
+    ['Paciente','Última visita','Último procedimento'].forEach(h =>
+      thead.appendChild(el('th', { style:'text-align:left;padding:8px 6px;border-bottom:2px solid var(--line-light);color:var(--muted);font-size:11px;text-transform:uppercase;' }, document.createTextNode(h))));
+    table.appendChild(thead);
+    lista.forEach(r => {
+      const tr = el('tr', { style:'cursor:pointer;' });
+      tr.onclick = () => { window.location.href = 'paciente.html?id='+encodeURIComponent(r.pacienteId); };
+      const tdNome = el('td', { style:'padding:8px 6px;border-bottom:1px solid var(--line-light);font-weight:700;color:var(--ink);' }, document.createTextNode(r.nome));
+      const corVisita = (r.diasSemVisita!==null && r.diasSemVisita>180) ? 'var(--amber)' : 'var(--ink)';
+      const tdVisita = el('td', { style:'padding:8px 6px;border-bottom:1px solid var(--line-light);color:'+corVisita+';' },
+        document.createTextNode(r.ultimaVisita ? (formatDateBRISO(r.ultimaVisita)+(r.diasSemVisita!==null?' ('+Math.floor(r.diasSemVisita/30.44)+' meses atrás)':'')) : '—'));
+      const tdProc = el('td', { style:'padding:8px 6px;border-bottom:1px solid var(--line-light);color:var(--muted);' }, document.createTextNode(r.ultimoProcedimento || '—'));
+      tr.appendChild(tdNome); tr.appendChild(tdVisita); tr.appendChild(tdProc);
+      table.appendChild(tr);
+    });
+    wrap.appendChild(table);
+  }
+  renderTabelaResumo();
 
   if(totalPendencias === 0){
     main.appendChild(el('div', { class:'tudo-ok', style:'margin-top:16px;' }, document.createTextNode('✓ Tudo em dia! Nenhuma pendência no momento.')));
