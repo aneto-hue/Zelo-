@@ -230,6 +230,12 @@ nav.steps button.active{
   color:var(--ios-label) !important;
   font-weight:700 !important;
 }
+/* Exceção: o nome da clínica no topo da barra lateral escura também usa a classe ".name",
+   mas ali o fundo é escuro — sem essa regra mais específica, ficava texto quase preto sobre
+   fundo quase preto, ilegível. */
+.sidebar-logo .name{
+  color:#f9f4ed !important;
+}
 .card-sub, .pac-sub, .desc, .month-count-label{
   color:var(--ios-label-2) !important;
 }
