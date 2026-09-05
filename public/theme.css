@@ -675,9 +675,9 @@ header.topbar .home-btn, a.home-btn{
 
 :root{
   --fl-bg:#f5ead8; --fl-surface:#ebddc5; --fl-ink:#201e1d; --fl-muted:color-mix(in srgb, #201e1d 55%, transparent);
-  --fl-accent:#c67139; --fl-accent-2:#7a8a5e;
-  --fl-accent-100:#fff2eb; --fl-accent-300:#ffc6a5; --fl-accent-600:#b2622d; --fl-accent-700:#8c491a; --fl-accent-800:#643312;
-  --fl-accent2-100:#f0fae1; --fl-accent2-300:#ccdbb2; --fl-accent2-600:#728157; --fl-accent2-700:#56633f; --fl-accent2-800:#3d472b;
+  --fl-accent:#F0611C; --fl-accent-2:#4C8C3D;
+  --fl-accent-100:#FFF3E9; --fl-accent-300:#FFB37A; --fl-accent-600:#C94A0A; --fl-accent-700:#A33607; --fl-accent-800:#7A2E08;
+  --fl-accent2-100:#EAF7DE; --fl-accent2-300:#B8DFA0; --fl-accent2-600:#3F7A2E; --fl-accent2-700:#2E5C21; --fl-accent2-800:#1F4016;
   --fl-line: color-mix(in srgb, #201e1d 14%, transparent);
   --fl-font-heading:'Caprasimo', system-ui, sans-serif; --fl-font-body:'Figtree', system-ui, sans-serif;
   --fl-radius:20px; --fl-radius-lg:28px;

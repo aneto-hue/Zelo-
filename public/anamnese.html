@@ -16,17 +16,17 @@
 "></script>
 <style>
   :root{
-    --blue-dark:#1F5C8B;
-    --blue-med:#2E75B6;
-    --blue-head:#D6E7F3;
-    --blue-light:#EFF6FB;
-    --line:#9BBBD4;
-    --line-light:#C9DCEC;
+    --blue-dark:#0B5FD9;
+    --blue-med:#2196F3;
+    --blue-head:#CCE7FB;
+    --blue-light:#E8F4FF;
+    --line:#7FB2E0;
+    --line-light:#BFDCF2;
     --ink:#1A1A1A;
     --muted:#5B6B7A;
-    --green:#2E8B57;
-    --red:#C0392B;
-    --amber:#C98A1F;
+    --green:#1FAE5C;
+    --red:#E53935;
+    --amber:#F5A623;
     --bg:#F4F8FB;
   }
   *{box-sizing:border-box;}
@@ -990,7 +990,7 @@ const ALL_TEETH = [...UPPER_RIGHT,...UPPER_LEFT,...LOWER_RIGHT,...LOWER_LEFT,
                    ...DEC_UPPER_RIGHT,...DEC_UPPER_LEFT,...DEC_LOWER_RIGHT,...DEC_LOWER_LEFT];
 const TOOTH_LABELS = ['','Problema','Tratado','Ausente'];
 const TOOTH_COLORS = ['#ffffff','#FADADD','#B9D6EC','#CCCCCC'];
-const TOOTH_STROKES= ['#9BBBD4','#C0392B','#1F5C8B','#888888'];
+const TOOTH_STROKES= ['#7FB2E0','#E53935','#0B5FD9','#888888'];
 
 function novoTratamentoId(){ return 'tt'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 
@@ -1114,7 +1114,7 @@ function buildOdontoSVG(){
       const tData = td(n);
       const fill = TOOTH_COLORS[tData.status||0];
       const fillActual = tData.status===0 && isDeciduous ? '#FFFDE7' : fill;
-      const strokeActual = tData.status>0 ? TOOTH_STROKES[tData.status] : (isDeciduous?'#B8860B':'#9BBBD4');
+      const strokeActual = tData.status>0 ? TOOTH_STROKES[tData.status] : (isDeciduous?'#B8860B':'#7FB2E0');
       const isSel = selectedTooth==n;
       const hasNote = tData.status!==3 && !!(tData.tratamentos && tData.tratamentos.some(t=>t.situacao||t.tratamento||t.valor));
       const absent = tData.status===3;
@@ -1165,9 +1165,9 @@ function openToothModal(container, n){
   const tData = td(n);
   const statusNames = ['Sem alteração','Problema','Tratado','Ausente'];
   const colors = [
-    ['#F4F8FB','#1F5C8B'],
-    ['#FADADD','#C0392B'],
-    ['#B9D6EC','#1F5C8B'],
+    ['#F4F8FB','#0B5FD9'],
+    ['#FADADD','#E53935'],
+    ['#B9D6EC','#0B5FD9'],
     ['#E8E8E8','#888888']
   ];
 
@@ -1385,9 +1385,9 @@ function renderTeethGrid(container){
   bindToothClicks(container);
   const legend = el('div', { class:'legend', style:'margin-top:8px;' });
   legend.innerHTML = `
-    <span><i style="background:#fff;border-color:#9BBBD4"></i> Normal</span>
-    <span><i style="background:#FADADD;border-color:#C0392B"></i> Problema</span>
-    <span><i style="background:#B9D6EC;border-color:#1F5C8B"></i> Tratado</span>
+    <span><i style="background:#fff;border-color:#7FB2E0"></i> Normal</span>
+    <span><i style="background:#FADADD;border-color:#E53935"></i> Problema</span>
+    <span><i style="background:#B9D6EC;border-color:#0B5FD9"></i> Tratado</span>
     <span><i style="background:#EEE;border-color:#AAA"></i> Ausente</span>
     <span><i style="background:#F39C12;border-radius:50%;border-color:#F39C12"></i> Com anotação</span>
     <span><i style="background:#FFFDE7;border-color:#B8860B"></i> Decíduo</span>`;
@@ -1496,7 +1496,7 @@ function renderOdontograma(container){
       valWrap.appendChild(valInp);
       row.appendChild(valWrap);
 
-      const removeBtn=el('div',{style:'margin-top:22px;cursor:pointer;color:#C0392B;font-size:20px;line-height:1;padding:6px 4px;flex-shrink:0;'},
+      const removeBtn=el('div',{style:'margin-top:22px;cursor:pointer;color:#E53935;font-size:20px;line-height:1;padding:6px 4px;flex-shrink:0;'},
         document.createTextNode('✕'));
       removeBtn.onclick=()=>{state.outrosTratamentos.splice(idx,1);saveProgressDebounced();syncTotalToPayInfo();renderOutrosRows(outrosWrapper);renderTabelaConsolidada();if(refreshPaymentDisplay) refreshPaymentDisplay();};
       row.appendChild(removeBtn);
@@ -1599,7 +1599,7 @@ function renderOdontograma(container){
         });
 
         const tdAction=el('td',{style:'padding:7px 6px;text-align:center;'});
-        const delBtn=el('span',{style:'cursor:pointer;color:#C0392B;font-size:18px;line-height:1;padding:4px;'},document.createTextNode('✕'));
+        const delBtn=el('span',{style:'cursor:pointer;color:#E53935;font-size:18px;line-height:1;padding:4px;'},document.createTextNode('✕'));
         delBtn.onclick=()=>{
           if(t){
             const idxReal = d.tratamentos.indexOf(t);
@@ -1642,7 +1642,7 @@ function renderOdontograma(container){
       tdValor.appendChild(inputValor);
       tr.appendChild(tdValor);
       const tdAction=el('td',{style:'padding:7px 6px;text-align:center;'});
-      const delBtn=el('span',{style:'cursor:pointer;color:#C0392B;font-size:18px;line-height:1;padding:4px;'},document.createTextNode('✕'));
+      const delBtn=el('span',{style:'cursor:pointer;color:#E53935;font-size:18px;line-height:1;padding:4px;'},document.createTextNode('✕'));
       delBtn.onclick=()=>{
         const idx = state.outrosTratamentos.indexOf(item);
         if(idx>-1) state.outrosTratamentos.splice(idx,1);
@@ -2145,7 +2145,7 @@ function renderContract(container){
   editorSection.appendChild(comDitado(ta));
 
   const restoreBtn = el('div', {
-    style:'margin-top:8px;text-align:center;font-size:12px;color:#C0392B;cursor:pointer;text-decoration:underline;'
+    style:'margin-top:8px;text-align:center;font-size:12px;color:#E53935;cursor:pointer;text-decoration:underline;'
   }, document.createTextNode('Restaurar texto padrão (desfazer alterações)'));
   restoreBtn.onclick = () => {
     if(confirm('Isso vai apagar suas alterações no texto e voltar ao texto gerado automaticamente. Deseja continuar?')){
@@ -2187,12 +2187,12 @@ function renderContract(container){
   if(planoPagamentoTravado()){
     container.appendChild(el('p', { style:'font-size:12.5px;color:var(--amber);background:#FFF6E5;padding:10px 12px;border-radius:8px;margin-top:16px;' },
       document.createTextNode('🔒 Essa ficha já foi concluída e enviada ao Financeiro. As condições do plano de pagamento agora só podem ser alteradas pelo gestor da clínica.')));
-    const reimprimirBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:var(--blue-med,#2E75B6);border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
+    const reimprimirBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:var(--blue-med,#2196F3);border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
       document.createTextNode('🖨 Reimprimir ficha e contrato'));
     reimprimirBtn.onclick = generatePDF;
     container.appendChild(reimprimirBtn);
   } else {
-    const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:20px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
+    const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:20px;background:#1FAE5C;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
       document.createTextNode(fichaJaConcluida() ? '💾 Salvar alterações e reimprimir' : 'Concluir contrato e enviar para financeiro'));
     pdfBtn.onclick = generatePDF;
     container.appendChild(pdfBtn);
@@ -2202,7 +2202,7 @@ function renderContract(container){
     }
   }
 
-  const newBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:transparent;border:1.5px solid #C0392B;color:#C0392B;text-align:center;font-size:13px;padding:11px;' },
+  const newBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:transparent;border:1.5px solid #E53935;color:#E53935;text-align:center;font-size:13px;padding:11px;' },
     document.createTextNode('Iniciar nova ficha (limpar dados deste paciente)'));
   newBtn.onclick = () => {
     if(confirm('Isso vai apagar todos os dados preenchidos desta ficha e começar do zero. Deseja continuar?')){
@@ -3474,9 +3474,9 @@ function showFatalError(err){
   try{
     document.body.innerHTML =
       '<div style="max-width:600px;margin:40px auto;padding:20px;font-family:Arial,sans-serif;color:#1A1A1A;">' +
-      '<h2 style="color:#C0392B;">Não foi possível carregar a ficha</h2>' +
+      '<h2 style="color:#E53935;">Não foi possível carregar a ficha</h2>' +
       '<p>Ocorreu um erro técnico ao iniciar o formulário. Copie a mensagem abaixo e envie para o suporte:</p>' +
-      '<pre style="background:#F4F8FB;border:1px solid #C9DCEC;border-radius:8px;padding:12px;white-space:pre-wrap;font-size:12px;color:#C0392B;">' +
+      '<pre style="background:#F4F8FB;border:1px solid #BFDCF2;border-radius:8px;padding:12px;white-space:pre-wrap;font-size:12px;color:#E53935;">' +
       (err && err.stack ? err.stack : String(err)) +
       '</pre>' +
       '<p style="font-size:13px;color:#5B6B7A;">Dica: tente também abrir este mesmo arquivo diretamente no Chrome ou no Safari normal (não dentro de outro app), com internet ativada.</p>' +

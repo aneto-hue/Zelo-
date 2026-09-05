@@ -14,17 +14,17 @@
 "></script>
 <style>
   :root{
-    --blue-dark:#1F5C8B;
-    --blue-med:#2E75B6;
-    --blue-head:#D6E7F3;
-    --blue-light:#EFF6FB;
-    --line:#9BBBD4;
-    --line-light:#C9DCEC;
+    --blue-dark:#0B5FD9;
+    --blue-med:#2196F3;
+    --blue-head:#CCE7FB;
+    --blue-light:#E8F4FF;
+    --line:#7FB2E0;
+    --line-light:#BFDCF2;
     --ink:#1A1A1A;
     --muted:#5B6B7A;
-    --green:#2E8B57;
-    --red:#C0392B;
-    --amber:#C98A1F;
+    --green:#1FAE5C;
+    --red:#E53935;
+    --amber:#F5A623;
     --bg:#F4F8FB;
   }
   *{box-sizing:border-box;}
@@ -261,7 +261,7 @@
 // ============ ESTADO ============
 function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
-const CORES_PRESET = ['#1F5C8B','#2E8B57','#C98A1F','#8E44AD','#C0392B','#16A085','#D35400','#2980B9'];
+const CORES_PRESET = ['#0B5FD9','#1FAE5C','#F5A623','#8E44AD','#E53935','#16A085','#D35400','#2980B9'];
 
 const state = {
   profissionais: [],
@@ -514,7 +514,7 @@ function renderProfissionalForm(container, prof, onSalvar, onCancelar){
   form.appendChild(textField('Nome do profissional', prof, 'nome'));
   const corField = el('div', { class:'field' });
   corField.appendChild(el('label', {}, document.createTextNode('Cor de identificação na agenda')));
-  const corInput = el('input', { type:'color', value: prof.cor || '#1F5C8B' });
+  const corInput = el('input', { type:'color', value: prof.cor || '#0B5FD9' });
   corInput.oninput = (e) => { prof.cor = e.target.value; };
   corField.appendChild(corInput);
   form.appendChild(corField);
@@ -553,7 +553,7 @@ function renderProfissionais(container){
     const card = el('div', { class:'card' });
     const top = el('div', { class:'card-top' });
     const info = el('div', { style:'display:flex;align-items:center;gap:8px;' });
-    info.appendChild(el('span', { class:'color-dot', style:'background:'+(prof.cor||'#1F5C8B')+';width:14px;height:14px;' }));
+    info.appendChild(el('span', { class:'color-dot', style:'background:'+(prof.cor||'#0B5FD9')+';width:14px;height:14px;' }));
     info.appendChild(el('span', { class:'card-title' }, document.createTextNode(prof.nome)));
     top.appendChild(info);
     card.appendChild(top);

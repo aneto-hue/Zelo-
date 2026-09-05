@@ -14,9 +14,9 @@
 "></script>
 <style>
   :root{
-    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
-    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
-    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+    --blue-dark:#0B5FD9; --blue-med:#2196F3; --blue-head:#CCE7FB; --blue-light:#E8F4FF;
+    --line:#7FB2E0; --line-light:#BFDCF2; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#1FAE5C; --red:#E53935; --amber:#F5A623; --bg:#F4F8FB;
   }
   *{box-sizing:border-box;}
   body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
@@ -420,7 +420,7 @@ function renderProfissionais(container){
   container.appendChild(novoBtn);
 
   if(novoProfissionalFinAberto){
-    const novo = { id:'prof'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), nome:'', cor:'#1F5C8B', pagamento:{percentual:'',diaria:'',fixo:''} };
+    const novo = { id:'prof'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), nome:'', cor:'#0B5FD9', pagamento:{percentual:'',diaria:'',fixo:''} };
     renderCamposProfissionalFinanceiro(container, novo, async () => {
       state.profissionais.push(novo);
       await ClinicaStorage.save(CHAVE_PROFISSIONAIS_COMPARTILHADA, state.profissionais);
@@ -458,7 +458,7 @@ function renderProfissionais(container){
     const top = el('div', { class:'card-top' });
     const info = el('div', {});
     info.appendChild(el('div', { class:'card-title' }, [
-      el('span', { style:'display:inline-block;width:11px;height:11px;border-radius:50%;background:'+(prof.cor||'#1F5C8B')+';margin-right:7px;' }),
+      el('span', { style:'display:inline-block;width:11px;height:11px;border-radius:50%;background:'+(prof.cor||'#0B5FD9')+';margin-right:7px;' }),
       document.createTextNode(prof.nome)
     ]));
     const pg = prof.pagamento || { percentual: prof.comissaoPercent||'', diaria:'', fixo:'' };

@@ -16,16 +16,16 @@
 "></script>
 <style>
   :root{
-    --blue-dark:#1F5C8B;
-    --blue-med:#2E75B6;
-    --blue-head:#D6E7F3;
-    --blue-light:#EFF6FB;
-    --line:#9BBBD4;
-    --line-light:#C9DCEC;
+    --blue-dark:#0B5FD9;
+    --blue-med:#2196F3;
+    --blue-head:#CCE7FB;
+    --blue-light:#E8F4FF;
+    --line:#7FB2E0;
+    --line-light:#BFDCF2;
     --ink:#1A1A1A;
     --muted:#5B6B7A;
-    --green:#2E8B57;
-    --red:#C0392B;
+    --green:#1FAE5C;
+    --red:#E53935;
     --bg:#F4F8FB;
   }
   *{box-sizing:border-box;}
@@ -157,11 +157,11 @@
     display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none;
   }
   .odo-tooth.documented{ background:var(--blue-dark); border-color:var(--blue-dark); color:#fff; }
-  .odo-tooth.pending{ background:#FBEAEA; border-color:#C0392B; color:#C0392B; }
+  .odo-tooth.pending{ background:#FBEAEA; border-color:#E53935; color:#E53935; }
   .odo-tooth.planned{ background:#FFF3E0; border-color:var(--amber); color:#8A5A0F; }
   .odo-tooth.deciduous{ border-color:#C9A227; color:#8A6D1B; background:#FEF8E4; }
   .odo-tooth.deciduous.documented{ background:#C9A227; border-color:#C9A227; color:#fff; }
-  .odo-tooth.deciduous.pending{ background:#FBEAEA; border-color:#C0392B; color:#C0392B; }
+  .odo-tooth.deciduous.pending{ background:#FBEAEA; border-color:#E53935; color:#E53935; }
   .odo-tooth.deciduous.planned{ background:#FFF3E0; border-color:var(--amber); color:#8A5A0F; }
   .odo-label{font-size:10.5px; font-weight:700; color:var(--muted); text-align:center; text-transform:uppercase; letter-spacing:.4px; margin:6px 0 5px;}
   .odo-sep{border-top:1px dashed var(--line-light); margin:10px 0;}
@@ -965,7 +965,7 @@ let historicoAberto = {};
 function recordCard(r, idx){
   const isOpen = !!recordExpanded[r.id];
   const souAdmin = !!(window._clinicaMe && window._clinicaMe.papel === 'admin');
-  const card = el('div', { id:'record-'+r.id, style:'border:1.5px solid '+(r.finalizado?'#2E8B57':'var(--line-light)')+'; border-radius:10px; padding:12px; margin-bottom:14px; background:'+(r.finalizado?'#F3FBF5':'#fff')+';' });
+  const card = el('div', { id:'record-'+r.id, style:'border:1.5px solid '+(r.finalizado?'#1FAE5C':'var(--line-light)')+'; border-radius:10px; padding:12px; margin-bottom:14px; background:'+(r.finalizado?'#F3FBF5':'#fff')+';' });
 
   const headerRow = el('div', { style:'display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;' });
   headerRow.appendChild(el('div', { style:'font-weight:700; color:var(--blue-dark); font-size:13px;' },
@@ -984,7 +984,7 @@ function recordCard(r, idx){
 
   if(r.finalizado){
     // ---- Registro finalizado: só leitura, exceto se for o admin da clínica ----
-    card.appendChild(el('div', { style:'background:#2E8B57;color:#fff;font-size:11.5px;font-weight:700;padding:6px 10px;border-radius:6px;display:inline-block;margin-bottom:10px;' },
+    card.appendChild(el('div', { style:'background:#1FAE5C;color:#fff;font-size:11.5px;font-weight:700;padding:6px 10px;border-radius:6px;display:inline-block;margin-bottom:10px;' },
       document.createTextNode('✓ Atendimento finalizado e arquivado no histórico')));
     const resumo = el('div', { style:'font-size:13px;line-height:1.7;' });
     resumo.appendChild(el('div', {}, document.createTextNode('Data: ' + (formatDateBR(r.data)||'—'))));
@@ -1247,7 +1247,7 @@ function renderOdontogramBlock(container){
   container.appendChild(el('div', { class:'odo-legend' }, [
     el('span', {}, [el('i', { style:'background:#fff;border:1.5px solid var(--line);' }), document.createTextNode('Sem registro')]),
     el('span', {}, [el('i', { style:'background:#FFF3E0;border:1.5px solid var(--amber);' }), document.createTextNode('Indicado na Anamnese (pendente)')]),
-    el('span', {}, [el('i', { style:'background:#FBEAEA;border:1.5px solid #C0392B;' }), document.createTextNode('Registro em aberto')]),
+    el('span', {}, [el('i', { style:'background:#FBEAEA;border:1.5px solid #E53935;' }), document.createTextNode('Registro em aberto')]),
     el('span', {}, [el('i', { style:'background:var(--blue-dark);' }), document.createTextNode('Documentado')]),
   ]));
   const wrap = el('div', { class:'odo-wrap' });
@@ -1340,12 +1340,12 @@ function renderProntuario(container){
   };
   container.appendChild(addBtn);
 
-  const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:22px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
+  const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:22px;background:#1FAE5C;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
     document.createTextNode('Gerar PDF do prontuário completo'));
   pdfBtn.onclick = generatePDF;
   container.appendChild(pdfBtn);
 
-  const newBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:transparent;border:1.5px solid #C0392B;color:#C0392B;text-align:center;font-size:13px;padding:11px;' },
+  const newBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:transparent;border:1.5px solid #E53935;color:#E53935;text-align:center;font-size:13px;padding:11px;' },
     document.createTextNode('Iniciar novo prontuário (limpar dados deste paciente)'));
   newBtn.onclick = () => {
     if(confirm('Isso vai apagar todos os dados preenchidos deste prontuário e começar do zero. Deseja continuar?')){
@@ -1459,7 +1459,7 @@ function renderModeloPicker(container, tipo, listaModelos, store){
   };
   btnRow.appendChild(salvarBtn);
 
-  const excluirBtn = el('div', { class:'add-row-btn', style:'flex:1;margin-top:0;font-size:12.5px;padding:10px;background:transparent;border:1.5px solid #C0392B;color:#C0392B;' },
+  const excluirBtn = el('div', { class:'add-row-btn', style:'flex:1;margin-top:0;font-size:12.5px;padding:10px;background:transparent;border:1.5px solid #E53935;color:#E53935;' },
     document.createTextNode('🗑 Excluir um modelo salvo'));
   excluirBtn.onclick = () => {
     if(!listaModelos.length){ alert('Não há modelos salvos para excluir.'); return; }
@@ -1514,12 +1514,12 @@ function renderReceituario(container){
   const btnRow = el('div', { class:'row', style:'margin-bottom:6px;' });
   const rxToggleBtn = el('div', { class:'add-row-btn',
     style:'margin-top:0;flex:1;text-align:center;font-size:14px;padding:13px;'+
-      (docOpen.receituario ? 'background:#1F5C8B;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
+      (docOpen.receituario ? 'background:#0B5FD9;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
     document.createTextNode('Receituário'));
   rxToggleBtn.onclick = () => { docOpen.receituario = !docOpen.receituario; refreshPanel(); };
   const documentosToggleBtn = el('div', { class:'add-row-btn',
     style:'margin-top:0;flex:1;text-align:center;font-size:14px;padding:13px;'+
-      (docOpen.documentos ? 'background:#1F5C8B;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
+      (docOpen.documentos ? 'background:#0B5FD9;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
     document.createTextNode('Documentos'));
   documentosToggleBtn.onclick = () => { docOpen.documentos = !docOpen.documentos; refreshPanel(); };
   btnRow.appendChild(rxToggleBtn);
@@ -1585,7 +1585,7 @@ function renderReceituario(container){
           const chip = el('div', { class:'med-chip', style:'display:flex;align-items:center;gap:6px;' }, [
             el('span', {}, document.createTextNode(m.nome))
           ]);
-          const delX = el('span', { style:'color:#C0392B;font-weight:900;cursor:pointer;' }, document.createTextNode('✕'));
+          const delX = el('span', { style:'color:#E53935;font-weight:900;cursor:pointer;' }, document.createTextNode('✕'));
           delX.onclick = (e) => {
             e.stopPropagation();
             if(!confirm('Remover "'+m.nome+'" do catálogo da clínica?')) return;
@@ -1618,7 +1618,7 @@ function renderReceituario(container){
     ));
 
     const rxBtn = el('div', { class:'add-row-btn',
-      style:'margin-top:10px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:14px;padding:13px;' },
+      style:'margin-top:10px;background:#1FAE5C;border:none;color:#fff;text-align:center;font-size:14px;padding:13px;' },
       document.createTextNode('📄 Gerar Receituário (PDF)'));
     rxBtn.onclick = generateReceituarioPDF;
     container.appendChild(rxBtn);
@@ -1687,7 +1687,7 @@ function renderReceituario(container){
       todosTipos.forEach(t => {
         const ativo = documentoAtivo === t.id;
         const chip = el('div', { class:'add-row-btn', style:'margin-top:0;flex:1;min-width:120px;text-align:center;font-size:12.5px;padding:10px;'+
-          (ativo ? 'background:#1F5C8B;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
+          (ativo ? 'background:#0B5FD9;color:#fff;border:none;' : 'background:#fff;color:var(--blue-dark);border:1.5px solid var(--blue-dark);') },
           document.createTextNode(t.nome));
         chip.onclick = () => { documentoAtivo = t.id; refreshPanel(); };
         subRow.appendChild(chip);
@@ -1706,7 +1706,7 @@ function renderReceituario(container){
         document.createTextNode('Dica de formatação: linhas com "## " viram título de seção; linhas com "- " viram item de lista; texto entre **duplo asterisco** sai em negrito.'+(tipoAtual.id==='posop'?' O texto {{TELEFONE_CLINICA}} é substituído automaticamente pelo telefone cadastrado na aba Clínica.':''))));
 
       const emitBtn = el('div', { class:'add-row-btn',
-        style:'margin-top:6px;background:#2E8B57;border:none;color:#fff;text-align:center;font-size:14px;padding:13px;' },
+        style:'margin-top:6px;background:#1FAE5C;border:none;color:#fff;text-align:center;font-size:14px;padding:13px;' },
         document.createTextNode('✅ Emitir ' + tipoAtual.nome + ' (PDF)'));
       emitBtn.onclick = () => {
         if(tipoAtual.id === 'posop') generatePosOpPDF();
@@ -2916,7 +2916,7 @@ async function generatePDF(){
     }
   }catch(err){
     document.body.innerHTML = '<div style="max-width:600px;margin:40px auto;padding:20px;font-family:Arial,sans-serif;">' +
-      '<h2 style="color:#C0392B;">Não foi possível carregar a ficha</h2>' +
+      '<h2 style="color:#E53935;">Não foi possível carregar a ficha</h2>' +
       '<p>Tente abrir este arquivo diretamente no Chrome ou Safari, com internet ativada.</p></div>';
   }
 })();

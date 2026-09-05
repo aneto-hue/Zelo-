@@ -10,9 +10,9 @@
 <script src="nav-home.js"></script>
 <style>
   :root{
-    --blue-dark:#1F5C8B; --blue-med:#2E75B6; --blue-head:#D6E7F3; --blue-light:#EFF6FB;
-    --line:#9BBBD4; --line-light:#C9DCEC; --ink:#1A1A1A; --muted:#5B6B7A;
-    --green:#2E8B57; --red:#C0392B; --amber:#C98A1F; --bg:#F4F8FB;
+    --blue-dark:#0B5FD9; --blue-med:#2196F3; --blue-head:#CCE7FB; --blue-light:#E8F4FF;
+    --line:#7FB2E0; --line-light:#BFDCF2; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#1FAE5C; --red:#E53935; --amber:#F5A623; --bg:#F4F8FB;
   }
   *{box-sizing:border-box;}
   body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
@@ -364,7 +364,7 @@ function render(){
       linhaEsquerda.appendChild(info);
       card.appendChild(linhaEsquerda);
       const linkBtn = el('span', {
-        style:'display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;font-size:22px;color:var(--blue-dark);cursor:pointer;border-radius:10px;background:var(--blue-light,#EFF6FB);margin-right:8px;flex-shrink:0;user-select:none;',
+        style:'display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;font-size:22px;color:var(--blue-dark);cursor:pointer;border-radius:10px;background:var(--blue-light,#E8F4FF);margin-right:8px;flex-shrink:0;user-select:none;',
         title:'Gerar link para o paciente preencher os dados'
       }, document.createTextNode('🔗'));
       let gerandoLink = false;
