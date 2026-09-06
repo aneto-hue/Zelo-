@@ -186,7 +186,31 @@ async function loadProgress(){
   const saved = await ClinicaStorage.load(STORAGE_KEY);
   if(!saved) return false;
   Object.keys(state).forEach(k => { if(saved[k]!==undefined) state[k]=saved[k]; });
+  if(repararTratamentosSemId()) saveProgress();
   return true;
+}
+
+// Conserta lançamentos antigos cujos tratamentos foram criados sem um "id" (bug já corrigido
+// na Anamnese, mas registros já existentes ainda podem estar sem esse campo). Sem um id
+// estável, o Financeiro não consegue saber com certeza qual tratamento foi movido quando o
+// profissional reatribui um serviço pra outro colega — o valor "some" de um lado e "aparece
+// zerado" do outro. Retorna true se consertou alguma coisa (pra saber se precisa salvar).
+function repararTratamentosSemId(){
+  let consertouAlgo = false;
+  (state.lancamentos||[]).forEach(lanc => {
+    (lanc.tratamentos||[]).forEach((t,idx) => {
+      if(!t.id){ t.id = 'trat_reparado_'+idx+'_'+(lanc.id||''); consertouAlgo = true; }
+    });
+    // Limpa referências quebradas (null/undefined) que sobraram de reatribuições feitas
+    // enquanto o bug ainda estava ativo — essas não têm mais como saber a qual tratamento
+    // se referiam, então é mais seguro removê-las do que deixá-las causando o mesmo problema.
+    (lanc.linhasDerivadas||[]).forEach(ld => {
+      const antes = (ld.tratamentoIds||[]).length;
+      ld.tratamentoIds = (ld.tratamentoIds||[]).filter(id => id);
+      if(ld.tratamentoIds.length !== antes) consertouAlgo = true;
+    });
+  });
+  return consertouAlgo;
 }
 function clearProgress(){ ClinicaStorage.save(STORAGE_KEY, null); try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
 

@@ -3205,15 +3205,20 @@ async function generatePDF(){
   }
 
   // ---------- Dados financeiros embutidos (para importação no Controle de Pagamentos e Comissões) ----------
+  // Cada tratamento precisa de um "id" único e ESTÁVEL — sem isso, o Financeiro não consegue
+  // saber com certeza qual tratamento foi movido quando o profissional reatribui um serviço
+  // pra outro colega (o valor "some" de um lado e "aparece zerado" do outro). Precisa ser
+  // estável (não aleatório a cada geração) pra, se a ficha for reimpressa/atualizada depois de
+  // já ter sido dividida entre profissionais, o id continuar batendo com o que foi salvo antes.
   const tratamentosParaFinanceiro = [];
   listarTodosTratamentosDentes().forEach(item=>{
     if((item.tratamento||'').trim() || (item.valor||'').trim()){
-      tratamentosParaFinanceiro.push({ descricao: 'Dente '+item.dente+(item.tratamento?(': '+item.tratamento.trim()):''), valor: parseMoney(item.valor) });
+      tratamentosParaFinanceiro.push({ id: 'trat_dente_'+item.dente, descricao: 'Dente '+item.dente+(item.tratamento?(': '+item.tratamento.trim()):''), valor: parseMoney(item.valor) });
     }
   });
-  (state.outrosTratamentos||[]).forEach(item=>{
+  (state.outrosTratamentos||[]).forEach((item,idx)=>{
     if((item.descricao||'').trim() || (item.valor||'').trim()){
-      tratamentosParaFinanceiro.push({ descricao: item.descricao||'', valor: parseMoney(item.valor) });
+      tratamentosParaFinanceiro.push({ id: 'trat_outro_'+idx, descricao: item.descricao||'', valor: parseMoney(item.valor) });
     }
   });
   const parcelasParaFinanceiro = (state.payRows||[])
@@ -3298,8 +3303,19 @@ async function lancarAutomaticamenteNoFinanceiro(payload){
     };
 
     const idxExistente = dados.lancamentos.findIndex(l => l.id === lancamento.id);
-    if(idxExistente > -1) dados.lancamentos[idxExistente] = lancamento;
-    else dados.lancamentos.unshift(lancamento);
+    if(idxExistente > -1){
+      // Atualiza só os dados que vieram da ficha (paciente, valor, tratamentos, parcelas) —
+      // preserva o que já existia só no Financeiro, como divisões entre profissionais
+      // (linhasDerivadas) e o histórico de alterações. Sem isso, reimprimir/atualizar a ficha
+      // depois de já ter dividido um tratamento com outro profissional apagava a divisão.
+      const existente = dados.lancamentos[idxExistente];
+      dados.lancamentos[idxExistente] = Object.assign({}, lancamento, {
+        linhasDerivadas: existente.linhasDerivadas || [],
+        historicoAlteracoes: existente.historicoAlteracoes || [],
+      });
+    } else {
+      dados.lancamentos.unshift(lancamento);
+    }
 
     if(!state.financeiroLancamentoId){
       state.financeiroLancamentoId = lancamento.id;
