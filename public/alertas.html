@@ -124,7 +124,7 @@ function desfazerResolvido(chave){
 
 async function montarAlertas(){
   const hoje = hojeISO();
-  const alertas = { semRetorno: [], pagamentosAtraso: [], boletos: [], orcamentosAbertos: [], retornoProcedimento: [], resumoPacientes: [] };
+  const alertas = { semRetorno: [], pagamentosAtraso: [], boletos: [], orcamentosAbertos: [], retornoProcedimento: [], resumoPacientes: [], tratamentosAbertos: [] };
 
   const [perfil, pacientes, dadosAgenda, dadosFinanceiro, dadosEstoque] = await Promise.all([
     ClinicaStorage.load('clinica_perfil_v1'),
@@ -245,7 +245,25 @@ async function montarAlertas(){
       });
     }
 
-    // 6) Resumo rápido por paciente: última visita (consulta confirmada mais recente, ou a data
+    // 7) Tratamentos não finalizados: dentes marcados como "Problema" (status 1) que já têm um
+    // tratamento planejado — ou seja, foi diagnosticado e proposto um tratamento, mas ele ainda
+    // não foi concluído (só vira "Tratado", status 2, quando o profissional atualiza isso no
+    // Odontograma depois de executar o procedimento).
+    const dentesAbertos = [];
+    Object.entries(ficha.toothData||{}).forEach(([dente,d]) => {
+      if(d.status !== 1) return;
+      (d.tratamentos||[]).forEach(t => { if((t.tratamento||'').trim()) dentesAbertos.push({ dente, tratamento:t.tratamento.trim() }); });
+    });
+    if(dentesAbertos.length){
+      alertas.tratamentosAbertos.push({
+        chave: 'trat_aberto_' + p.id,
+        pacienteId: p.id,
+        titulo: p.nome + ' — ' + dentesAbertos.length + ' tratamento(s) em aberto',
+        sub: dentesAbertos.map(x => 'Dente '+x.dente+': '+x.tratamento).join(' • '),
+      });
+    }
+
+    // 8) Resumo rápido por paciente: última visita (consulta confirmada mais recente, ou a data
     // do contrato da ficha se não houver consulta confirmada) + último procedimento feito
     // (o tratamento mais recente registrado na ficha, dentre odontograma e "outros tratamentos").
     const todosOsTratamentos = [];
@@ -302,8 +320,9 @@ async function render(){
   const orcamentosTodos = alertas.orcamentosAbertos.filter(a => !estaResolvido(a.chave));
   const orcamentos = orcamentosTodos.filter(a => a.dias >= filtroOrcamentoDias);
   const retornoProc = alertas.retornoProcedimento.filter(a => !estaResolvido(a.chave));
+  const tratamentosAbertos = alertas.tratamentosAbertos.filter(a => !estaResolvido(a.chave));
   const resumoPacientes = alertas.resumoPacientes || [];
-  const totalPendencias = semRetorno.length + pagamentos.length + boletos.length + orcamentos.length + retornoProc.length;
+  const totalPendencias = semRetorno.length + pagamentos.length + boletos.length + orcamentos.length + retornoProc.length + tratamentosAbertos.length;
 
   main.innerHTML = '';
 
@@ -327,6 +346,10 @@ async function render(){
   summary.appendChild(el('div', { class:'summary-card' }, [
     el('div', { class:'summary-num amber' }, document.createTextNode(String(retornoProc.length))),
     el('div', { class:'summary-label' }, document.createTextNode('Retorno por procedimento'))
+  ]));
+  summary.appendChild(el('div', { class:'summary-card' }, [
+    el('div', { class:'summary-num alert' }, document.createTextNode(String(tratamentosAbertos.length))),
+    el('div', { class:'summary-label' }, document.createTextNode('Tratamentos não finalizados'))
   ]));
   main.appendChild(summary);
 
@@ -438,6 +461,12 @@ async function render(){
     if(retornoProc.length){
       main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Retorno recomendado por procedimento')));
       retornoProc.forEach(item => main.appendChild(cardAlerta(item, 'paciente.html?id='+encodeURIComponent(item.pacienteId))));
+    }
+
+    // ---- Tratamentos não finalizados ----
+    if(tratamentosAbertos.length){
+      main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Tratamentos não finalizados')));
+      tratamentosAbertos.forEach(item => main.appendChild(cardAlerta(item, 'anamnese.html?paciente='+encodeURIComponent(item.pacienteId))));
     }
   }
 
