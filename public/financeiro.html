@@ -1574,13 +1574,21 @@ function renderPainelParcela(lanc, linha, idx){
   }
 
   wrap.appendChild(el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:4px;' }, document.createTextNode('Cor')));
-  const coresRow = el('div', { style:'display:flex;gap:8px;margin-bottom:12px;' });
+  const coresRow = el('div', { style:'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;' });
   [['verde','✓ Quitada','#2E7D32','#E8F5E9'],['azul','A vencer','#1565C0','#E3F2FD'],['vermelho','Vencida/não paga','#C62828','#FFEBEE'],[null,'Automático','var(--ink)','#fff']].forEach(([valor,label,fg,bg]) => {
     const chip = el('div', { style:'padding:6px 12px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:700;border:1.5px solid '+fg+';color:'+fg+';background:'+bg+((p.corManual===valor)?';box-shadow:0 0 0 2px '+fg+';':'') }, document.createTextNode(label));
     chip.onclick = () => {
+      const jaEstavaPaga = p.pago;
       registrarAlteracao(lanc, 'Cor da parcela '+(idx+1)+' definida manualmente como "'+label+'"');
       p.corManual = valor;
       if(valor==='verde') p.pago = true; if(valor==='vermelho'||valor==='azul') p.pago = false;
+      // Confirmar o pagamento (verde) gera automaticamente o recibo em PDF, pronto pra
+      // imprimir ou enviar ao paciente — só na hora em que a parcela vira paga (não gera de
+      // novo sozinho se você só estiver reabrindo o painel de uma parcela já quitada antes).
+      if(valor==='verde' && !jaEstavaPaga){
+        if(!p.dataRecebimento) p.dataRecebimento = new Date().toISOString().slice(0,10);
+        gerarReciboPDF(lanc, linha, p, idx);
+      }
       saveProgress(); refreshPanel();
     };
     coresRow.appendChild(chip);
@@ -1588,6 +1596,13 @@ function renderPainelParcela(lanc, linha, idx){
   wrap.appendChild(coresRow);
   wrap.appendChild(el('p', { style:'font-size:10.5px;color:var(--muted);margin:-6px 0 12px;' },
     document.createTextNode('Automático: verde se já quitada ou for cartão de crédito; vermelho se venceu sem pagar; azul se ainda está dentro do prazo.')));
+
+  if(p.pago){
+    const reciboBtn = el('div', { style:'color:var(--blue-dark);font-weight:700;font-size:12px;cursor:pointer;text-decoration:underline;margin:-6px 0 12px;display:inline-block;' },
+      document.createTextNode('🧾 Gerar recibo dessa parcela novamente'));
+    reciboBtn.onclick = () => gerarReciboPDF(lanc, linha, p, idx);
+    wrap.appendChild(reciboBtn);
+  }
 
   // Compensar diferença numa parcela posterior
   const compWrap = el('div', { style:'padding-top:10px;border-top:1px solid var(--line-light);' });
@@ -2926,6 +2941,82 @@ function generateComissoesPDF(porProfissional, semProfTotal, semProfRecebido, te
 
 // Gera um PDF com o resultado exato dos filtros de apuração ativos no momento (período,
 // profissional, forma de pagamento, situação) — mesmos números mostrados na tela.
+// Gera um recibo em PDF de uma parcela paga — chamado automaticamente assim que a parcela é
+// marcada como quitada (cor verde), e também disponível pra reimprimir depois, a qualquer hora.
+function gerarReciboPDF(lanc, linha, p, idx){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW=595.28, pageH=841.89, marginX=50, contentW=pageW-marginX*2;
+  const BLUE=window._clinicaCorPrimariaRGB||[31,92,139], INK=[26,26,26], MUTED=[91,107,122], LINECOL=[155,187,212], BLUEHEAD=window.clarearCor(BLUE,0.85);
+  let y=60;
+
+  if(typeof desenharMarcaDagua === 'function') desenharMarcaDagua(doc, pageW, pageH, window._clinicaPerfil);
+
+  const perfil = window._clinicaPerfil;
+  if(perfil && perfil.logo){
+    try{
+      const fmt = perfil.logo.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(perfil.logo, fmt, marginX, y-24, 34, 34);
+    }catch(e){}
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...BLUE);
+  doc.text((perfil && perfil.nome) || '', marginX + (perfil&&perfil.logo?42:0), y);
+  y += 34;
+
+  doc.setDrawColor(...BLUE); doc.setLineWidth(1.2);
+  doc.line(marginX, y, marginX+contentW, y);
+  y += 34;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...INK);
+  doc.text('RECIBO DE PAGAMENTO', pageW/2, y, { align:'center' });
+  y += 36;
+
+  const hoje = new Date();
+  const numeroRecibo = (lanc.id||'').slice(-6).toUpperCase() + '-' + (p.id||'').slice(-4).toUpperCase();
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+  doc.text('Recibo nº '+numeroRecibo, marginX, y);
+  doc.text('Emitido em '+String(hoje.getDate()).padStart(2,'0')+'/'+String(hoje.getMonth()+1).padStart(2,'0')+'/'+hoje.getFullYear(), pageW-marginX, y, { align:'right' });
+  y += 30;
+
+  doc.setFillColor(...BLUEHEAD);
+  doc.setDrawColor(...LINECOL);
+  doc.rect(marginX, y, contentW, 90, 'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...BLUE);
+  doc.text('R$ '+formatMoney(p.valor), pageW/2, y+42, { align:'center' });
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+  doc.text('Valor recebido', pageW/2, y+64, { align:'center' });
+  y += 110;
+
+  function linhaDado(label, valor){
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...MUTED);
+    doc.text(label, marginX, y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11.5); doc.setTextColor(...INK);
+    doc.text(String(valor||'—'), marginX, y+15);
+    y += 34;
+  }
+  linhaDado('Recebemos de', lanc.paciente||'—');
+  linhaDado('Referente a', 'Parcela '+(idx+1)+' de '+(linha.parcelas?linha.parcelas.length:1)+(linha.profissionalNome?(' — '+linha.profissionalNome):''));
+  linhaDado('Forma de pagamento', p.forma||linha.forma||'—');
+  linhaDado('Data do pagamento', formatDateBR(p.dataRecebimento));
+  if(nomeProfissionalEmitindo && typeof nomeProfissionalEmitindo === 'function' && nomeProfissionalEmitindo()){
+    linhaDado('Responsável pelo atendimento', nomeProfissionalEmitindo());
+  }
+
+  y += 30;
+  doc.setDrawColor(...MUTED);
+  doc.line(marginX+contentW/2-90, y, marginX+contentW/2+90, y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...MUTED);
+  doc.text((perfil && perfil.nome) || 'Assinatura', pageW/2, y+14, { align:'center' });
+
+  const safeName = (lanc.paciente||'paciente').trim().replace(/\s+/g,'_');
+  doc.save('recibo_'+safeName+'_parcela'+(idx+1)+'.pdf');
+  toast('Recibo gerado com sucesso!');
+}
+
 function generateApuracaoPDF(dados){
   if(!window.jspdf || !window.jspdf.jsPDF){
     alert('Não foi possível carregar a biblioteca de geração de PDF. Verifique sua conexão com a internet e tente novamente.');
