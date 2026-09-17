@@ -2184,17 +2184,37 @@ function renderContract(container){
   }
 
   // Separador botões finais
+  // Handler compartilhado: além da trava interna em generatePDF(), dá feedback visual (texto
+  // "Gerando..." + bloqueia novos cliques no próprio botão) — é a falta desse feedback que leva
+  // a pessoa a clicar de novo achando que o primeiro clique não funcionou.
+  function criarHandlerGerarPdf(btnEl, textoOriginal){
+    return async () => {
+      if(_gerandoPdfEmAndamento) return;
+      btnEl.textContent = '⏳ Gerando...';
+      btnEl.style.opacity = '0.7';
+      btnEl.style.pointerEvents = 'none';
+      try{
+        await generatePDF();
+      } finally {
+        btnEl.textContent = textoOriginal;
+        btnEl.style.opacity = '';
+        btnEl.style.pointerEvents = '';
+      }
+    };
+  }
   if(planoPagamentoTravado()){
     container.appendChild(el('p', { style:'font-size:12.5px;color:var(--amber);background:#FFF6E5;padding:10px 12px;border-radius:8px;margin-top:16px;' },
       document.createTextNode('🔒 Essa ficha já foi concluída e enviada ao Financeiro. As condições do plano de pagamento agora só podem ser alteradas pelo gestor da clínica.')));
+    const textoReimprimir = '🖨 Reimprimir ficha e contrato';
     const reimprimirBtn = el('div', { class:'add-row-btn', style:'margin-top:10px;background:var(--blue-med,#2196F3);border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
-      document.createTextNode('🖨 Reimprimir ficha e contrato'));
-    reimprimirBtn.onclick = generatePDF;
+      document.createTextNode(textoReimprimir));
+    reimprimirBtn.onclick = criarHandlerGerarPdf(reimprimirBtn, textoReimprimir);
     container.appendChild(reimprimirBtn);
   } else {
+    const textoPdf = fichaJaConcluida() ? '💾 Salvar alterações e reimprimir' : 'Concluir contrato e enviar para financeiro';
     const pdfBtn = el('div', { class:'add-row-btn', style:'margin-top:20px;background:#1FAE5C;border:none;color:#fff;text-align:center;font-size:15px;padding:14px;' },
-      document.createTextNode(fichaJaConcluida() ? '💾 Salvar alterações e reimprimir' : 'Concluir contrato e enviar para financeiro'));
-    pdfBtn.onclick = generatePDF;
+      document.createTextNode(textoPdf));
+    pdfBtn.onclick = criarHandlerGerarPdf(pdfBtn, textoPdf);
     container.appendChild(pdfBtn);
     if(fichaJaConcluida()){
       container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:6px;' },
@@ -2254,9 +2274,21 @@ function refreshPanel(){
 
 document.getElementById('voltarListaBtn').onclick = () => mostrarListaFichas();
 document.getElementById('btnPrev').onclick = () => { if(currentStep>0) renderPanel(currentStep-1); };
-document.getElementById('btnNext').onclick = () => {
-  if(currentStep < STEPS.length-1) renderPanel(currentStep+1);
-  else generatePDF();
+document.getElementById('btnNext').onclick = async () => {
+  if(currentStep < STEPS.length-1){ renderPanel(currentStep+1); return; }
+  if(_gerandoPdfEmAndamento) return;
+  const btn = document.getElementById('btnNext');
+  const textoOriginal = btn.textContent;
+  btn.textContent = '⏳ Gerando...';
+  btn.style.opacity = '0.7';
+  btn.style.pointerEvents = 'none';
+  try{
+    await generatePDF();
+  } finally {
+    btn.textContent = textoOriginal;
+    btn.style.opacity = '';
+    btn.style.pointerEvents = '';
+  }
 };
 
 // ============ PDF GENERATION ============
@@ -2600,7 +2632,26 @@ function generateOrcamentoPDF(){
   toast('Orçamento gerado com sucesso!');
 }
 
+let _gerandoPdfEmAndamento = false;
 async function generatePDF(){
+  // Trava contra clique duplo: gerar o PDF e lançar no Financeiro envolve várias operações
+  // assíncronas em sequência (upsert do paciente, geração do PDF, salvar no Financeiro) — sem
+  // essa trava, clicar duas vezes rápido (comum quando a pessoa acha que o primeiro clique não
+  // "pegou", já que não tem um indicador visual de carregamento) dispara duas execuções ao
+  // mesmo tempo, cada uma lendo e salvando os dados do Financeiro por cima da outra — o mesmo
+  // tipo de problema que uma disputa entre duas pessoas causaria, só que dentro da mesma sessão.
+  if(_gerandoPdfEmAndamento){
+    toast('Já está gerando — aguarde terminar antes de clicar de novo.');
+    return;
+  }
+  _gerandoPdfEmAndamento = true;
+  try{
+    await gerarPdfEExecutar();
+  } finally {
+    _gerandoPdfEmAndamento = false;
+  }
+}
+async function gerarPdfEExecutar(){
   migrateImages();
   if(typeof clinicaUpsertPaciente === 'function' && (state.patient.nome||'').trim()){
     await clinicaUpsertPaciente({
@@ -3342,11 +3393,6 @@ async function lancarAutomaticamenteNoFinanceiro(payload, tentativa){
       dados.lancamentos.unshift(lancamento);
     }
 
-    if(!state.financeiroLancamentoId){
-      state.financeiroLancamentoId = lancamento.id;
-      saveProgressDebounced();
-    }
-
     await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dados);
 
     // Confere se realmente ficou salvo — se outro profissional salvou por cima logo depois
@@ -3359,6 +3405,15 @@ async function lancarAutomaticamenteNoFinanceiro(payload, tentativa){
         return lancarAutomaticamenteNoFinanceiro(payload, tentativa+1);
       }
       throw new Error('O lançamento não persistiu depois de '+tentativa+' tentativas (provável conflito de salvamento simultâneo).');
+    }
+
+    // Só marca a ficha como "concluída/travada" DEPOIS de confirmar que o lançamento realmente
+    // existe no Financeiro — se isso fosse feito antes e o salvamento falhasse, a ficha ficava
+    // "travada" achando que já tinha sido enviada, mesmo sem nada ter chegado no Financeiro de
+    // verdade (foi exatamente isso que aconteceu com uma ficha da Dra Marry).
+    if(!state.financeiroLancamentoId){
+      state.financeiroLancamentoId = lancamento.id;
+      saveProgressDebounced();
     }
 
     toast('Lançado automaticamente no Financeiro!');
