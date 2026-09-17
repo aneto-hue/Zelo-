@@ -190,6 +190,24 @@ async function loadProgress(){
   return true;
 }
 
+// Compara nomes de profissional de forma tolerante: remove títulos (Dr/Dra) e maiúsculas antes
+// de comparar. Usada em vários lugares porque o nome de login (ex: "Neto") quase nunca bate
+// letra por letra com o nome cadastrado no Financeiro/Agenda (ex: "Dr Neto").
+function normalizarNomeProf(n){
+  return (n||'').trim().toLowerCase().replace(/^(dr\.?|dra\.?|sr\.?|sra\.?)\s+/,'').trim();
+}
+function buscarProfissionalPorNomeFlexivel(nomeAlvo, listaProfissionais){
+  const alvo = normalizarNomeProf(nomeAlvo);
+  if(!alvo) return null;
+  let achado = listaProfissionais.find(p => normalizarNomeProf(p.nome) === alvo);
+  if(achado) return achado;
+  const candidatos = listaProfissionais.filter(p => {
+    const nome = normalizarNomeProf(p.nome);
+    return nome && (alvo.includes(nome) || nome.includes(alvo));
+  });
+  return candidatos.length === 1 ? candidatos[0] : null;
+}
+
 // Conserta lançamentos antigos cujos tratamentos foram criados sem um "id" (bug já corrigido
 // na Anamnese, mas registros já existentes ainda podem estar sem esse campo). Sem um id
 // estável, o Financeiro não consegue saber com certeza qual tratamento foi movido quando o
@@ -213,6 +231,21 @@ function repararTratamentosSemId(){
   return consertouAlgo;
 }
 function clearProgress(){ ClinicaStorage.save(STORAGE_KEY, null); try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
+
+// Conserta lançamentos que ficaram com profissionalId vazio porque o nome de quem concluiu a
+// ficha (ex: "Neto") não batia letra por letra com o nome cadastrado no Financeiro/Agenda (ex:
+// "Dr Neto") — com isso, o lançamento não aparecia nem quando você filtrava pelo profissional
+// certo, parecia que ele "não tinha feito nada". Roda depois que a lista de profissionais do
+// Financeiro/Agenda já foi carregada, senão não tem com o que comparar.
+function repararProfissionalIdVazio(){
+  let consertouAlgo = false;
+  (state.lancamentos||[]).forEach(lanc => {
+    if(lanc.profissionalId || !lanc.profissionalNomeOriginal) return;
+    const achado = buscarProfissionalPorNomeFlexivel(lanc.profissionalNomeOriginal, state.profissionais);
+    if(achado){ lanc.profissionalId = achado.id; consertouAlgo = true; }
+  });
+  return consertouAlgo;
+}
 
 // A partir de agora, quem cadastra profissionais é o Perfil da Clínica (lista compartilhada,
 // a mesma usada no Agendamento). Aqui, só migra dados antigos (se o Financeiro já tinha
@@ -3172,13 +3205,15 @@ function refreshPanel(){ renderPanel(currentStep, { keepScroll:true }); }
   await clinicaInitPacientes();
   await loadProgress();
   await carregarProfissionaisCompartilhados();
+  if(repararProfissionalIdVazio()) saveProgress();
 
   // Cada profissional só vê os PRÓPRIOS números no Financeiro; só o administrador (gestor da
   // clínica) vê todos. A lista de profissionais do Financeiro é separada da lista de login, então
-  // a identificação é feita pelo nome (mesmo padrão já usado em outras partes do sistema).
+  // a identificação é feita pelo nome (mesmo padrão já usado em outras partes do sistema) — de
+  // forma tolerante (ex: "Neto" também reconhece "Dr Neto"), já que raramente batem letra por
+  // letra.
   if(window._clinicaMe && window._clinicaMe.papel !== 'admin'){
-    const meuNomeNormalizado = (window._clinicaMe.nome||'').trim().toLowerCase();
-    const meuProfissional = state.profissionais.find(p => (p.nome||'').trim().toLowerCase() === meuNomeNormalizado);
+    const meuProfissional = buscarProfissionalPorNomeFlexivel(window._clinicaMe.nome, state.profissionais);
     restricaoProfissionalId = meuProfissional ? meuProfissional.id : '__nenhum__'; // sem cadastro correspondente = não vê ninguém
     filtroApuracao.profissionalId = restricaoProfissionalId;
   }

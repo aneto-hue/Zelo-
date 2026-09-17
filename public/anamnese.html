@@ -3240,7 +3240,7 @@ async function generatePDF(){
   }
 
   // ---------- Lança automaticamente no Financeiro (sem precisar importar o PDF manualmente) ----------
-  lancarAutomaticamenteNoFinanceiro(financeiroPayload);
+  await lancarAutomaticamenteNoFinanceiro(financeiroPayload);
 
   sharePDF(doc, fileName);
 }
@@ -3249,20 +3249,45 @@ async function generatePDF(){
 // direto no módulo Financeiro — sem precisar do passo manual de "Importar PDF".
 // Parcelas pagas com cartão já entram marcadas como recebidas; as demais formas (dinheiro,
 // Pix, promissória, boleto) ficam pendentes até serem confirmadas manualmente no Financeiro.
-async function lancarAutomaticamenteNoFinanceiro(payload){
+async function lancarAutomaticamenteNoFinanceiro(payload, tentativa){
+  tentativa = tentativa || 1;
   try{
+    // Recarrega os dados na hora, o mais perto possível do salvamento — se dois profissionais
+    // concluírem uma ficha quase ao mesmo tempo, o que salva por último pode sobrescrever o
+    // outro sem nenhum erro aparecer (o "lançamento sumiu" sem ninguém perceber). Além disso,
+    // depois de salvar, confere se o lançamento realmente ficou lá; se não ficou (perdeu a
+    // corrida), tenta de novo automaticamente antes de desistir.
     const dados = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { profissionais:[], rateiosFixos:[], lancamentos:[] };
     if(!Array.isArray(dados.lancamentos)) dados.lancamentos = [];
 
     // Busca o profissional na lista COMPARTILHADA (Perfil da Clínica), que é sempre a fonte
     // de verdade mais atual — a cópia dentro do Financeiro só atualiza quando alguém abre e
     // salva algo lá, então não dá pra confiar só nela pra esse cruzamento automático.
-    const nomeAlvo = (payload.profissionalNome||'').trim().toLowerCase();
+    // A comparação não pode ser só "nome idêntico": na prática, o nome de login (ex: "Neto" ou
+    // "Argemiro Ribeiro de Almeida Neto") quase nunca bate letra por letra com o nome cadastrado
+    // no Financeiro/Agenda (ex: "Dr Neto") — por isso, além do nome exato, também tenta por
+    // aproximação: remove títulos (Dr/Dra) dos dois lados e vê se um nome está contido no outro.
+    function normalizarNomeProf(n){
+      return (n||'').trim().toLowerCase().replace(/^(dr\.?|dra\.?|sr\.?|sra\.?)\s+/,'').trim();
+    }
+    const nomeAlvo = normalizarNomeProf(payload.profissionalNome);
     let profEncontrado = null;
     if(nomeAlvo){
       try{
         const profissionaisCompartilhados = await ClinicaStorage.load('clinica_profissionais_agenda_v1') || [];
-        profEncontrado = profissionaisCompartilhados.find(p => (p.nome||'').trim().toLowerCase() === nomeAlvo);
+        // 1) Tenta nome idêntico (ignorando títulos e maiúsculas/minúsculas) primeiro.
+        profEncontrado = profissionaisCompartilhados.find(p => normalizarNomeProf(p.nome) === nomeAlvo);
+        // 2) Sem igual, tenta por aproximação: um nome contido no outro (cobre "Neto" vs "Dr
+        // Neto", ou "Argemiro Ribeiro de Almeida Neto" vs "Dr Neto" — desde que a palavra
+        // "neto" apareça nos dois). Só aceita se achar exatamente UM candidato, pra não
+        // arriscar cruzar com a pessoa errada quando há mais de uma coincidência possível.
+        if(!profEncontrado){
+          const candidatos = profissionaisCompartilhados.filter(p => {
+            const nomeCadastrado = normalizarNomeProf(p.nome);
+            return nomeCadastrado && (nomeAlvo.includes(nomeCadastrado) || nomeCadastrado.includes(nomeAlvo));
+          });
+          if(candidatos.length === 1) profEncontrado = candidatos[0];
+        }
         // Garante que esse profissional também exista na lista interna do Financeiro, com o
         // MESMO id, senão o cruzamento por profissionalId nas telas de comissão não bate.
         if(profEncontrado){
@@ -3323,9 +3348,26 @@ async function lancarAutomaticamenteNoFinanceiro(payload){
     }
 
     await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dados);
+
+    // Confere se realmente ficou salvo — se outro profissional salvou por cima logo depois
+    // (condição de corrida), o lançamento pode ter se perdido mesmo sem erro nenhum.
+    const conferencia = await ClinicaStorage.load('controle_pagamentos_comissoes_v1');
+    const persistiu = conferencia && Array.isArray(conferencia.lancamentos) && conferencia.lancamentos.some(l => l.id === lancamento.id);
+    if(!persistiu){
+      if(tentativa < 3){
+        await new Promise(r => setTimeout(r, 300 + Math.random()*400));
+        return lancarAutomaticamenteNoFinanceiro(payload, tentativa+1);
+      }
+      throw new Error('O lançamento não persistiu depois de '+tentativa+' tentativas (provável conflito de salvamento simultâneo).');
+    }
+
     toast('Lançado automaticamente no Financeiro!');
   }catch(e){
     console.error('Não foi possível lançar automaticamente no Financeiro:', e);
+    // Diferente de antes, agora avisa quem estava usando o sistema — sem isso, a pessoa achava
+    // que tinha dado tudo certo (o PDF gerou normal) e só ia descobrir, se descobrisse, dias
+    // depois, quando fosse procurar o valor no Financeiro e não achasse nada.
+    alert('⚠ O contrato foi gerado, mas não foi possível confirmar o lançamento no Financeiro automaticamente (' + (e.message||'erro desconhecido') + '). Avise o gestor — pode ser necessário lançar esse contrato manualmente no Financeiro.');
   }
 }
 function uidFinLocal(){ return 'lanc'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
