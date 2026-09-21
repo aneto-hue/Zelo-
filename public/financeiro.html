@@ -3035,8 +3035,10 @@ function gerarReciboPDF(lanc, linha, p, idx){
   linhaDado('Referente a', 'Parcela '+(idx+1)+' de '+(linha.parcelas?linha.parcelas.length:1)+(linha.profissionalNome?(' — '+linha.profissionalNome):''));
   linhaDado('Forma de pagamento', p.forma||linha.forma||'—');
   linhaDado('Data do pagamento', formatDateBR(p.dataRecebimento));
-  if(nomeProfissionalEmitindo && typeof nomeProfissionalEmitindo === 'function' && nomeProfissionalEmitindo()){
+  if(typeof nomeProfissionalEmitindo === 'function' && nomeProfissionalEmitindo()){
     linhaDado('Responsável pelo atendimento', nomeProfissionalEmitindo());
+  } else if(linha.profissionalNome){
+    linhaDado('Responsável pelo atendimento', linha.profissionalNome);
   }
 
   y += 30;
