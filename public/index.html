@@ -310,6 +310,7 @@ const NAV_ITEMS = [
   { nome:'Financeiro', icon:'financeiro', href:'financeiro.html' },
   { nome:'Gastos Fixos Mensais', icon:'gastos-fixos', href:'gastos-fixos.html' },
   { nome:'Perfil da Clínica', icon:'perfil', href:'perfil-clinica.html' },
+  { nome:'Lixeira', icon:'alertas', href:'lixeira.html', soAdmin:true },
 ];
 
 function fotoIcone(nome){
@@ -320,10 +321,11 @@ function fotoIcone(nome){
   return img;
 }
 
-function montarSidebarNav(){
+function montarSidebarNav(souAdmin){
   const nav = document.getElementById('sidebarNav');
   nav.innerHTML = '';
   NAV_ITEMS.forEach(item => {
+    if(item.soAdmin && !souAdmin) return;
     const a = el('a', { href:item.href, class: item.ativo ? 'active' : '' }, [
       el('span', { class:'navicon' }, fotoIcone(item.icon)),
       document.createTextNode(item.nome)
@@ -675,6 +677,7 @@ async function iniciar(){
   document.getElementById('sidebarUserNome').textContent = me.nome;
   document.getElementById('sidebarUserPapel').textContent = me.papel==='admin' ? 'Administrador(a)' : 'Profissional';
   document.getElementById('sidebarAvatar').textContent = (me.nome||'?').trim().charAt(0).toUpperCase();
+  montarSidebarNav(me.papel === 'admin');
   document.getElementById('sidebarSenhaBtn').onclick = abrirModalTrocarSenha;
   document.getElementById('sidebarSairBtn').onclick = async () => {
     await fetch('/api/logout', { method:'POST', credentials:'same-origin' });

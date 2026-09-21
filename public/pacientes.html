@@ -68,6 +68,10 @@ function el(tag, attrs={}, children=[]){
 let novoPacienteAberto = false;
 let filtroPacientes = '';
 let confirmandoExcluirPacienteId = null;
+let excluindoTudoPacienteId = null;
+let motivoExclusaoTexto = '';
+let resumoExclusaoTudo = '';
+let motivoExclusaoCarregando = false;
 
 function maskCPF(v){
   v = v.replace(/\D/g,'').slice(0,11);
@@ -418,9 +422,39 @@ function render(){
             render();
           };
           card.appendChild(simBtn);
-          const naoBtn = el('span', { style:'color:var(--muted);cursor:pointer;font-size:11.5px;text-decoration:underline;' }, document.createTextNode('Cancelar'));
+          const naoBtn = el('span', { style:'color:var(--muted);cursor:pointer;font-size:11.5px;text-decoration:underline;margin-right:10px;' }, document.createTextNode('Cancelar'));
           naoBtn.onclick = (e) => { e.stopPropagation(); confirmandoExcluirPacienteId = null; render(); };
           card.appendChild(naoBtn);
+        } else if(excluindoTudoPacienteId === p.id){
+          const wrapExcluirTudo = el('div', { style:'width:100%;background:#FBEAEA;border-radius:8px;padding:10px;margin-top:6px;' });
+          wrapExcluirTudo.onclick = (e) => e.stopPropagation();
+          wrapExcluirTudo.appendChild(el('div', { style:'font-size:11.5px;font-weight:700;color:var(--red);margin-bottom:6px;' },
+            document.createTextNode('⚠ Excluir TUDO sobre este paciente')));
+          wrapExcluirTudo.appendChild(el('div', { style:'font-size:11px;color:var(--muted);margin-bottom:8px;' },
+            document.createTextNode(motivoExclusaoCarregando ? 'Verificando o que existe sobre esse paciente...' : ('Isso vai apagar: '+(resumoExclusaoTudo||'...')+'. Fica guardado na Lixeira, com o motivo, e dá pra restaurar depois.'))));
+          const motivoInput = el('textarea', { placeholder:'Motivo da exclusão (obrigatório)', rows:'2',
+            style:'width:100%;padding:8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:12.5px;margin-bottom:8px;resize:vertical;' });
+          motivoInput.value = motivoExclusaoTexto;
+          motivoInput.oninput = (e) => { motivoExclusaoTexto = e.target.value; };
+          wrapExcluirTudo.appendChild(motivoInput);
+          const linhaBtns = el('div', {});
+          const confirmarTudoBtn = el('span', { style:'color:#fff;background:var(--red);border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:700;font-size:11.5px;margin-right:8px;' },
+            document.createTextNode('Excluir tudo'));
+          confirmarTudoBtn.onclick = async () => {
+            if(!motivoExclusaoTexto.trim()){ alert('Informe o motivo da exclusão.'); return; }
+            try{
+              await clinicaExcluirTudoDoPaciente(p.id, motivoExclusaoTexto);
+              excluindoTudoPacienteId = null; motivoExclusaoTexto=''; resumoExclusaoTudo='';
+              render();
+              alert('Paciente e todos os dados dele foram movidos pra Lixeira.');
+            }catch(err){ alert(err.message||'Não foi possível excluir.'); }
+          };
+          linhaBtns.appendChild(confirmarTudoBtn);
+          const cancelarTudoBtn = el('span', { style:'color:var(--muted);cursor:pointer;font-size:11.5px;text-decoration:underline;' }, document.createTextNode('Cancelar'));
+          cancelarTudoBtn.onclick = () => { excluindoTudoPacienteId = null; motivoExclusaoTexto=''; resumoExclusaoTudo=''; render(); };
+          linhaBtns.appendChild(cancelarTudoBtn);
+          wrapExcluirTudo.appendChild(linhaBtns);
+          card.appendChild(wrapExcluirTudo);
         } else {
           const del = el('span', { class:'pac-del', title:'Excluir cadastro (apenas gestor da clínica)' }, document.createTextNode('✕'));
           del.onclick = (e) => {
@@ -429,6 +463,23 @@ function render(){
             render();
           };
           card.appendChild(del);
+          const delTudo = el('span', { title:'Excluir TUDO sobre este paciente (ficha, financeiro, agenda) — vai pra Lixeira', style:'margin-left:8px;color:var(--red);font-size:11px;cursor:pointer;text-decoration:underline;' },
+            document.createTextNode('excluir tudo'));
+          delTudo.onclick = async (e) => {
+            e.stopPropagation();
+            excluindoTudoPacienteId = p.id; motivoExclusaoTexto=''; resumoExclusaoTudo=''; motivoExclusaoCarregando = true;
+            render();
+            const dados = await coletarDadosCompletosDoPaciente(p.id);
+            resumoExclusaoTudo = [
+              dados.fichaAnamnese ? '1 ficha de anamnese' : null,
+              dados.fichaProntuario ? '1 ficha de prontuário' : null,
+              dados.lancamentosFinanceiro.length ? (dados.lancamentosFinanceiro.length+' lançamento(s) financeiro(s)') : null,
+              dados.consultasAgendamento.length ? (dados.consultasAgendamento.length+' consulta(s) na agenda') : null,
+            ].filter(Boolean).join(', ') || 'só o cadastro (sem ficha, financeiro ou consultas)';
+            motivoExclusaoCarregando = false;
+            render();
+          };
+          card.appendChild(delTudo);
         }
       }
       listaWrap.appendChild(card);

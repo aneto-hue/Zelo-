@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Lixeira — Zelo</title>
+<script src="client-storage.js"></script>
+<script src="clinic-branding.js"></script>
+<script src="shared-data.js"></script>
+<script src="nav-home.js"></script>
+<style>
+  :root{
+    --blue-dark:#0B5FD9; --blue-med:#2196F3; --blue-head:#CCE7FB; --blue-light:#E8F4FF;
+    --line:#7FB2E0; --line-light:#BFDCF2; --ink:#1A1A1A; --muted:#5B6B7A;
+    --green:#1FAE5C; --red:#E53935; --amber:#F5A623; --bg:#F4F8FB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent;}
+  header.topbar{background:#fff; border-bottom:3px solid var(--red); padding:22px 16px 18px; text-align:center; position:relative;}
+  header.topbar h1{font-size:22px; margin:0; color:var(--red); font-weight:800;}
+  header.topbar p{margin:4px 0 0; font-size:13px; color:var(--muted);}
+  main{max-width:900px; width:100%; box-sizing:border-box; margin:0 auto; padding:20px 14px 50px;}
+  .empty-hint{text-align:center; padding:30px 20px; color:var(--muted); font-size:13px; background:#fff; border:1.5px dashed var(--line-light); border-radius:10px;}
+  .lixo-card{background:#fff; border:1.5px solid var(--line-light); border-left:5px solid var(--red); border-radius:10px; padding:14px; margin-bottom:12px;}
+  .lixo-titulo{font-weight:700; font-size:15px; color:var(--ink);}
+  .lixo-meta{font-size:12px; color:var(--muted); margin-top:3px;}
+  .lixo-resumo{font-size:12.5px; color:var(--ink); margin-top:8px; background:var(--blue-light); border-radius:8px; padding:8px 10px;}
+  .lixo-motivo{font-size:12.5px; color:var(--ink); margin-top:8px; padding:8px 10px; background:#FFF6E5; border-radius:8px;}
+  .lixo-motivo b{color:var(--amber);}
+  .lixo-actions{display:flex; gap:8px; margin-top:12px;}
+  .btn-restaurar{flex:1; padding:9px; border:none; border-radius:8px; background:var(--green); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; text-align:center;}
+  .btn-apagar-def{padding:9px 14px; border:1.5px solid var(--red); border-radius:8px; background:#fff; color:var(--red); font-weight:700; font-size:12.5px; cursor:pointer; text-align:center;}
+  .confirma-row{display:flex; gap:8px; margin-top:10px; align-items:center;}
+  .aviso-topo{background:#FFF6E5; border:1.5px solid var(--amber); border-radius:10px; padding:12px 14px; margin-bottom:18px; font-size:12.5px; color:#8A5A0F;}
+  .bloqueado{text-align:center; padding:40px 20px; color:var(--muted); font-size:14px;}
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>🗑 Lixeira</h1>
+  <p>Cadastros excluídos, com o motivo — restaure se precisar</p>
+</header>
+
+<main id="main"><div class="empty-hint">Carregando...</div></main>
+
+<div class="toast" id="toast" style="position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);background:#1A1A1A;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:all .25s;z-index:50;pointer-events:none;text-align:center;max-width:90%;"></div>
+
+<script>
+function el(tag, attrs={}, children=[]){
+  const e=document.createElement(tag);
+  for(const k in attrs){
+    if(k==='class') e.className=attrs[k];
+    else if(k==='html') e.innerHTML=attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)';
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(-20px)'; },2000);
+}
+
+let confirmandoApagarDefId = null;
+
+async function render(){
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  if(!(window._clinicaMe && window._clinicaMe.papel === 'admin')){
+    main.appendChild(el('div', { class:'bloqueado' }, document.createTextNode('Só o gestor da clínica pode acessar a Lixeira.')));
+    return;
+  }
+
+  const lixeira = await ClinicaStorage.load('lixeira_clinica_v1') || [];
+
+  main.appendChild(el('div', { class:'aviso-topo' }, document.createTextNode(
+    'Quando um paciente é excluído com a opção "excluir tudo" (na tela de Pacientes), o cadastro, a ficha de anamnese, a ficha de prontuário, os lançamentos financeiros e as consultas da agenda ficam guardados aqui — com o motivo — em vez de serem apagados de vez. Você pode restaurar tudo a qualquer momento.'
+  )));
+
+  if(!lixeira.length){
+    main.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('A lixeira está vazia.')));
+    return;
+  }
+
+  lixeira.forEach(item => {
+    const card = el('div', { class:'lixo-card' });
+    card.appendChild(el('div', { class:'lixo-titulo' }, document.createTextNode(item.pacienteNome || '(sem nome)')));
+    const dataFormatada = new Date(item.quando).toLocaleString('pt-BR');
+    card.appendChild(el('div', { class:'lixo-meta' }, document.createTextNode('Excluído por '+(item.quem||'—')+' em '+dataFormatada)));
+    card.appendChild(el('div', { class:'lixo-resumo' }, document.createTextNode('O que foi excluído: '+(item.resumo||'—'))));
+    card.appendChild(el('div', { class:'lixo-motivo' }, [
+      el('b', {}, document.createTextNode('Motivo: ')),
+      document.createTextNode(item.motivo||'—'),
+    ]));
+
+    const actions = el('div', { class:'lixo-actions' });
+    const restaurarBtn = el('div', { class:'btn-restaurar' }, document.createTextNode('↩ Restaurar tudo'));
+    restaurarBtn.onclick = async () => {
+      try{
+        await clinicaRestaurarDaLixeira(item.id);
+        toast('Restaurado com sucesso!');
+        render();
+      }catch(err){ alert(err.message || 'Não foi possível restaurar.'); }
+    };
+    actions.appendChild(restaurarBtn);
+
+    if(confirmandoApagarDefId === item.id){
+      const simBtn = el('div', { class:'btn-apagar-def', style:'background:var(--red);color:#fff;' }, document.createTextNode('Confirmar (não dá pra desfazer)'));
+      simBtn.onclick = async () => {
+        await clinicaExcluirDefinitivamenteDaLixeira(item.id);
+        confirmandoApagarDefId = null;
+        toast('Apagado definitivamente.');
+        render();
+      };
+      actions.appendChild(simBtn);
+      const naoBtn = el('div', { class:'btn-apagar-def' }, document.createTextNode('Cancelar'));
+      naoBtn.onclick = () => { confirmandoApagarDefId = null; render(); };
+      actions.appendChild(naoBtn);
+    } else {
+      const apagarDefBtn = el('div', { class:'btn-apagar-def' }, document.createTextNode('Apagar de vez'));
+      apagarDefBtn.onclick = () => { confirmandoApagarDefId = item.id; render(); };
+      actions.appendChild(apagarDefBtn);
+    }
+    card.appendChild(actions);
+    main.appendChild(card);
+  });
+}
+
+(async function iniciar(){
+  const meResp = await fetch('/api/me', { credentials:'same-origin' });
+  if(meResp.status === 401){ window.location.href = '/login.html'; return; }
+  window._clinicaMe = await meResp.json();
+  await aplicarIdentidadeClinica();
+  await clinicaInitPacientes();
+  render();
+})();
+</script>
+</body>
+</html>

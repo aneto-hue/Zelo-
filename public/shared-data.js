@@ -82,6 +82,151 @@ function clinicaRemovePaciente(id){
   clinicaSalvarCache();
 }
 
+// ============================================================
+// LIXEIRA — exclusão completa de um paciente (cadastro + ficha de anamnese + ficha de
+// prontuário + lançamentos no Financeiro + consultas na Agenda), com motivo obrigatório e
+// possibilidade de restaurar tudo depois. Em vez de apagar de vez, guarda um "retrato" de tudo
+// que existia antes de excluir, na lista compartilhada 'lixeira_clinica_v1'.
+const LIXEIRA_KEY = 'lixeira_clinica_v1';
+
+function lixeiraUid(){ return 'lix'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+// Reúne tudo que existe hoje sobre um paciente, em todos os módulos, sem apagar nada ainda —
+// usado tanto pra montar o retrato antes de excluir quanto pra mostrar ao gestor, na hora de
+// confirmar, exatamente o que vai ser apagado (quantas fichas, lançamentos, consultas).
+async function coletarDadosCompletosDoPaciente(pacienteId){
+  const [
+    fichaAnamnese, indiceAnamnese,
+    fichaProntuario, indiceProntuario,
+    dadosFinanceiro, dadosAgendamento,
+  ] = await Promise.all([
+    ClinicaStorage.load('ficha_anamnese_paciente_' + pacienteId).catch(()=>null),
+    ClinicaStorage.load('ficha_anamnese_indice_v1').catch(()=>null),
+    ClinicaStorage.load('ficha_prontuario_paciente_' + pacienteId).catch(()=>null),
+    ClinicaStorage.load('ficha_prontuario_indice_v1').catch(()=>null),
+    ClinicaStorage.load('controle_pagamentos_comissoes_v1').catch(()=>null),
+    ClinicaStorage.load('controle_agendamento_progresso_v1').catch(()=>null),
+  ]);
+  const lancamentosDoPaciente = ((dadosFinanceiro && dadosFinanceiro.lancamentos) || []).filter(l => l.pacienteId === pacienteId);
+  const consultasDoPaciente = ((dadosAgendamento && dadosAgendamento.consultas) || []).filter(c => c.pacienteId === pacienteId);
+  return {
+    paciente: clinicaFindPacienteById(pacienteId),
+    fichaAnamnese: fichaAnamnese || null,
+    estavaNoIndiceAnamnese: Array.isArray(indiceAnamnese) ? indiceAnamnese.includes(pacienteId) : false,
+    fichaProntuario: fichaProntuario || null,
+    estavaNoIndiceProntuario: Array.isArray(indiceProntuario) ? indiceProntuario.includes(pacienteId) : false,
+    lancamentosFinanceiro: lancamentosDoPaciente,
+    consultasAgendamento: consultasDoPaciente,
+  };
+}
+
+// Exclui de vez (das listas ativas) tudo sobre um paciente, guardando antes um retrato completo
+// na lixeira — com quem excluiu, quando, e o motivo (obrigatório). Retorna o id do registro
+// criado na lixeira, que pode ser usado depois pra restaurar tudo com clinicaRestaurarDaLixeira.
+async function clinicaExcluirTudoDoPaciente(pacienteId, motivo){
+  if(!(motivo||'').trim()) throw new Error('É obrigatório informar o motivo da exclusão.');
+  const dados = await coletarDadosCompletosDoPaciente(pacienteId);
+  if(!dados.paciente) throw new Error('Paciente não encontrado.');
+
+  const registroLixeira = {
+    id: lixeiraUid(),
+    tipo: 'paciente_completo',
+    pacienteId,
+    pacienteNome: dados.paciente.nome,
+    quem: (window._clinicaMe && window._clinicaMe.nome) || 'Usuário',
+    quando: Date.now(),
+    motivo: motivo.trim(),
+    resumo: [
+      dados.fichaAnamnese ? '1 ficha de anamnese' : null,
+      dados.fichaProntuario ? '1 ficha de prontuário' : null,
+      dados.lancamentosFinanceiro.length ? (dados.lancamentosFinanceiro.length+' lançamento(s) financeiro(s)') : null,
+      dados.consultasAgendamento.length ? (dados.consultasAgendamento.length+' consulta(s) na agenda') : null,
+    ].filter(Boolean).join(', ') || 'só o cadastro (sem ficha, financeiro ou consultas)',
+    snapshot: dados,
+  };
+
+  const lixeiraAtual = await ClinicaStorage.load(LIXEIRA_KEY) || [];
+  lixeiraAtual.unshift(registroLixeira);
+  await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtual);
+
+  // Só depois de garantir que o retrato foi salvo na lixeira é que apaga de fato, das listas
+  // ativas de cada módulo.
+  clinicaRemovePaciente(pacienteId);
+  if(dados.fichaAnamnese) await ClinicaStorage.save('ficha_anamnese_paciente_' + pacienteId, null);
+  if(dados.estavaNoIndiceAnamnese){
+    const indice = await ClinicaStorage.load('ficha_anamnese_indice_v1') || [];
+    await ClinicaStorage.save('ficha_anamnese_indice_v1', indice.filter(id => id !== pacienteId));
+  }
+  if(dados.fichaProntuario) await ClinicaStorage.save('ficha_prontuario_paciente_' + pacienteId, null);
+  if(dados.estavaNoIndiceProntuario){
+    const indice = await ClinicaStorage.load('ficha_prontuario_indice_v1') || [];
+    await ClinicaStorage.save('ficha_prontuario_indice_v1', indice.filter(id => id !== pacienteId));
+  }
+  if(dados.lancamentosFinanceiro.length){
+    const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1');
+    if(dadosFin && Array.isArray(dadosFin.lancamentos)){
+      dadosFin.lancamentos = dadosFin.lancamentos.filter(l => l.pacienteId !== pacienteId);
+      await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dadosFin);
+    }
+  }
+  if(dados.consultasAgendamento.length){
+    const dadosAgenda = await ClinicaStorage.load('controle_agendamento_progresso_v1');
+    if(dadosAgenda && Array.isArray(dadosAgenda.consultas)){
+      dadosAgenda.consultas = dadosAgenda.consultas.filter(c => c.pacienteId !== pacienteId);
+      await ClinicaStorage.save('controle_agendamento_progresso_v1', dadosAgenda);
+    }
+  }
+  return registroLixeira.id;
+}
+
+// Desfaz uma exclusão: pega o retrato guardado na lixeira e devolve tudo pro lugar — cadastro,
+// ficha de anamnese, ficha de prontuário, lançamentos financeiros e consultas da agenda.
+async function clinicaRestaurarDaLixeira(registroLixeiraId){
+  const lixeiraAtual = await ClinicaStorage.load(LIXEIRA_KEY) || [];
+  const registro = lixeiraAtual.find(r => r.id === registroLixeiraId);
+  if(!registro) throw new Error('Registro não encontrado na lixeira (pode já ter sido restaurado).');
+  const dados = registro.snapshot;
+
+  if(dados.paciente){
+    _clinicaPacientesCache = _clinicaPacientesCache.filter(p => p.id !== dados.paciente.id);
+    _clinicaPacientesCache.push(dados.paciente);
+    await ClinicaStorage.save(CLINICA_PACIENTES_KEY, _clinicaPacientesCache);
+  }
+  if(dados.fichaAnamnese) await ClinicaStorage.save('ficha_anamnese_paciente_' + registro.pacienteId, dados.fichaAnamnese);
+  if(dados.estavaNoIndiceAnamnese){
+    const indice = await ClinicaStorage.load('ficha_anamnese_indice_v1') || [];
+    if(!indice.includes(registro.pacienteId)){ indice.push(registro.pacienteId); await ClinicaStorage.save('ficha_anamnese_indice_v1', indice); }
+  }
+  if(dados.fichaProntuario) await ClinicaStorage.save('ficha_prontuario_paciente_' + registro.pacienteId, dados.fichaProntuario);
+  if(dados.estavaNoIndiceProntuario){
+    const indice = await ClinicaStorage.load('ficha_prontuario_indice_v1') || [];
+    if(!indice.includes(registro.pacienteId)){ indice.push(registro.pacienteId); await ClinicaStorage.save('ficha_prontuario_indice_v1', indice); }
+  }
+  if((dados.lancamentosFinanceiro||[]).length){
+    const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { lancamentos:[], profissionais:[], rateiosFixos:[] };
+    if(!Array.isArray(dadosFin.lancamentos)) dadosFin.lancamentos = [];
+    dados.lancamentosFinanceiro.forEach(l => { if(!dadosFin.lancamentos.some(x=>x.id===l.id)) dadosFin.lancamentos.unshift(l); });
+    await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dadosFin);
+  }
+  if((dados.consultasAgendamento||[]).length){
+    const dadosAgenda = await ClinicaStorage.load('controle_agendamento_progresso_v1') || { consultas:[], profissionais:[], bloqueios:[] };
+    if(!Array.isArray(dadosAgenda.consultas)) dadosAgenda.consultas = [];
+    dados.consultasAgendamento.forEach(c => { if(!dadosAgenda.consultas.some(x=>x.id===c.id)) dadosAgenda.consultas.unshift(c); });
+    await ClinicaStorage.save('controle_agendamento_progresso_v1', dadosAgenda);
+  }
+
+  // Remove o registro da lixeira, já que foi restaurado.
+  const lixeiraAtualizada = lixeiraAtual.filter(r => r.id !== registroLixeiraId);
+  await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtualizada);
+}
+
+// Apaga um registro da lixeira PRA SEMPRE (sem possibilidade de restaurar depois) — usado
+// quando o gestor tem certeza de que não vai precisar mais daqueles dados.
+async function clinicaExcluirDefinitivamenteDaLixeira(registroLixeiraId){
+  const lixeiraAtual = await ClinicaStorage.load(LIXEIRA_KEY) || [];
+  await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtual.filter(r => r.id !== registroLixeiraId));
+}
+
 // Preenche um <input> de texto com sugestões de nomes já cadastrados (via <datalist>),
 // para os módulos que só precisam digitar/selecionar um nome (Agendamento, Financeiro).
 function clinicaPacientesDatalistId(){
