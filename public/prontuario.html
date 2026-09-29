@@ -2721,13 +2721,13 @@ async function generatePDF(){
   function fieldRow(fields){ fieldRowW(contentW, fields); }
   function drawTable(headers, rows, colWidths){
     ensureSpace(30);
-    const rowH = 16;
+    const rowH = 16, fontSize = 8.5, lineGap = fontSize+2;
     function drawHeader(){
       let cx = marginX;
       headers.forEach((h,i) => {
         doc.setFillColor(...BLUEHEAD); doc.setDrawColor(...LINECOL);
         doc.rect(cx, y, colWidths[i], rowH, 'FD');
-        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...BLUE);
+        doc.setFont('helvetica','bold'); doc.setFontSize(fontSize); doc.setTextColor(...BLUE);
         doc.text(h, cx+4, y+rowH-5);
         cx += colWidths[i];
       });
@@ -2735,19 +2735,26 @@ async function generatePDF(){
     }
     drawHeader();
     rows.forEach((row, ri) => {
-      if(y + rowH > pageH - 50){ newPage(); drawHeader(); }
+      // Calcula quantas linhas cada célula precisa (em vez de mostrar só a primeira e descartar
+      // o resto) e usa a maior — a linha da tabela fica mais alta quando precisa, mas nunca
+      // perde parte do texto digitado.
+      doc.setFont('helvetica','normal'); doc.setFontSize(fontSize);
+      const linhasPorCelula = row.map((val,ci) => doc.splitTextToSize(String(val||''), colWidths[ci]-6));
+      const maxLinhas = Math.max(1, ...linhasPorCelula.map(l=>l.length));
+      const alturaLinha = Math.max(rowH, maxLinhas*lineGap + (rowH-fontSize));
+      if(y + alturaLinha > pageH - 50){ newPage(); drawHeader(); }
       let cx = marginX;
       const rowFill = ri % 2 === 1 ? BLUELIGHT : [255,255,255];
       row.forEach((val, ci) => {
         doc.setFillColor(...rowFill); doc.setDrawColor(...LINECOL);
-        doc.rect(cx, y, colWidths[ci], rowH, 'FD');
-        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...INK);
-        const txt = String(val||'');
-        const clipped = doc.splitTextToSize(txt, colWidths[ci]-6)[0] || '';
-        doc.text(clipped, cx+4, y+rowH-5);
+        doc.rect(cx, y, colWidths[ci], alturaLinha, 'FD');
+        doc.setFont('helvetica','normal'); doc.setFontSize(fontSize); doc.setTextColor(...INK);
+        linhasPorCelula[ci].forEach((linha, li) => {
+          doc.text(linha, cx+4, y+fontSize+2+li*lineGap);
+        });
         cx += colWidths[ci];
       });
-      y += rowH;
+      y += alturaLinha;
     });
     y += 14;
   }

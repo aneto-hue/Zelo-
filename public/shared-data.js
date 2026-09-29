@@ -179,12 +179,27 @@ async function clinicaExcluirTudoDoPaciente(pacienteId, motivo){
   return registroLixeira.id;
 }
 
-// Desfaz uma exclusão: pega o retrato guardado na lixeira e devolve tudo pro lugar — cadastro,
-// ficha de anamnese, ficha de prontuário, lançamentos financeiros e consultas da agenda.
+// Desfaz uma exclusão: pega o retrato guardado na lixeira e devolve tudo pro lugar. Lida com
+// tipos diferentes de registro — hoje: 'paciente_completo' (cadastro + ficha + financeiro +
+// agenda) e 'lancamentos_duplicados' (lançamentos removidos por serem cópias repetidas).
 async function clinicaRestaurarDaLixeira(registroLixeiraId){
   const lixeiraAtual = await ClinicaStorage.load(LIXEIRA_KEY) || [];
   const registro = lixeiraAtual.find(r => r.id === registroLixeiraId);
   if(!registro) throw new Error('Registro não encontrado na lixeira (pode já ter sido restaurado).');
+
+  if(registro.tipo === 'lancamentos_duplicados'){
+    const lancamentosRemovidos = (registro.snapshot && registro.snapshot.lancamentosRemovidos) || [];
+    if(lancamentosRemovidos.length){
+      const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { lancamentos:[], profissionais:[], rateiosFixos:[] };
+      if(!Array.isArray(dadosFin.lancamentos)) dadosFin.lancamentos = [];
+      lancamentosRemovidos.forEach(l => { if(!dadosFin.lancamentos.some(x=>x.id===l.id)) dadosFin.lancamentos.unshift(l); });
+      await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dadosFin);
+    }
+    const lixeiraAtualizada = lixeiraAtual.filter(r => r.id !== registroLixeiraId);
+    await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtualizada);
+    return;
+  }
+
   const dados = registro.snapshot;
 
   if(dados.paciente){
@@ -225,6 +240,21 @@ async function clinicaRestaurarDaLixeira(registroLixeiraId){
 async function clinicaExcluirDefinitivamenteDaLixeira(registroLixeiraId){
   const lixeiraAtual = await ClinicaStorage.load(LIXEIRA_KEY) || [];
   await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtual.filter(r => r.id !== registroLixeiraId));
+}
+
+// Versão genérica da lixeira, pra outros tipos de exclusão além de "paciente completo" (por
+// exemplo, lançamentos duplicados removidos no Financeiro). O "snapshot" pode ser qualquer
+// coisa — quem for restaurar precisa saber como interpretar aquele tipo específico.
+async function clinicaAdicionarNaLixeiraGenerico(tipo, descricaoCurta, motivo, snapshot){
+  const registro = {
+    id: lixeiraUid(), tipo, pacienteNome: descricaoCurta,
+    quem: (window._clinicaMe && window._clinicaMe.nome) || 'Usuário',
+    quando: Date.now(), motivo, resumo: descricaoCurta, snapshot,
+  };
+  const lixeiraAtual = await ClinicaStorage.load(LIXEIRA_KEY) || [];
+  lixeiraAtual.unshift(registro);
+  await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtual);
+  return registro.id;
 }
 
 // Preenche um <input> de texto com sugestões de nomes já cadastrados (via <datalist>),

@@ -19,16 +19,23 @@ const ClinicaStorage = {
     }
   },
 
-  // "Fire and forget": não trava a tela esperando salvar.
+  // IMPORTANTE: apesar do comentário "fire and forget" original, esta função PRECISA devolver
+  // a Promise do fetch — muitos lugares do sistema fazem "await ClinicaStorage.save(...)"
+  // esperando que o salvamento realmente tenha terminado antes de continuar (por exemplo, antes
+  // de conferir se um lançamento persistiu no Financeiro). Sem o "return" aqui, esse await não
+  // esperava nada de verdade — resolvia na hora, antes da requisição sequer chegar no servidor —
+  // o que causava falsos "conflitos de salvamento simultâneo" mesmo com só uma pessoa usando o
+  // sistema. Quem não precisa esperar continua podendo chamar sem "await", normalmente.
   save(key, value){
-    fetch('/api/storage/' + encodeURIComponent(key), {
+    return fetch('/api/storage/' + encodeURIComponent(key), {
       method:'POST',
       credentials:'same-origin',
       headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify(value)
     }).then(resp => {
       if(resp.status === 401) ClinicaStorage._irParaLogin();
-    }).catch(()=>{ /* falha de rede pontual: próxima tentativa de salvar cobre isso */ });
+      return resp;
+    }).catch((e)=>{ console.error('Não foi possível salvar no servidor:', e); return null; });
   },
 
   _irParaLogin(){

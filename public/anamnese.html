@@ -2589,19 +2589,28 @@ function generateOrcamentoPDF(){
   }
   ensureSpace(rowH*2);
   drawHeaderTabela();
+  const lineGapOrc = 9.5 + 1.5;
   [...txRows, ...outrosRows].forEach((row, ri) => {
-    if(y + rowH > pageH - 90){ newPage(); drawHeaderTabela(); }
+    // Calcula quantas linhas cada célula precisa (em vez de mostrar só a primeira e descartar
+    // o resto) e usa a maior — a linha da tabela fica mais alta quando precisa, mas nunca perde
+    // parte do texto digitado.
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+    const linhasPorCelula = row.map((val,ci) => doc.splitTextToSize(String(val||''), colWidths[ci]-8));
+    const maxLinhas = Math.max(1, ...linhasPorCelula.map(l=>l.length));
+    const alturaLinha = Math.max(rowH, maxLinhas*lineGapOrc + 6);
+    if(y + alturaLinha > pageH - 90){ newPage(); drawHeaderTabela(); }
     let cx = marginX;
     const rowFill = ri % 2 === 1 ? BLUELIGHT : [255,255,255];
     row.forEach((val, ci) => {
       doc.setFillColor(...rowFill); doc.setDrawColor(...LINECOL);
-      doc.rect(cx, y, colWidths[ci], rowH, 'FD');
+      doc.rect(cx, y, colWidths[ci], alturaLinha, 'FD');
       doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...INK);
-      const clipped = doc.splitTextToSize(String(val||''), colWidths[ci]-8)[0] || '';
-      doc.text(clipped, cx+5, y+rowH-6);
+      linhasPorCelula[ci].forEach((linha, li) => {
+        doc.text(linha, cx+5, y+9.5+2+li*lineGapOrc);
+      });
       cx += colWidths[ci];
     });
-    y += rowH;
+    y += alturaLinha;
   });
 
   // ---------- Total ----------
@@ -2782,6 +2791,7 @@ async function gerarPdfEExecutar(){
   function drawTable(headers, rows, colWidths, rowH, fontSize){
     rowH = rowH || 16;
     fontSize = fontSize || 8.5;
+    const lineGap = fontSize + 2; // espaço entre linhas, quando uma célula precisa de mais de uma
     ensureSpace(30);
     function drawHeader(){
       let cx = marginX;
@@ -2797,20 +2807,26 @@ async function gerarPdfEExecutar(){
     }
     drawHeader();
     rows.forEach((row, ri) => {
-      if(y + rowH > pageH - 50){ newPage(); drawHeader(); }
+      // Calcula quantas linhas cada célula precisa (em vez de cortar pra uma linha só) e usa a
+      // maior — assim nenhuma célula perde parte do texto, a linha inteira só fica mais alta.
+      doc.setFont('helvetica','normal'); doc.setFontSize(fontSize);
+      const linhasPorCelula = row.map((val,ci) => doc.splitTextToSize(String(val||''), colWidths[ci]-6));
+      const maxLinhas = Math.max(1, ...linhasPorCelula.map(l=>l.length));
+      const alturaLinha = Math.max(rowH, maxLinhas*lineGap + (rowH-fontSize));
+      if(y + alturaLinha > pageH - 50){ newPage(); drawHeader(); }
       let cx = marginX;
       const rowFill = ri % 2 === 1 ? BLUELIGHT : [255,255,255];
       row.forEach((val, ci) => {
         doc.setFillColor(...rowFill);
         doc.setDrawColor(...LINECOL);
-        doc.rect(cx, y, colWidths[ci], rowH, 'FD');
+        doc.rect(cx, y, colWidths[ci], alturaLinha, 'FD');
         doc.setFont('helvetica','normal'); doc.setFontSize(fontSize); doc.setTextColor(...INK);
-        const txt = String(val||'');
-        const clipped = doc.splitTextToSize(txt, colWidths[ci]-6)[0] || '';
-        doc.text(clipped, cx+4, y+rowH-5);
+        linhasPorCelula[ci].forEach((linha, li) => {
+          doc.text(linha, cx+4, y+fontSize+2+li*lineGap);
+        });
         cx += colWidths[ci];
       });
-      y += rowH;
+      y += alturaLinha;
     });
     y += 14;
   }
