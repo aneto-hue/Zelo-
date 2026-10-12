@@ -227,39 +227,101 @@ async function clinicaRestaurarDaLixeira(registroLixeiraId){
     return;
   }
 
-  const dados = registro.snapshot;
+  // Paciente excluído por completo: restaura todas as partes que ainda estão pendentes
+  // (veja clinicaRestaurarPartesDaLixeira, que também permite restaurar só algumas, como o cadastro).
+  return clinicaRestaurarPartesDaLixeira(registroLixeiraId);
+}
 
-  if(dados.paciente){
-    _clinicaPacientesCache = _clinicaPacientesCache.filter(p => p.id !== dados.paciente.id);
-    _clinicaPacientesCache.push(dados.paciente);
-    await ClinicaStorage.save(CLINICA_PACIENTES_KEY, _clinicaPacientesCache);
-  }
-  if(dados.fichaAnamnese) await ClinicaStorage.save('ficha_anamnese_paciente_' + registro.pacienteId, dados.fichaAnamnese);
-  if(dados.estavaNoIndiceAnamnese){
-    const indice = await ClinicaStorage.load('ficha_anamnese_indice_v1') || [];
-    if(!indice.includes(registro.pacienteId)){ indice.push(registro.pacienteId); await ClinicaStorage.save('ficha_anamnese_indice_v1', indice); }
-  }
-  if(dados.fichaProntuario) await ClinicaStorage.save('ficha_prontuario_paciente_' + registro.pacienteId, dados.fichaProntuario);
-  if(dados.estavaNoIndiceProntuario){
-    const indice = await ClinicaStorage.load('ficha_prontuario_indice_v1') || [];
-    if(!indice.includes(registro.pacienteId)){ indice.push(registro.pacienteId); await ClinicaStorage.save('ficha_prontuario_indice_v1', indice); }
-  }
-  if((dados.lancamentosFinanceiro||[]).length){
-    const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { lancamentos:[], profissionais:[], rateiosFixos:[] };
-    if(!Array.isArray(dadosFin.lancamentos)) dadosFin.lancamentos = [];
-    dados.lancamentosFinanceiro.forEach(l => { if(!dadosFin.lancamentos.some(x=>x.id===l.id)) dadosFin.lancamentos.unshift(l); });
-    await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dadosFin);
-  }
-  if((dados.consultasAgendamento||[]).length){
-    const dadosAgenda = await ClinicaStorage.load('controle_agendamento_progresso_v1') || { consultas:[], profissionais:[], bloqueios:[] };
-    if(!Array.isArray(dadosAgenda.consultas)) dadosAgenda.consultas = [];
-    dados.consultasAgendamento.forEach(c => { if(!dadosAgenda.consultas.some(x=>x.id===c.id)) dadosAgenda.consultas.unshift(c); });
-    await ClinicaStorage.save('controle_agendamento_progresso_v1', dadosAgenda);
+// ---- Restaurar um paciente excluído por PARTES ----
+// O que foi guardado na Lixeira de um paciente: cadastro, ficha de anamnese, ficha de prontuário,
+// lançamentos do Financeiro e consultas da agenda. Dá pra restaurar tudo de uma vez ou só o
+// cadastro (e o resto depois). O registro vai marcando o que já voltou; só sai da Lixeira
+// quando não sobra mais nada pendente.
+function lixeiraPartesDoRegistro(registro){
+  const snap = registro.snapshot || {};
+  const feitas = registro.restaurado || {};
+  const nFin = (snap.lancamentosFinanceiro||[]).length;
+  const nAg = (snap.consultasAgendamento||[]).length;
+  const todas = [];
+  if(snap.paciente) todas.push({ id:'cadastro', rotulo:'cadastro do paciente' });
+  if(snap.fichaAnamnese) todas.push({ id:'anamnese', rotulo:'ficha de anamnese' });
+  if(snap.fichaProntuario) todas.push({ id:'prontuario', rotulo:'ficha de prontuário' });
+  if(nFin) todas.push({ id:'financeiro', rotulo: nFin+' lançamento(s) do Financeiro' });
+  if(nAg) todas.push({ id:'agenda', rotulo: nAg+' consulta(s) da agenda' });
+  return {
+    pendentes: todas.filter(p => !feitas[p.id]),
+    restauradas: todas.filter(p => feitas[p.id]),
+  };
+}
+
+// partesPedidas: lista de ids ('cadastro', 'anamnese', 'prontuario', 'financeiro', 'agenda') ou
+// nada, pra restaurar tudo que falta. Devolve { restauradas, puladas, avisos, removido }:
+//  - puladas: partes que NÃO foram restauradas por segurança (continuam na Lixeira)
+//  - avisos: observações que não são erro (ex: o cadastro já estava na lista)
+async function clinicaRestaurarPartesDaLixeira(registroLixeiraId, partesPedidas){
+  const lixeiraAtual = await ClinicaStorage.load(LIXEIRA_KEY) || [];
+  const registro = lixeiraAtual.find(r => r.id === registroLixeiraId);
+  if(!registro) throw new Error('Registro não encontrado na lixeira (pode já ter sido restaurado).');
+  if(registro.tipo !== 'paciente_completo') throw new Error('Esse tipo de registro não tem partes separadas.');
+  const snap = registro.snapshot || {};
+  const pacienteId = registro.pacienteId;
+  if(!registro.restaurado) registro.restaurado = {};
+
+  const alvo = lixeiraPartesDoRegistro(registro).pendentes.filter(p => !partesPedidas || partesPedidas.includes(p.id));
+  const restauradas = [], puladas = [], avisos = [];
+
+  async function restaurarFicha(parte, chave, dadosFicha, chaveIndice, estavaNoIndice){
+    // Nunca sobrescreve uma ficha que já exista hoje: pode ser uma ficha NOVA, criada depois da
+    // exclusão, e substituir faria a pessoa perder o que foi preenchido.
+    const atual = await ClinicaStorage.load(chave);
+    if(atual){
+      puladas.push({ id: parte.id, rotulo: parte.rotulo, motivo:'já existe uma ficha atual desse paciente e ela não foi substituída. Se quiser a antiga de volta, limpe a atual ("Iniciar nova ficha") e restaure de novo.' });
+      return;
+    }
+    await ClinicaStorage.save(chave, dadosFicha);
+    if(estavaNoIndice){
+      const indice = await ClinicaStorage.load(chaveIndice) || [];
+      if(!indice.includes(pacienteId)){ indice.push(pacienteId); await ClinicaStorage.save(chaveIndice, indice); }
+    }
+    registro.restaurado[parte.id] = true; restauradas.push(parte.rotulo);
   }
 
-  // Remove o registro da lixeira, já que foi restaurado.
-  const lixeiraAtualizada = lixeiraAtual.filter(r => r.id !== registroLixeiraId);
-  await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtualizada);
+  for(const parte of alvo){
+    if(parte.id === 'cadastro'){
+      await clinicaInitPacientes(); // lê a lista mais recente antes de mexer, pra não apagar mudanças de outra pessoa
+      if(clinicaFindPacienteById(snap.paciente.id)){
+        avisos.push('O cadastro de "'+snap.paciente.nome+'" já estava na lista de pacientes.');
+      } else {
+        _clinicaPacientesCache = _clinicaPacientesCache.concat([snap.paciente]);
+        await ClinicaStorage.save(CLINICA_PACIENTES_KEY, _clinicaPacientesCache);
+        restauradas.push(parte.rotulo);
+      }
+      registro.restaurado.cadastro = true;
+    } else if(parte.id === 'anamnese'){
+      await restaurarFicha(parte, 'ficha_anamnese_paciente_' + pacienteId, snap.fichaAnamnese, 'ficha_anamnese_indice_v1', snap.estavaNoIndiceAnamnese);
+    } else if(parte.id === 'prontuario'){
+      await restaurarFicha(parte, 'ficha_prontuario_paciente_' + pacienteId, snap.fichaProntuario, 'ficha_prontuario_indice_v1', snap.estavaNoIndiceProntuario);
+    } else if(parte.id === 'financeiro'){
+      const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { lancamentos:[], profissionais:[], rateiosFixos:[] };
+      if(!Array.isArray(dadosFin.lancamentos)) dadosFin.lancamentos = [];
+      snap.lancamentosFinanceiro.forEach(l => { if(!dadosFin.lancamentos.some(x=>x.id===l.id)) dadosFin.lancamentos.unshift(l); });
+      await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dadosFin);
+      registro.restaurado.financeiro = true; restauradas.push(parte.rotulo);
+    } else if(parte.id === 'agenda'){
+      const dadosAgenda = await ClinicaStorage.load('controle_agendamento_progresso_v1') || { consultas:[], profissionais:[], bloqueios:[] };
+      if(!Array.isArray(dadosAgenda.consultas)) dadosAgenda.consultas = [];
+      snap.consultasAgendamento.forEach(c => { if(!dadosAgenda.consultas.some(x=>x.id===c.id)) dadosAgenda.consultas.unshift(c); });
+      await ClinicaStorage.save('controle_agendamento_progresso_v1', dadosAgenda);
+      registro.restaurado.agenda = true; restauradas.push(parte.rotulo);
+    }
+  }
+
+  // O registro só sai da Lixeira quando não sobra nenhuma parte pendente; senão continua lá,
+  // marcando o que já voltou.
+  const removido = lixeiraPartesDoRegistro(registro).pendentes.length === 0;
+  const lixeiraNova = removido ? lixeiraAtual.filter(r => r.id !== registroLixeiraId) : lixeiraAtual;
+  await ClinicaStorage.save(LIXEIRA_KEY, lixeiraNova);
+  return { restauradas, puladas, avisos, removido };
 }
 
 // Apaga um registro da lixeira PRA SEMPRE (sem possibilidade de restaurar depois) — usado

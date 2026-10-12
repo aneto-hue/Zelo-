@@ -27,8 +27,10 @@
   .lixo-resumo{font-size:12.5px; color:var(--ink); margin-top:8px; background:var(--blue-light); border-radius:8px; padding:8px 10px;}
   .lixo-motivo{font-size:12.5px; color:var(--ink); margin-top:8px; padding:8px 10px; background:#FFF6E5; border-radius:8px;}
   .lixo-motivo b{color:var(--amber);}
-  .lixo-actions{display:flex; gap:8px; margin-top:12px;}
-  .btn-restaurar{flex:1; padding:9px; border:none; border-radius:8px; background:var(--green); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; text-align:center;}
+  .lixo-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+  .btn-restaurar{flex:1; min-width:150px; padding:9px; border:1.5px solid var(--green); border-radius:8px; background:var(--green); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; text-align:center;}
+  .btn-restaurar.secundario{background:#fff; color:var(--green);}
+  .lixo-feito{font-size:12.5px; color:#1B7F45; margin-top:8px; background:#E8F7EE; border-radius:8px; padding:8px 10px;}
   .btn-apagar-def{padding:9px 14px; border:1.5px solid var(--red); border-radius:8px; background:#fff; color:var(--red); font-weight:700; font-size:12.5px; cursor:pointer; text-align:center;}
   .confirma-row{display:flex; gap:8px; margin-top:10px; align-items:center;}
   .aviso-topo{background:#FFF6E5; border:1.5px solid var(--amber); border-radius:10px; padding:12px 14px; margin-bottom:18px; font-size:12.5px; color:#8A5A0F;}
@@ -66,6 +68,35 @@ function toast(msg){
 
 let confirmandoApagarDefId = null;
 
+// Restaura um paciente excluído: tudo que falta (partes = null) ou só as partes indicadas.
+async function restaurarPartes(item, partes){
+  const pendentes = lixeiraPartesDoRegistro(item).pendentes;
+  const vaiRestaurarCadastro = pendentes.some(x => x.id === 'cadastro') && (!partes || partes.includes('cadastro'));
+  if(vaiRestaurarCadastro){
+    // Se alguém já cadastrou outro paciente com o mesmo nome depois da exclusão, avisa antes de
+    // criar um segundo cadastro igual.
+    const outro = clinicaFindPacienteByNome(item.pacienteNome);
+    if(outro && outro.id !== item.pacienteId){
+      if(!confirm('Já existe um paciente chamado "'+outro.nome+'" no cadastro (um cadastro diferente do que foi excluído). Restaurar mesmo assim vai deixar dois pacientes com o mesmo nome. Continuar?')) return;
+    }
+  }
+  try{
+    const r = await clinicaRestaurarPartesDaLixeira(item.id, partes);
+    if(r.puladas.length || r.avisos.length){
+      let msg = r.restauradas.length ? ('Restaurado: ' + r.restauradas.join(', ') + '.') : 'Nada foi restaurado.';
+      r.avisos.forEach(a => { msg += '\n\n' + a; });
+      if(r.puladas.length){
+        msg += '\n\nNão restaurei (continua guardado aqui):';
+        r.puladas.forEach(x => { msg += '\n• ' + x.rotulo + ' — ' + x.motivo; });
+      }
+      alert(msg);
+    } else {
+      toast(r.removido ? 'Restaurado com sucesso!' : 'Restaurado: ' + r.restauradas.join(', ') + '.');
+    }
+    render();
+  }catch(err){ alert(err.message || 'Não foi possível restaurar.'); }
+}
+
 async function render(){
   const main = document.getElementById('main');
   main.innerHTML = '';
@@ -78,7 +109,7 @@ async function render(){
   const lixeira = await ClinicaStorage.load('lixeira_clinica_v1') || [];
 
   main.appendChild(el('div', { class:'aviso-topo' }, document.createTextNode(
-    'Aqui ficam guardados, com o motivo, os pacientes excluídos com a opção "excluir tudo" (cadastro, fichas, financeiro e agenda), os contratos que foram tirados da contabilidade e voltaram a ser só orçamento, e os lançamentos duplicados removidos do Financeiro — em vez de serem apagados de vez. Você pode restaurar a qualquer momento.'
+    'Aqui ficam guardados, com o motivo, os pacientes excluídos com a opção "excluir tudo" (cadastro, fichas, financeiro e agenda), os contratos que foram tirados da contabilidade e voltaram a ser só orçamento, e os lançamentos duplicados removidos do Financeiro — em vez de serem apagados de vez. Você pode restaurar a qualquer momento. Num paciente excluído, dá pra restaurar tudo de uma vez ou só o cadastro (o resto continua guardado aqui, pra restaurar depois).'
   )));
 
   if(!lixeira.length){
@@ -91,24 +122,47 @@ async function render(){
     card.appendChild(el('div', { class:'lixo-titulo' }, document.createTextNode(item.pacienteNome || '(sem nome)')));
     const dataFormatada = new Date(item.quando).toLocaleString('pt-BR');
     card.appendChild(el('div', { class:'lixo-meta' }, document.createTextNode('Excluído por '+(item.quem||'—')+' em '+dataFormatada)));
-    card.appendChild(el('div', { class:'lixo-resumo' }, document.createTextNode((item.tipo === 'paciente_completo' ? 'O que foi excluído: ' : 'O que aconteceu: ')+(item.resumo||'—'))));
+    // Num paciente excluído, mostra o que já voltou e o que ainda está guardado aqui
+    const partes = item.tipo === 'paciente_completo' ? lixeiraPartesDoRegistro(item) : null;
+    const jaRestauroAlgo = !!(partes && partes.restauradas.length);
+    if(jaRestauroAlgo){
+      card.appendChild(el('div', { class:'lixo-feito' }, document.createTextNode('✓ Já restaurado: ' + partes.restauradas.map(x=>x.rotulo).join(', '))));
+      card.appendChild(el('div', { class:'lixo-resumo' }, document.createTextNode('Ainda guardado aqui: ' + partes.pendentes.map(x=>x.rotulo).join(', '))));
+    } else {
+      card.appendChild(el('div', { class:'lixo-resumo' }, document.createTextNode((item.tipo === 'paciente_completo' ? 'O que foi excluído: ' : 'O que aconteceu: ')+(item.resumo||'—'))));
+    }
     card.appendChild(el('div', { class:'lixo-motivo' }, [
       el('b', {}, document.createTextNode('Motivo: ')),
       document.createTextNode(item.motivo||'—'),
     ]));
 
     const actions = el('div', { class:'lixo-actions' });
-    const rotuloRestaurar = item.tipo === 'contrato_para_orcamento' ? '↩ Restaurar contrato'
-      : item.tipo === 'lancamentos_duplicados' ? '↩ Restaurar lançamentos' : '↩ Restaurar tudo';
-    const restaurarBtn = el('div', { class:'btn-restaurar' }, document.createTextNode(rotuloRestaurar));
-    restaurarBtn.onclick = async () => {
-      try{
-        await clinicaRestaurarDaLixeira(item.id);
-        toast('Restaurado com sucesso!');
-        render();
-      }catch(err){ alert(err.message || 'Não foi possível restaurar.'); }
-    };
-    actions.appendChild(restaurarBtn);
+    if(item.tipo === 'paciente_completo'){
+      const pendentes = partes.pendentes;
+      const restaurarBtn = el('div', { class:'btn-restaurar' }, document.createTextNode(jaRestauroAlgo ? '↩ Restaurar o que falta' : '↩ Restaurar tudo'));
+      restaurarBtn.onclick = () => restaurarPartes(item, null);
+      actions.appendChild(restaurarBtn);
+      // "Só o cadastro" só faz sentido quando ainda há outras partes além do cadastro; se o cadastro
+      // for a única coisa guardada, o botão principal já faz exatamente isso.
+      if(pendentes.some(x => x.id === 'cadastro') && pendentes.length > 1){
+        const soCadastroBtn = el('div', { class:'btn-restaurar secundario', title:'Devolve só o cadastro do paciente. Ficha, prontuário, financeiro e agenda continuam guardados aqui.' },
+          document.createTextNode('↩ Restaurar só o cadastro'));
+        soCadastroBtn.onclick = () => restaurarPartes(item, ['cadastro']);
+        actions.appendChild(soCadastroBtn);
+      }
+    } else {
+      const rotuloRestaurar = item.tipo === 'contrato_para_orcamento' ? '↩ Restaurar contrato'
+        : item.tipo === 'lancamentos_duplicados' ? '↩ Restaurar lançamentos' : '↩ Restaurar tudo';
+      const restaurarBtn = el('div', { class:'btn-restaurar' }, document.createTextNode(rotuloRestaurar));
+      restaurarBtn.onclick = async () => {
+        try{
+          await clinicaRestaurarDaLixeira(item.id);
+          toast('Restaurado com sucesso!');
+          render();
+        }catch(err){ alert(err.message || 'Não foi possível restaurar.'); }
+      };
+      actions.appendChild(restaurarBtn);
+    }
 
     if(confirmandoApagarDefId === item.id){
       const simBtn = el('div', { class:'btn-apagar-def', style:'background:var(--red);color:#fff;' }, document.createTextNode('Confirmar (não dá pra desfazer)'));
