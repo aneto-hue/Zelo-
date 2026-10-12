@@ -113,6 +113,20 @@
   .fin-col-4{ left:345px; min-width:135px; }
   .fin-col-5{ left:480px; min-width:110px; box-shadow:2px 0 4px rgba(0,0,0,0.04); }
   thead .fin-col-fixa{ background:var(--bg,#F4F8FB); z-index:2; }
+  /* Cabeçalhos dos meses: o mês atual em destaque e os meses que já passaram mais discretos */
+  .fin-table thead th.fin-mes-atual{ background:var(--blue-head,#CCE7FB); color:var(--blue-dark,#0B5FD9); box-shadow:inset 0 -3px 0 var(--blue-dark,#0B5FD9); }
+  .fin-table thead th.fin-mes-passado{ color:var(--muted); font-weight:600; opacity:.85; }
+  /* A planilha precisa deixar as colunas da esquerda "grudarem" ao rolar pro lado. Isso NÃO funciona
+     com overflow:hidden na própria tabela (ela vira o "recipiente de rolagem" e a rolagem real, do
+     invólucro, é ignorada) nem com bordas colapsadas (as bordas das células fixas ficam pra trás).
+     O recorte dos cantos arredondados passa pro invólucro. */
+  #planilhaScrollWrap{ border-radius:10px; scrollbar-width:auto; scrollbar-color:var(--blue-med,#2196F3) #E3EDF7; }
+  #planilhaScrollWrap .fin-table{ overflow:visible; border-collapse:separate; border-spacing:0; }
+  #planilhaScrollWrap::-webkit-scrollbar{ height:14px; }
+  #planilhaScrollWrap::-webkit-scrollbar-track{ background:#E3EDF7; border-radius:8px; }
+  #planilhaScrollWrap::-webkit-scrollbar-thumb{ background:var(--blue-med,#2196F3); border-radius:8px; }
+  .fin-bt-meses{ flex:0 0 auto; padding:6px 10px; border:1.5px solid var(--line); border-radius:8px; background:#fff; color:var(--blue-dark); font-size:12px; font-weight:700; cursor:pointer; user-select:none; white-space:nowrap; }
+  .fin-bt-meses:hover{ background:var(--blue-light,#E8F4FF); }
   .parcela-row{
     display:flex; align-items:flex-start; gap:8px; padding:10px; border:1.5px solid var(--line-light); border-radius:8px;
     margin-bottom:8px; background:#fff; flex-wrap:wrap;
@@ -958,17 +972,24 @@ function renderPlanilhaLancamentos(container){
   }
   // ===================== FIM DOS FILTROS =====================
 
-  // Descobre o intervalo de meses a mostrar como coluna: do mês mais antigo com parcela até o
-  // mais recente. Começa sempre no mês atual (sem mostrar meses que já passaram) e vai pelo
-  // menos 12 meses pra frente, com espaço de rolar caso alguma parcela seja mais longe que isso.
+  // Descobre o intervalo de meses a mostrar como coluna: vai do mês da parcela mais ANTIGA até a
+  // mais distante no futuro (no mínimo 12 meses pra frente). Assim dá pra rolar pra trás e ver
+  // parcelas que já terminaram (por exemplo, as que acabaram no mês passado) e pra frente pra ver
+  // as dos meses seguintes. Por segurança, uma data muito antiga (ex: erro de digitação no ano)
+  // não cria dezenas de colunas vazias: o limite pra trás é de 36 meses, e se houver parcela
+  // mais antiga que isso um aviso é mostrado (elas continuam contando nos totais).
   const hoje = new Date();
-  let minData = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const mesAtualD = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const limitePassadoD = new Date(hoje.getFullYear(), hoje.getMonth()-36, 1);
+  let minData = new Date(mesAtualD);
   let maxData = new Date(hoje.getFullYear(), hoje.getMonth()+12, 1);
+  let parcelasAntesDoLimite = 0;
   todasLinhas.forEach(l => (l.parcelas||[]).forEach(p => {
     const am = extrairAnoMes(p.data);
     if(!am) return;
     const d = new Date(am.ano, am.mes-1, 1);
     if(d > maxData) maxData = d;
+    if(d < minData){ if(d < limitePassadoD) parcelasAntesDoLimite++; else minData = d; }
   }));
   const mesesColunas = [];
   let cursor = new Date(minData);
@@ -987,7 +1008,16 @@ function renderPlanilhaLancamentos(container){
     el('th', { class:'fin-col-fixa fin-col-4' }, document.createTextNode('Profissional')),
     el('th', { class:'fin-col-fixa fin-col-5' }, document.createTextNode('Parcelas')),
   ];
-  mesesColunas.forEach(c => theadCells.push(el('th', { style:'text-align:center;min-width:86px;' }, document.createTextNode(MESES_ABREV[c.mes-1]+'/'+String(c.ano).slice(2)))));
+  const thMeses = [];
+  mesesColunas.forEach(c => {
+    const ehAtual = c.ano===hoje.getFullYear() && c.mes===hoje.getMonth()+1;
+    const ehPassado = new Date(c.ano, c.mes-1, 1) < mesAtualD;
+    const th = el('th', { class: ehAtual ? 'fin-mes-atual' : (ehPassado ? 'fin-mes-passado' : ''), style:'text-align:center;min-width:86px;',
+      title: ehAtual ? 'Mês atual' : (ehPassado ? 'Mês anterior' : '') },
+      document.createTextNode(MESES_ABREV[c.mes-1]+'/'+String(c.ano).slice(2)));
+    thMeses.push(th);
+    theadCells.push(th);
+  });
   table.appendChild(el('thead', {}, el('tr', {}, theadCells)));
 
   const tbody = el('tbody', {});
@@ -1167,18 +1197,182 @@ function renderPlanilhaLancamentos(container){
 
   table.appendChild(tbody);
   tableWrap.appendChild(table);
+
+  // Barra de rolagem lateral no TOPO da planilha (a nativa fica lá no fim da tabela, longe de
+  // quem está nas primeiras linhas) + botões pra pular entre os meses.
+  const barraRolagem = montarBarraRolagemPlanilha(tableWrap, thMeses, idxMesAtual);
+  container.appendChild(barraRolagem.barra);
+  if(parcelasAntesDoLimite > 0){
+    const rotuloLimite = MESES_ABREV[limitePassadoD.getMonth()]+'/'+String(limitePassadoD.getFullYear()).slice(2);
+    container.appendChild(el('div', { style:'font-size:11.5px;color:#8A5A0F;background:#FFF6E5;border-radius:8px;padding:7px 10px;margin-bottom:8px;' },
+      document.createTextNode('⚠ '+parcelasAntesDoLimite+' parcela(s) com vencimento antes de '+rotuloLimite+' não aparecem nas colunas (continuam contando nos totais). Se a data estiver errada, corrija na própria parcela.')));
+  }
   container.appendChild(tableWrap);
+  barraRolagem.iniciar(); // mede, posiciona a rolagem e liga a sincronia entre as duas barras
 
   container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:10px;' },
-    document.createTextNode('Verde: recebido. Vermelho: não recebido. Roxo: ainda sem definição de parcelas (mostra o valor cheio do tratamento). Toque em qualquer célula pra editar. Arraste a tabela pros lados pra ver outros meses.')));
+    document.createTextNode('Verde: recebido. Vermelho: não recebido. Roxo: ainda sem definição de parcelas (mostra o valor cheio do tratamento). Toque em qualquer célula pra editar. Use a barra de rolagem acima da tabela (ou os botões ◀ ▶) pra ver os meses anteriores e os seguintes.')));
+}
 
-  // Já abre a planilha rolada até o mês atual, em vez de começar lá em janeiro.
-  if(idxMesAtual > 0){
-    setTimeout(() => {
-      const larguraColunaMes = 86;
-      tableWrap.scrollLeft = Math.max(0, (idxMesAtual - 1) * larguraColunaMes);
-    }, 30);
+// Rolagem lateral da planilha, guardada pra não voltar sozinha pro mês atual a cada clique
+// (a tela inteira é refeita a cada edição).
+let planilhaScrollLeft = null;
+
+// Distância do topo da tela em que a barra de rolagem da planilha deve "grudar", pra ficar logo
+// abaixo do cabeçalho e da barra de abas fixos, sem ficar escondida atrás deles.
+function calcularTopoStickyPlanilha(){
+  const tb = document.querySelector('header.topbar');
+  const nav = document.getElementById('stepsNav');
+  let topo = 0;
+  if(tb && getComputedStyle(tb).position === 'sticky') topo = tb.offsetHeight;
+  if(nav && getComputedStyle(nav).position === 'sticky' && getComputedStyle(nav).display !== 'none'){
+    topo = Math.max(topo, (parseFloat(getComputedStyle(nav).top)||0) + nav.offsetHeight);
   }
+  return topo;
+}
+
+// Monta a barra de rolagem lateral (desenhada aqui mesmo, pra aparecer sempre — as barras nativas
+// de alguns aparelhos ficam escondidas até a pessoa rolar) e os botões de navegação entre meses.
+// Devolve { barra, iniciar } — "iniciar" só pode ser chamada depois que a barra e a tabela já
+// estão na página, porque precisa medir as larguras de verdade.
+function montarBarraRolagemPlanilha(tableWrap, thMeses, idxMesAtual){
+  const table = tableWrap.querySelector('table');
+  const barra = el('div', { id:'planilhaBarraRolagem',
+    style:'position:sticky;top:'+calcularTopoStickyPlanilha()+'px;z-index:15;background:var(--bg,#F4F8FB);padding:6px 0;margin-bottom:6px;display:flex;gap:8px;align-items:center;' });
+  const largMes = () => (thMeses[0] && thMeses[0].offsetWidth) || 86;
+  const posicaoDoMes = (idx) => thMeses[idx] && thMeses[0] ? Math.max(0, thMeses[idx].offsetLeft - thMeses[0].offsetLeft) : 0;
+  // Abre sempre mostrando o MÊS ANTERIOR ao lado do mês atual, pra já enxergar o que acabou de terminar.
+  const posicaoInicial = () => posicaoDoMes(Math.max(0, idxMesAtual - 1));
+  const maxScroll = () => Math.max(0, tableWrap.scrollWidth - tableWrap.clientWidth);
+
+  function botao(texto, titulo, acao){
+    const b = el('div', { class:'fin-bt-meses', title:titulo }, document.createTextNode(texto));
+    b.onclick = acao;
+    return b;
+  }
+  const btnAnt = botao('◀ Anteriores', 'Ver meses anteriores', () => tableWrap.scrollBy({ left: -3*largMes(), behavior:'smooth' }));
+  const btnHoje = botao('📍 Mês atual', 'Voltar pro mês atual', () => tableWrap.scrollTo({ left: posicaoInicial(), behavior:'smooth' }));
+  const btnProx = botao('Seguintes ▶', 'Ver meses seguintes', () => tableWrap.scrollBy({ left: 3*largMes(), behavior:'smooth' }));
+
+  // Trilho + "puxador": arrastar o puxador, ou tocar no trilho, rola a planilha pros lados.
+  const trilho = el('div', { id:'planilhaScrollTopo', role:'scrollbar', tabindex:'0',
+    'aria-orientation':'horizontal', 'aria-label':'Rolagem lateral dos meses',
+    style:'flex:1;min-width:60px;position:relative;height:18px;background:#E3EDF7;border-radius:9px;cursor:pointer;touch-action:none;user-select:none;' });
+  const puxador = el('div', { id:'planilhaScrollPuxador',
+    style:'position:absolute;top:2px;bottom:2px;left:0;width:60px;background:var(--blue-med,#2196F3);border-radius:8px;cursor:grab;touch-action:none;' });
+  trilho.appendChild(puxador);
+  [btnAnt, btnHoje, btnProx, trilho].forEach(x => barra.appendChild(x));
+
+  function atualizarPuxador(){
+    const max = maxScroll();
+    const larguraTrilho = trilho.clientWidth;
+    const larguraPuxador = Math.min(larguraTrilho, Math.max(48, Math.round(larguraTrilho * tableWrap.clientWidth / Math.max(1, tableWrap.scrollWidth))));
+    const livre = Math.max(0, larguraTrilho - larguraPuxador);
+    puxador.style.width = larguraPuxador + 'px';
+    puxador.style.left = (max > 0 ? Math.round(livre * tableWrap.scrollLeft / max) : 0) + 'px';
+    trilho.setAttribute('aria-valuemin', '0');
+    trilho.setAttribute('aria-valuemax', String(Math.round(max)));
+    trilho.setAttribute('aria-valuenow', String(Math.round(tableWrap.scrollLeft)));
+    btnAnt.style.opacity = tableWrap.scrollLeft <= 1 ? '.4' : '1';
+    btnProx.style.opacity = tableWrap.scrollLeft >= max - 1 ? '.4' : '1';
+  }
+
+  // Arrastar o puxador
+  let arrasto = null;
+  puxador.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    try { puxador.setPointerCapture(e.pointerId); } catch(_) {}
+    arrasto = { x0: e.clientX, s0: tableWrap.scrollLeft };
+    puxador.style.cursor = 'grabbing';
+  });
+  puxador.addEventListener('pointermove', (e) => {
+    if(!arrasto) return;
+    const livre = trilho.clientWidth - puxador.offsetWidth;
+    if(livre <= 0) return;
+    tableWrap.scrollLeft = arrasto.s0 + (e.clientX - arrasto.x0) * maxScroll() / livre;
+  });
+  const soltar = (e) => { arrasto = null; puxador.style.cursor = 'grab'; try { puxador.releasePointerCapture(e.pointerId); } catch(_) {} };
+  puxador.addEventListener('pointerup', soltar);
+  puxador.addEventListener('pointercancel', soltar);
+  // Tocar/clicar no trilho (fora do puxador) leva a planilha pra aquela posição
+  trilho.addEventListener('pointerdown', (e) => {
+    if(e.target === puxador) return;
+    const r = trilho.getBoundingClientRect();
+    const livre = trilho.clientWidth - puxador.offsetWidth;
+    const fracao = livre > 0 ? Math.min(1, Math.max(0, (e.clientX - r.left - puxador.offsetWidth/2) / livre)) : 0;
+    tableWrap.scrollTo({ left: fracao * maxScroll(), behavior:'smooth' });
+  });
+  // Pelo teclado: setas movem um mês, Home/End vão pro começo/fim
+  trilho.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowLeft'){ tableWrap.scrollBy({ left: -largMes() }); e.preventDefault(); }
+    else if(e.key === 'ArrowRight'){ tableWrap.scrollBy({ left: largMes() }); e.preventDefault(); }
+    else if(e.key === 'Home'){ tableWrap.scrollTo({ left: 0 }); e.preventDefault(); }
+    else if(e.key === 'End'){ tableWrap.scrollTo({ left: maxScroll() }); e.preventDefault(); }
+  });
+
+  // Deixa as colunas da esquerda (nome, valor, forma, profissional, parcelas) "grudadas" ao rolar
+  // pro lado. As posições são MEDIDAS (as larguras mudam conforme os dados e o tamanho da tela),
+  // e só gruda quantas colunas couberem em ~55% da largura visível — em tela pequena (celular)
+  // grudar todas deixaria quase nenhum espaço pros meses.
+  function fixarColunasEsquerda(){
+    const ths = Array.from(table.querySelectorAll('thead th.fin-col-fixa'));
+    if(ths.length !== 5) return;
+    const limite = tableWrap.clientWidth * 0.55;
+    let acumulado = 0, cabe = true;
+    const info = ths.map(th => {
+      const left = acumulado;
+      acumulado += th.offsetWidth;
+      if(acumulado > limite) cabe = false;
+      return { left, fixa: cabe };
+    });
+    const qtdFixas = info.filter(x => x.fixa).length;
+    for(let n = 1; n <= 5; n++){
+      const c = info[n-1];
+      table.querySelectorAll('.fin-col-'+n).forEach(cel => {
+        if(c.fixa){
+          cel.style.position = 'sticky';
+          cel.style.left = c.left + 'px';
+          cel.style.boxShadow = (n === qtdFixas) ? '2px 0 4px rgba(0,0,0,0.10)' : 'none';
+        } else {
+          cel.style.position = 'static';
+          cel.style.left = '';
+          cel.style.boxShadow = 'none';
+        }
+      });
+    }
+  }
+
+  function ajustarLayout(){
+    const precisaRolar = tableWrap.scrollWidth > tableWrap.clientWidth + 1;
+    barra.style.display = precisaRolar ? 'flex' : 'none';
+    fixarColunasEsquerda();
+    if(precisaRolar) atualizarPuxador();
+  }
+
+  function iniciar(){
+    ajustarLayout();
+    const alvo = planilhaScrollLeft !== null ? planilhaScrollLeft : posicaoInicial();
+    tableWrap.scrollLeft = alvo;
+    atualizarPuxador();
+    // Os "ouvintes" só entram DEPOIS da posição inicial, senão o primeiro evento de rolagem
+    // (o do próprio posicionamento) sobrescreveria a posição guardada com zero.
+    tableWrap.addEventListener('scroll', () => {
+      planilhaScrollLeft = tableWrap.scrollLeft;
+      atualizarPuxador();
+    });
+    // Se o navegador ainda não tinha terminado de medir tudo, confere de novo logo em seguida.
+    setTimeout(() => {
+      ajustarLayout();
+      if(Math.abs(tableWrap.scrollLeft - alvo) > 2 && planilhaScrollLeft === null) tableWrap.scrollLeft = alvo;
+      atualizarPuxador();
+    }, 30);
+    window._planilhaAjustarLayout = ajustarLayout;
+    if(!window._planilhaResizeLigado){
+      window._planilhaResizeLigado = true;
+      window.addEventListener('resize', () => { if(window._planilhaAjustarLayout) window._planilhaAjustarLayout(); });
+    }
+  }
+  return { barra, iniciar };
 }
 
 // Cria uma <tr> que ocupa a largura toda da tabela, pra mostrar um painel de edição
@@ -1186,7 +1380,12 @@ function renderPlanilhaLancamentos(container){
 function linhaPainel(totalColunas, conteudo){
   const tr = el('tr', {});
   const td = el('td', { colspan: String(totalColunas), style:'background:#FAFBFC;padding:12px;' });
-  td.appendChild(conteudo);
+  // O conteúdo fica "grudado" na parte VISÍVEL da planilha: com a tabela rolada pra um mês lá na
+  // frente, o painel de edição abre onde você está olhando, em vez de ficar lá no começo da linha,
+  // fora da tela.
+  const caixa = el('div', { style:'position:sticky;left:12px;box-sizing:border-box;width:min(calc(100vw - 80px),1500px);white-space:normal;' });
+  caixa.appendChild(conteudo);
+  td.appendChild(caixa);
   tr.appendChild(td);
   return tr;
 }
