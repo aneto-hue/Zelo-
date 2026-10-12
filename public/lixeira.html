@@ -78,7 +78,7 @@ async function render(){
   const lixeira = await ClinicaStorage.load('lixeira_clinica_v1') || [];
 
   main.appendChild(el('div', { class:'aviso-topo' }, document.createTextNode(
-    'Quando um paciente é excluído com a opção "excluir tudo" (na tela de Pacientes), o cadastro, a ficha de anamnese, a ficha de prontuário, os lançamentos financeiros e as consultas da agenda ficam guardados aqui — com o motivo — em vez de serem apagados de vez. Você pode restaurar tudo a qualquer momento.'
+    'Aqui ficam guardados, com o motivo, os pacientes excluídos com a opção "excluir tudo" (cadastro, fichas, financeiro e agenda), os contratos que foram tirados da contabilidade e voltaram a ser só orçamento, e os lançamentos duplicados removidos do Financeiro — em vez de serem apagados de vez. Você pode restaurar a qualquer momento.'
   )));
 
   if(!lixeira.length){
@@ -91,14 +91,16 @@ async function render(){
     card.appendChild(el('div', { class:'lixo-titulo' }, document.createTextNode(item.pacienteNome || '(sem nome)')));
     const dataFormatada = new Date(item.quando).toLocaleString('pt-BR');
     card.appendChild(el('div', { class:'lixo-meta' }, document.createTextNode('Excluído por '+(item.quem||'—')+' em '+dataFormatada)));
-    card.appendChild(el('div', { class:'lixo-resumo' }, document.createTextNode('O que foi excluído: '+(item.resumo||'—'))));
+    card.appendChild(el('div', { class:'lixo-resumo' }, document.createTextNode((item.tipo === 'paciente_completo' ? 'O que foi excluído: ' : 'O que aconteceu: ')+(item.resumo||'—'))));
     card.appendChild(el('div', { class:'lixo-motivo' }, [
       el('b', {}, document.createTextNode('Motivo: ')),
       document.createTextNode(item.motivo||'—'),
     ]));
 
     const actions = el('div', { class:'lixo-actions' });
-    const restaurarBtn = el('div', { class:'btn-restaurar' }, document.createTextNode('↩ Restaurar tudo'));
+    const rotuloRestaurar = item.tipo === 'contrato_para_orcamento' ? '↩ Restaurar contrato'
+      : item.tipo === 'lancamentos_duplicados' ? '↩ Restaurar lançamentos' : '↩ Restaurar tudo';
+    const restaurarBtn = el('div', { class:'btn-restaurar' }, document.createTextNode(rotuloRestaurar));
     restaurarBtn.onclick = async () => {
       try{
         await clinicaRestaurarDaLixeira(item.id);

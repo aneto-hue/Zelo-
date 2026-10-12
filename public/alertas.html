@@ -204,6 +204,11 @@ async function montarAlertas(){
   fichasPorPaciente.forEach(({ paciente: p, ficha }) => {
     if(!ficha) return;
 
+    // A ficha de anamnese guarda a data do contrato dentro de "contract" (ficha.contract.dataContrato),
+    // não solta no topo — ler o campo errado fazia os alertas de "retorno por procedimento" e a
+    // "última visita" nunca enxergarem a data de verdade.
+    const dataContratoFicha = (ficha.contract && ficha.contract.dataContrato) || ficha.dataContrato || '';
+
     // 4) Orçamentos não fechados: um orçamento é considerado "fechado" se existe um lançamento
     // no Financeiro pra esse paciente com data de contrato igual ou posterior à data do orçamento.
     (ficha.historicoOrcamentos||[]).forEach(orc => {
@@ -221,7 +226,7 @@ async function montarAlertas(){
     });
 
     // 5) Retorno recomendado por procedimento (ex: quem fez Canal, reavaliar em 6 meses)
-    if(ficha.dataContrato && procComRetorno.length){
+    if(dataContratoFicha && procComRetorno.length){
       const nomesToProcedimentos = [];
       Object.values(ficha.toothData||{}).forEach(d => {
         (d.tratamentos||[]).forEach(t => { if(t.tratamento) nomesToProcedimentos.push(t.tratamento); });
@@ -231,15 +236,15 @@ async function montarAlertas(){
       procComRetorno.forEach(proc => {
         const bateu = nomesToProcedimentos.some(n => n.toLowerCase().includes((proc.nome||'').toLowerCase()));
         if(!bateu) return;
-        const diasDesde = diasEntre(ficha.dataContrato, hoje);
+        const diasDesde = diasEntre(dataContratoFicha, hoje);
         const mesesDesde = diasDesde/30.44;
         const limiteMeses = parseFloat(proc.mesesRetorno);
         if(mesesDesde < limiteMeses) return;
-        const chave = 'retorno_proc_' + p.id + '_' + proc.id + '_' + ficha.dataContrato;
+        const chave = 'retorno_proc_' + p.id + '_' + proc.id + '_' + dataContratoFicha;
         alertas.retornoProcedimento.push({
           chave, pacienteId: p.id,
           titulo: p.nome + ' — reavaliação de ' + proc.nome,
-          sub: proc.nome + ' feito em ' + formatDateBRISO(ficha.dataContrato) + ', recomendado retorno em ' + proc.mesesRetorno + ' meses (' + Math.floor(mesesDesde) + ' meses atrás)',
+          sub: proc.nome + ' feito em ' + formatDateBRISO(dataContratoFicha) + ', recomendado retorno em ' + proc.mesesRetorno + ' meses (' + Math.floor(mesesDesde) + ' meses atrás)',
           vencido: true
         });
       });
@@ -268,12 +273,12 @@ async function montarAlertas(){
     // (o tratamento mais recente registrado na ficha, dentre odontograma e "outros tratamentos").
     const todosOsTratamentos = [];
     Object.values(ficha.toothData||{}).forEach((d,dente) => {
-      (d.tratamentos||[]).forEach(t => { if(t.tratamento) todosOsTratamentos.push({ nome:t.tratamento, data: t.data||ficha.dataContrato||'' }); });
+      (d.tratamentos||[]).forEach(t => { if(t.tratamento) todosOsTratamentos.push({ nome:t.tratamento, data: t.data||dataContratoFicha||'' }); });
     });
-    (ficha.outrosTratamentos||[]).forEach(o => { if(o.descricao) todosOsTratamentos.push({ nome:o.descricao, data: o.data||ficha.dataContrato||'' }); });
+    (ficha.outrosTratamentos||[]).forEach(o => { if(o.descricao) todosOsTratamentos.push({ nome:o.descricao, data: o.data||dataContratoFicha||'' }); });
     todosOsTratamentos.sort((a,b) => (b.data||'').localeCompare(a.data||''));
     const ultimoProcedimento = todosOsTratamentos.length ? todosOsTratamentos[0].nome : '';
-    const ultimaVisita = ultimaVisitaPorPaciente[p.id] || ficha.dataContrato || '';
+    const ultimaVisita = ultimaVisitaPorPaciente[p.id] || dataContratoFicha || '';
     if(ultimaVisita || ultimoProcedimento){
       alertas.resumoPacientes.push({
         pacienteId: p.id, nome: p.nome, telefone: p.telefone||'',

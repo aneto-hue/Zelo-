@@ -200,6 +200,33 @@ async function clinicaRestaurarDaLixeira(registroLixeiraId){
     return;
   }
 
+  if(registro.tipo === 'contrato_para_orcamento'){
+    const snap = registro.snapshot || {};
+    const lanc = snap.lancamento;
+    if(!lanc) throw new Error('Esse registro não tem os dados do contrato.');
+    const chaveFicha = snap.pacienteId ? ('ficha_anamnese_paciente_' + snap.pacienteId) : null;
+    const ficha = chaveFicha ? await ClinicaStorage.load(chaveFicha) : null;
+    // Segurança: se depois disso o paciente já teve OUTRO contrato lançado, restaurar este
+    // duplicaria a cobrança — melhor avisar e não fazer nada.
+    if(ficha && ficha.financeiroLancamentoId && ficha.financeiroLancamentoId !== lanc.id){
+      throw new Error('Esse paciente já tem outro contrato lançado depois deste. Desfaça o contrato novo antes de restaurar este, pra não duplicar a cobrança.');
+    }
+    const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { lancamentos:[], profissionais:[], rateiosFixos:[] };
+    if(!Array.isArray(dadosFin.lancamentos)) dadosFin.lancamentos = [];
+    if(!dadosFin.lancamentos.some(x => x.id === lanc.id)) dadosFin.lancamentos.unshift(lanc);
+    await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dadosFin);
+    if(ficha){
+      ficha.financeiroLancamentoId = lanc.id;
+      if(ficha.contract && snap.dataContratoAnterior) ficha.contract.dataContrato = snap.dataContratoAnterior;
+      if(snap.orcamentoRegistradoId && Array.isArray(ficha.historicoOrcamentos)){
+        ficha.historicoOrcamentos = ficha.historicoOrcamentos.filter(o => o.id !== snap.orcamentoRegistradoId);
+      }
+      await ClinicaStorage.save(chaveFicha, ficha);
+    }
+    await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtual.filter(r => r.id !== registroLixeiraId));
+    return;
+  }
+
   const dados = registro.snapshot;
 
   if(dados.paciente){
@@ -245,16 +272,78 @@ async function clinicaExcluirDefinitivamenteDaLixeira(registroLixeiraId){
 // Versão genérica da lixeira, pra outros tipos de exclusão além de "paciente completo" (por
 // exemplo, lançamentos duplicados removidos no Financeiro). O "snapshot" pode ser qualquer
 // coisa — quem for restaurar precisa saber como interpretar aquele tipo específico.
-async function clinicaAdicionarNaLixeiraGenerico(tipo, descricaoCurta, motivo, snapshot){
+async function clinicaAdicionarNaLixeiraGenerico(tipo, descricaoCurta, motivo, snapshot, resumo){
   const registro = {
     id: lixeiraUid(), tipo, pacienteNome: descricaoCurta,
     quem: (window._clinicaMe && window._clinicaMe.nome) || 'Usuário',
-    quando: Date.now(), motivo, resumo: descricaoCurta, snapshot,
+    quando: Date.now(), motivo, resumo: resumo || descricaoCurta, snapshot,
   };
   const lixeiraAtual = await ClinicaStorage.load(LIXEIRA_KEY) || [];
   lixeiraAtual.unshift(registro);
   await ClinicaStorage.save(LIXEIRA_KEY, lixeiraAtual);
   return registro.id;
+}
+
+// ============================================================
+// CONTRATO FECHADO POR ENGANO -> VOLTA A SER SÓ ORÇAMENTO
+// Tira um contrato da contabilidade (Financeiro) e devolve a ficha do paciente ao estado de
+// orçamento: a ficha deixa de constar como "concluída/enviada ao Financeiro" (libera o botão
+// "Concluir contrato" de novo) e a data do contrato é limpa (senão os alertas de retorno
+// achariam que o procedimento foi realmente feito). Tudo que existia fica guardado na Lixeira,
+// com o motivo, e dá pra restaurar.
+//
+// NÃO mexe na lista de lançamentos do Financeiro — quem chama é que remove o lançamento, cada
+// um do seu jeito (o Financeiro mantém a lista em memória e a salva inteira; a Anamnese edita
+// direto o que está salvo). Opções:
+//   registrarOrcamento        -> também cria um registro de orçamento em aberto no histórico da
+//                                ficha (aparece em "Orçamentos abertos" na Central de Pendências)
+//   atualizarFichaNoStorage   -> false quando a Anamnese está com a ficha aberta na tela (ela
+//                                mesma atualiza e salva a própria ficha, senão o salvamento
+//                                automático dela desfaria a mudança)
+//   orcamentoJaRegistradoId / dataContratoAnterior -> usados quando a Anamnese já fez isso
+function montarRetratoOrcamentoDoLancamento(lanc){
+  const fmt = n => 'R$ ' + (Number(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const trats = (lanc.tratamentos && lanc.tratamentos.length) ? lanc.tratamentos : [{ descricao:'Tratamento', valor: lanc.valorTotal||0 }];
+  const somaTrats = trats.reduce((a,t)=>a+(Number(t.valor)||0),0);
+  return {
+    id: 'orc' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+    dataGeracao: Date.now(),
+    itens: [],
+    outros: trats.map(t => ({ descricao: t.descricao||'', valor: fmt(t.valor) })),
+    total: Number(lanc.valorTotal) > 0 ? Number(lanc.valorTotal) : somaTrats,
+  };
+}
+
+async function clinicaReverterContratoParaOrcamento(lanc, motivo, opcoes){
+  opcoes = opcoes || {};
+  if(!lanc) throw new Error('Lançamento não encontrado.');
+  if(!(motivo||'').trim()) throw new Error('É obrigatório informar o motivo.');
+
+  let orcamentoRegistradoId = opcoes.orcamentoJaRegistradoId || null;
+  let dataContratoAnterior = opcoes.dataContratoAnterior || '';
+
+  if(opcoes.atualizarFichaNoStorage !== false && lanc.pacienteId){
+    const chave = 'ficha_anamnese_paciente_' + lanc.pacienteId;
+    const ficha = await ClinicaStorage.load(chave);
+    if(ficha){
+      ficha.financeiroLancamentoId = '';
+      if(ficha.contract){ dataContratoAnterior = ficha.contract.dataContrato || ''; ficha.contract.dataContrato = ''; }
+      if(opcoes.registrarOrcamento){
+        const entrada = montarRetratoOrcamentoDoLancamento(lanc);
+        if(!Array.isArray(ficha.historicoOrcamentos)) ficha.historicoOrcamentos = [];
+        ficha.historicoOrcamentos.unshift(entrada);
+        orcamentoRegistradoId = entrada.id;
+      }
+      await ClinicaStorage.save(chave, ficha);
+    }
+  }
+
+  const todasParcelas = (lanc.parcelas||[]).concat(...(lanc.linhasDerivadas||[]).map(ld => ld.parcelas||[]));
+  const pagas = todasParcelas.filter(p => p.pago).length;
+  const resumo = 'Contrato de R$ ' + (Number(lanc.valorTotal)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) +
+    ' tirado da contabilidade e devolvido ao estado de orçamento (' + todasParcelas.length + ' parcela(s), ' + pagas + ' já paga(s))';
+  await clinicaAdicionarNaLixeiraGenerico('contrato_para_orcamento', lanc.paciente || '(sem nome)', motivo.trim(),
+    { lancamento: lanc, pacienteId: lanc.pacienteId || '', orcamentoRegistradoId, dataContratoAnterior }, resumo);
 }
 
 // Preenche um <input> de texto com sugestões de nomes já cadastrados (via <datalist>),

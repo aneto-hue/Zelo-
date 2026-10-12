@@ -2219,6 +2219,7 @@ function renderContract(container){
     if(fichaJaConcluida()){
       container.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin-top:6px;' },
         document.createTextNode('Essa ficha já foi enviada ao Financeiro antes. Como você é o gestor, ainda pode alterar as condições — ao salvar, o lançamento no Financeiro é atualizado.')));
+      renderDesfazerContrato(container);
     }
   }
 
@@ -2305,6 +2306,101 @@ function formatDateBR(dateStr){
 function fichaJaConcluida(){ return !!state.financeiroLancamentoId; }
 function souAdminAnamnese(){ return !!(window._clinicaMe && window._clinicaMe.papel === 'admin'); }
 function planoPagamentoTravado(){ return fichaJaConcluida() && !souAdminAnamnese(); }
+
+// ---- Desfazer um contrato fechado por engano (só gestor): tira da contabilidade do Financeiro e
+// devolve a ficha ao estado de orçamento. Tudo fica guardado na Lixeira, com o motivo. ----
+let desfazendoContratoAberto = false;
+let motivoDesfazerContrato = '';
+let registrarOrcamentoAoDesfazer = true;
+let _revertendoContrato = false;
+
+// Cria, no histórico de orçamentos da ficha, um registro do plano de tratamento atual (mesmo
+// formato do orçamento em PDF) — assim o caso aparece em "Orçamentos abertos" na Central de
+// Pendências, pra alguém dar seguimento. Devolve o id do registro (ou null se não há tratamento).
+function registrarOrcamentoEmAbertoNoHistorico(){
+  const itens = listarTodosTratamentosDentes().map(item => ({ dente:item.dente, situacao:item.situacao, tratamento:item.tratamento, valor:item.valor }));
+  const outros = (state.outrosTratamentos||[]).filter(i=>i.descricao||i.valor).map(i => ({ descricao:i.descricao||'', valor:i.valor||'' }));
+  if(!itens.length && !outros.length) return null;
+  if(!Array.isArray(state.historicoOrcamentos)) state.historicoOrcamentos = [];
+  const id = 'orc' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  state.historicoOrcamentos.unshift({ id, dataGeracao: Date.now(), itens, outros, total: calcTotalTratamentos() });
+  return id;
+}
+
+async function desfazerContratoDestaFicha(){
+  if(_revertendoContrato) return;
+  _revertendoContrato = true;
+  try{
+    const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1');
+    const lanc = dadosFin && Array.isArray(dadosFin.lancamentos) ? dadosFin.lancamentos.find(l => l.id === state.financeiroLancamentoId) : null;
+    const dataAnterior = state.contract.dataContrato || '';
+    let orcamentoId = null;
+    if(lanc){
+      if(registrarOrcamentoAoDesfazer) orcamentoId = registrarOrcamentoEmAbertoNoHistorico();
+      await clinicaReverterContratoParaOrcamento(lanc, motivoDesfazerContrato, {
+        atualizarFichaNoStorage:false, orcamentoJaRegistradoId: orcamentoId, dataContratoAnterior: dataAnterior,
+      });
+      dadosFin.lancamentos = dadosFin.lancamentos.filter(l => l.id !== lanc.id);
+      await ClinicaStorage.save('controle_pagamentos_comissoes_v1', dadosFin);
+    }
+    // Com ou sem lançamento achado no Financeiro, a ficha volta a ser só orçamento: libera o
+    // botão de concluir e limpa a data do contrato.
+    state.financeiroLancamentoId = '';
+    state.contract.dataContrato = '';
+    saveProgress();
+    desfazendoContratoAberto = false; motivoDesfazerContrato = '';
+    toast(lanc ? 'Contrato tirado da contabilidade — voltou a ser só orçamento.' : 'A ficha estava marcada como enviada, mas não havia lançamento no Financeiro — foi só destravada.');
+    refreshPanel();
+  }catch(err){
+    alert(err.message || 'Não foi possível desfazer o contrato.');
+  } finally {
+    _revertendoContrato = false;
+  }
+}
+
+function renderDesfazerContrato(container){
+  const wrap = el('div', { style:'margin-top:16px;padding-top:12px;border-top:1px dashed var(--line);' });
+  if(!desfazendoContratoAberto){
+    const abrir = el('div', { style:'color:#E53935;cursor:pointer;font-size:12.5px;font-weight:700;text-decoration:underline;display:inline-block;' },
+      document.createTextNode('↩ Fechado por engano? Tirar da contabilidade e voltar a ser só orçamento'));
+    abrir.onclick = () => { desfazendoContratoAberto = true; motivoDesfazerContrato = ''; registrarOrcamentoAoDesfazer = true; refreshPanel(); };
+    wrap.appendChild(abrir);
+    container.appendChild(wrap);
+    return;
+  }
+  const box = el('div', { style:'background:#FBEAEA;border-radius:10px;padding:12px;' });
+  box.appendChild(el('div', { style:'font-weight:700;font-size:13px;color:#E53935;margin-bottom:6px;' }, document.createTextNode('↩ Voltar este contrato a ser só orçamento')));
+  box.appendChild(el('div', { style:'font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.45;' }, document.createTextNode(
+    'O contrato sai da contabilidade do Financeiro (com as parcelas e qualquer divisão entre profissionais), a data do contrato é limpa e a ficha volta a poder ser concluída depois, se o paciente fechar. Todo o plano de tratamento e os valores continuam na ficha. Fica guardado na Lixeira, com o motivo, e dá pra restaurar.'
+  )));
+  const motivoInput = el('textarea', { placeholder:'Motivo (obrigatório) — ex: era só pra gerar o orçamento', rows:'2',
+    style:'width:100%;padding:8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:8px;resize:vertical;' });
+  motivoInput.value = motivoDesfazerContrato;
+  motivoInput.oninput = (e) => { motivoDesfazerContrato = e.target.value; };
+  box.appendChild(motivoInput);
+  const chkLinha = el('label', { style:'display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:10px;cursor:pointer;' });
+  const chk = el('input', { type:'checkbox' });
+  chk.checked = registrarOrcamentoAoDesfazer;
+  chk.style.width = 'auto';
+  chk.onchange = (e) => { registrarOrcamentoAoDesfazer = e.target.checked; };
+  chkLinha.appendChild(chk);
+  chkLinha.appendChild(document.createTextNode('Registrar como orçamento em aberto (aparece em "Orçamentos abertos" na Central de Pendências)'));
+  box.appendChild(chkLinha);
+  const linhaBtns = el('div', { style:'display:flex;gap:10px;align-items:center;' });
+  const confirmar = el('div', { style:'background:#E53935;color:#fff;padding:9px 14px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;' },
+    document.createTextNode('Sim, tirar da contabilidade'));
+  confirmar.onclick = () => {
+    if(!motivoDesfazerContrato.trim()){ alert('Informe o motivo.'); return; }
+    desfazerContratoDestaFicha();
+  };
+  linhaBtns.appendChild(confirmar);
+  const cancelar = el('div', { style:'color:var(--muted);cursor:pointer;font-size:12.5px;text-decoration:underline;' }, document.createTextNode('Cancelar'));
+  cancelar.onclick = () => { desfazendoContratoAberto = false; refreshPanel(); };
+  linhaBtns.appendChild(cancelar);
+  box.appendChild(linhaBtns);
+  wrap.appendChild(box);
+  container.appendChild(wrap);
+}
 
 function nomeProfissionalEmitindo(){
   return (window._clinicaMe && window._clinicaMe.nome) || state.clinic.dentista || '';

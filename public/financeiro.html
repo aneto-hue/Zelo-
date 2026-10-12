@@ -722,6 +722,10 @@ let celulaValorAberta = null;   // lancId
 let confirmandoDesfazer = null; // chaveLinha, quando está pedindo confirmação de desfazer o desmembramento
 let celulaParcelasSemDataAberta = null; // chaveLinha
 let confirmandoResetTotal = null; // lancId
+let confirmandoReverterContrato = null; // lancId — painel de "tirar da contabilidade / voltar a orçamento" aberto
+let motivoReverterContrato = '';
+let registrarOrcamentoAoReverter = true;
+let _revertendoContratoFin = false;
 let redistribuindoDiferenca = null; // { idx, diferenca } — quando acabou de mudar o valor de uma parcela
 let celulaQtdParcelasAberta = null; // chaveLinha
 let celulaFormaAberta = null;   // lancId+linhaId
@@ -827,33 +831,41 @@ function renderPlanilhaLancamentos(container){
   // Calcula o total apurado com base nos filtros ativos, somando as parcelas que combinam
   // com TODOS os filtros marcados ao mesmo tempo.
   let totalApurado = 0, qtdParcelasApuradas = 0;
+  // Verifica se UMA parcela passa pelos filtros de período, forma de pagamento e situação
+  // (o filtro de profissional é por LINHA inteira, não por parcela, então fica de fora daqui).
+  // Usada tanto pra decidir quais linhas aparecem na tabela quanto pra somar o total apurado —
+  // assim os dois ficam sempre consistentes entre si.
+  function parcelaPassaFiltros(p){
+    if(filtroApuracao.forma && p.forma !== filtroApuracao.forma) return false;
+    const ehCartaoApuracao = /cart[ãa]o/i.test(p.forma||'');
+    const corAutoApuracao = (p.pago || ehCartaoApuracao) ? 'verde' : 'outra';
+    const corFinalApuracao = p.corManual || corAutoApuracao;
+    const foiRecebidaApuracao = corFinalApuracao === 'verde';
+    const dataParaPeriodo = dataParaISO(p.data);
+    if(filtroApuracao.dataIni && (!dataParaPeriodo || dataParaPeriodo < filtroApuracao.dataIni)) return false;
+    if(filtroApuracao.dataFim && (!dataParaPeriodo || dataParaPeriodo > filtroApuracao.dataFim)) return false;
+    if(filtroApuracao.status){
+      const vencidaAuto = !p.pago && !ehCartaoApuracao && dataParaPeriodo && dataParaPeriodo < hojeISOFiltro;
+      const vencida = p.corManual ? (p.corManual === 'vermelho') : vencidaAuto;
+      if(filtroApuracao.status === 'recebidos' && !foiRecebidaApuracao) return false;
+      if(filtroApuracao.status === 'vencidos' && !vencida) return false;
+      if(filtroApuracao.status === 'naoRecebidos' && (foiRecebidaApuracao || vencida)) return false;
+    }
+    return true;
+  }
+  // Filtro de período/forma/situação ativo? Uma linha só aparece na tabela se pelo menos uma
+  // das parcelas dela passar nesses filtros — sem isso, mudar o filtro só alterava o número do
+  // total, e a tabela embaixo continuava mostrando tudo, mesmo o que não combinava com a busca.
+  const temFiltroDeParcela = !!(filtroApuracao.dataIni || filtroApuracao.dataFim || filtroApuracao.forma || filtroApuracao.status);
   const linhasFiltradas = todasLinhasCompletas.filter(linha => {
     if(filtroApuracao.profissionalId && linha.profissionalId !== filtroApuracao.profissionalId) return false;
+    if(temFiltroDeParcela && !(linha.parcelas||[]).some(p => parcelaPassaFiltros(p))) return false;
     return true;
   });
   const totalPorProfissionalId = {}; // profissionalId (ou '__sem__') -> soma recebida com os filtros ativos
   linhasFiltradas.forEach(linha => {
     (linha.parcelas||[]).forEach(p => {
-      if(filtroApuracao.forma && p.forma !== filtroApuracao.forma) return;
-      // "Recebidos" deve bater exatamente com o que aparece VERDE na coluna do mês na
-      // planilha — e essa cor é sempre definida pela data de VENCIMENTO da parcela (a coluna
-      // em que ela aparece), nunca pela data em que foi confirmada depois. Cartão conta como
-      // garantido mesmo sem confirmar; cor manual, quando definida à mão, sempre tem a
-      // palavra final — igual ao painel principal.
-      const ehCartaoApuracao = /cart[ãa]o/i.test(p.forma||'');
-      const corAutoApuracao = (p.pago || ehCartaoApuracao) ? 'verde' : 'outra';
-      const corFinalApuracao = p.corManual || corAutoApuracao;
-      const foiRecebidaApuracao = corFinalApuracao === 'verde';
-      const dataParaPeriodo = dataParaISO(p.data);
-      if(filtroApuracao.dataIni && (!dataParaPeriodo || dataParaPeriodo < filtroApuracao.dataIni)) return;
-      if(filtroApuracao.dataFim && (!dataParaPeriodo || dataParaPeriodo > filtroApuracao.dataFim)) return;
-      if(filtroApuracao.status){
-        const vencidaAuto = !p.pago && !ehCartaoApuracao && dataParaPeriodo && dataParaPeriodo < hojeISOFiltro;
-        const vencida = p.corManual ? (p.corManual === 'vermelho') : vencidaAuto;
-        if(filtroApuracao.status === 'recebidos' && !foiRecebidaApuracao) return;
-        if(filtroApuracao.status === 'vencidos' && !vencida) return;
-        if(filtroApuracao.status === 'naoRecebidos' && (foiRecebidaApuracao || vencida)) return;
-      }
+      if(!parcelaPassaFiltros(p)) return;
       totalApurado += p.valor||0;
       qtdParcelasApuradas++;
       const pid = linha.profissionalId || '__sem__';
@@ -936,12 +948,12 @@ function renderPlanilhaLancamentos(container){
   filtrosWrap.appendChild(resumoWrap);
   container.appendChild(filtrosWrap);
 
-  // A tabela abaixo mostra só as linhas que combinam com o filtro de profissional (os outros
-  // filtros — período, forma, vencidas — afetam o total acima, mas continuam mostrando a linha
-  // inteira do paciente na tabela, pra não perder o contexto do que tem parcela em outro mês/forma).
+  // A tabela abaixo mostra só as linhas que combinam com TODOS os filtros ativos (profissional,
+  // período, forma de pagamento e situação) — uma linha aparece se tiver pelo menos uma parcela
+  // que bate com o que foi buscado.
   const todasLinhas = linhasFiltradas;
   if(!todasLinhas.length){
-    container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum lançamento combina com esse filtro de profissional.')));
+    container.appendChild(el('div', { class:'empty-hint' }, document.createTextNode('Nenhum lançamento combina com esses filtros.')));
     return;
   }
   // ===================== FIM DOS FILTROS =====================
@@ -1257,6 +1269,68 @@ function renderPainelValorTotal(lanc){
       resetWrap.appendChild(resetBtn);
     }
     wrap.appendChild(resetWrap);
+  }
+  // ---- Contrato fechado por engano (só gestor): tira da contabilidade e volta a ser orçamento ----
+  if(window._clinicaMe && window._clinicaMe.papel === 'admin'){
+    const revWrap = el('div', { style:'margin-top:14px;padding-top:10px;border-top:1px solid var(--line-light);' });
+    if(confirmandoReverterContrato === lanc.id){
+      const todasParcelas = (lanc.parcelas||[]).concat(...(lanc.linhasDerivadas||[]).map(ld => ld.parcelas||[]));
+      const qtdPagas = todasParcelas.filter(p => p.pago).length;
+      const box = el('div', { style:'background:#FBEAEA;border-radius:10px;padding:12px;' });
+      box.appendChild(el('div', { style:'font-weight:700;font-size:12.5px;color:var(--red);margin-bottom:6px;' }, document.createTextNode('↩ Voltar este contrato a ser só orçamento')));
+      box.appendChild(el('div', { style:'font-size:11.5px;color:var(--muted);margin-bottom:8px;line-height:1.45;' }, document.createTextNode(
+        'O contrato inteiro (parcelas e qualquer divisão entre profissionais) sai da contabilidade do Financeiro, e a ficha do paciente volta a ser só orçamento. Fica guardado na Lixeira, com o motivo, e dá pra restaurar.'
+      )));
+      if(qtdPagas > 0){
+        box.appendChild(el('div', { style:'font-size:12px;font-weight:700;color:#8A5A0F;background:#FFF6E5;border-radius:8px;padding:8px 10px;margin-bottom:8px;' },
+          document.createTextNode('⚠ Atenção: '+qtdPagas+' parcela(s) desse contrato já está(ão) marcada(s) como paga(s). Se o dinheiro realmente entrou, ele deixa de constar na contabilidade.')));
+      }
+      const motivoInput = el('textarea', { placeholder:'Motivo (obrigatório) — ex: era só pra gerar o orçamento', rows:'2',
+        style:'width:100%;padding:8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:12.5px;margin-bottom:8px;resize:vertical;' });
+      motivoInput.value = motivoReverterContrato;
+      motivoInput.oninput = (e) => { motivoReverterContrato = e.target.value; };
+      box.appendChild(motivoInput);
+      const chkLinha = el('label', { style:'display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:10px;cursor:pointer;' });
+      const chk = el('input', { type:'checkbox' });
+      chk.checked = registrarOrcamentoAoReverter;
+      chk.style.width = 'auto';
+      chk.onchange = (e) => { registrarOrcamentoAoReverter = e.target.checked; };
+      chkLinha.appendChild(chk);
+      chkLinha.appendChild(document.createTextNode('Registrar como orçamento em aberto (aparece em "Orçamentos abertos" na Central de Pendências)'));
+      box.appendChild(chkLinha);
+      const linhaBtns = el('div', { style:'display:flex;gap:10px;align-items:center;' });
+      const confirmar = el('span', { style:'color:#fff;background:var(--red);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;' }, document.createTextNode('Sim, tirar da contabilidade'));
+      confirmar.onclick = async () => {
+        if(!motivoReverterContrato.trim()){ alert('Informe o motivo.'); return; }
+        if(_revertendoContratoFin) return;
+        _revertendoContratoFin = true;
+        try{
+          await clinicaReverterContratoParaOrcamento(lanc, motivoReverterContrato, { registrarOrcamento: registrarOrcamentoAoReverter });
+          // O Financeiro mantém a lista em memória e a salva inteira — por isso o lançamento é
+          // removido aqui, na lista da tela, e não direto no que está salvo.
+          state.lancamentos = state.lancamentos.filter(l => l.id !== lanc.id);
+          confirmandoReverterContrato = null; motivoReverterContrato = ''; celulaValorAberta = null;
+          saveProgress();
+          toast('Contrato tirado da contabilidade — voltou a ser só orçamento.');
+          refreshPanel();
+        }catch(err){
+          alert(err.message || 'Não foi possível desfazer o contrato.');
+        } finally {
+          _revertendoContratoFin = false;
+        }
+      };
+      const cancelar = el('span', { style:'color:var(--muted);cursor:pointer;font-size:12px;text-decoration:underline;' }, document.createTextNode('Cancelar'));
+      cancelar.onclick = () => { confirmandoReverterContrato = null; refreshPanel(); };
+      linhaBtns.appendChild(confirmar); linhaBtns.appendChild(cancelar);
+      box.appendChild(linhaBtns);
+      revWrap.appendChild(box);
+    } else {
+      const abrir = el('span', { style:'color:var(--red);cursor:pointer;font-size:12px;font-weight:700;text-decoration:underline;' },
+        document.createTextNode('↩ Fechado por engano? Tirar da contabilidade e voltar a ser só orçamento'));
+      abrir.onclick = () => { confirmandoReverterContrato = lanc.id; motivoReverterContrato = ''; registrarOrcamentoAoReverter = true; refreshPanel(); };
+      revWrap.appendChild(abrir);
+    }
+    wrap.appendChild(revWrap);
   }
   const fecharBtn = el('div', { style:'margin-top:10px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;' }, document.createTextNode('Fechar'));
   fecharBtn.onclick = () => { celulaValorAberta = null; refreshPanel(); };
