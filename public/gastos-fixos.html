@@ -127,6 +127,31 @@ function dataISOparaBR(iso){
   return m ? (m[3]+'/'+m[2]+'/'+m[1]) : '';
 }
 
+// Data de hoje (e outras) no horário LOCAL, no formato AAAA-MM-DD. Não dá pra usar toISOString()
+// pra isso: ele conta em horário universal e, à noite no Brasil (depois das 21h), já devolve o dia
+// seguinte — uma conta que vence hoje aparecia como "Vencido".
+function dataLocalISO(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// Aceita só datas completas e com ano razoável. Digitando o ano aos poucos, o campo de data passa
+// por valores como 0002 — esses não devem filtrar nada até a data estar completa.
+function dataValidaISO(v){
+  const m = String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return (m && +m[1] >= 1900 && +m[1] <= 2100) ? v : '';
+}
+// Períodos prontos da caixinha de seleção do filtro.
+function periodosPredefinidos(){
+  const h = new Date(), y = h.getFullYear(), m = h.getMonth();
+  const mes = (desloc) => ({ ini: dataLocalISO(new Date(y, m+desloc, 1)), fim: dataLocalISO(new Date(y, m+desloc+1, 0)) });
+  return {
+    mes:        Object.assign({ rotulo:'Este mês' }, mes(0)),
+    mesPassado: Object.assign({ rotulo:'Mês passado' }, mes(-1)),
+    proxMes:    Object.assign({ rotulo:'Próximo mês' }, mes(1)),
+    prox30:     { rotulo:'Próximos 30 dias', ini: dataLocalISO(h), fim: dataLocalISO(new Date(y, m, h.getDate()+30)) },
+    ano:        { rotulo:'Este ano', ini: y+'-01-01', fim: y+'-12-31' },
+  };
+}
+
 const STORAGE_KEY = 'gastos_fixos_v1';
 const CATEGORIAS = ['Água','Luz','Internet','Telefone','Aluguel','Condomínio','Software/Sistema','Contabilidade','Segurança','Limpeza','Outro'];
 let state = { gastos: [] };
@@ -187,7 +212,7 @@ function renderMain(){
   const main = document.getElementById('main');
   main.innerHTML = '';
   const hoje = new Date();
-  const hojeISO = hoje.toISOString().slice(0,10);
+  const hojeISO = dataLocalISO(hoje);
 
   main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Gastos Fixos Mensais')));
   main.appendChild(el('p', { class:'hint' }, document.createTextNode('Água, luz, internet, aluguel e outras contas recorrentes — com aviso quando estiver perto de vencer.')));
@@ -223,30 +248,82 @@ function renderMain(){
   }
 
   // ---- Filtro de período ----
+  // Caixinha de seleção com períodos prontos (Este mês, Mês passado...) + calendários pra
+  // escolher a data inicial e a final. Escolher um período pronto preenche as duas datas.
   const filtrosWrap = el('div', { class:'filtros-wrap' });
   filtrosWrap.appendChild(el('div', { class:'titulo' }, document.createTextNode('Filtrar por período (vencimento)')));
   const linhaFiltro = el('div', { style:'display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;' });
+  const estiloCampo = 'padding:7px 9px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;background:#fff;';
+
+  const campoPeriodo = el('div', {});
+  campoPeriodo.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);margin-bottom:3px;' }, document.createTextNode('Período')));
+  const selectPeriodo = el('select', { id:'filtroPeriodoSelect', style:estiloCampo+'min-width:150px;' });
+  [['','Todo o período']].concat(Object.entries(periodosPredefinidos()).map(([k,v]) => [k, v.rotulo])).concat([['personalizado','Personalizado']])
+    .forEach(([valor, rotulo]) => selectPeriodo.appendChild(el('option', { value:valor }, document.createTextNode(rotulo))));
+  campoPeriodo.appendChild(selectPeriodo);
+  linhaFiltro.appendChild(campoPeriodo);
+
   const campoDe = el('div', {});
   campoDe.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);margin-bottom:3px;' }, document.createTextNode('De')));
-  const inputDe = el('input', { type:'text', placeholder:'dd/mm/aaaa', value: dataISOparaBR(filtroPeriodo.dataIni), style:'padding:7px 9px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;width:120px;' });
-  inputDe.oninput = (e) => { e.target.value = maskData(e.target.value); };
-  inputDe.onblur = (e) => { filtroPeriodo.dataIni = dataBRparaISO(e.target.value); refreshTabela(); };
+  const inputDe = el('input', { type:'date', id:'filtroDataDe', value: filtroPeriodo.dataIni, style:estiloCampo });
   campoDe.appendChild(inputDe);
   linhaFiltro.appendChild(campoDe);
+
   const campoAte = el('div', {});
   campoAte.appendChild(el('label', { style:'display:block;font-size:11px;color:var(--muted);margin-bottom:3px;' }, document.createTextNode('Até')));
-  const inputAte = el('input', { type:'text', placeholder:'dd/mm/aaaa', value: dataISOparaBR(filtroPeriodo.dataFim), style:'padding:7px 9px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;width:120px;' });
-  inputAte.oninput = (e) => { e.target.value = maskData(e.target.value); };
-  inputAte.onblur = (e) => { filtroPeriodo.dataFim = dataBRparaISO(e.target.value); refreshTabela(); };
+  const inputAte = el('input', { type:'date', id:'filtroDataAte', value: filtroPeriodo.dataFim, style:estiloCampo });
   campoAte.appendChild(inputAte);
   linhaFiltro.appendChild(campoAte);
-  if(filtroPeriodo.dataIni || filtroPeriodo.dataFim){
-    const limparBtn = el('span', { class:'link-acao', style:'align-self:center;' }, document.createTextNode('Limpar'));
-    limparBtn.onclick = () => { filtroPeriodo = { dataIni:'', dataFim:'' }; renderMain(); };
-    linhaFiltro.appendChild(limparBtn);
-  }
+
+  const limparBtn = el('span', { class:'link-acao', style:'align-self:center;' }, document.createTextNode('Limpar'));
+  linhaFiltro.appendChild(limparBtn);
   filtrosWrap.appendChild(linhaFiltro);
+  const avisoPeriodo = el('div', { style:'font-size:11.5px;color:var(--red);font-weight:700;margin-top:8px;display:none;' },
+    document.createTextNode('⚠ A data inicial está depois da data final — nenhuma conta vai aparecer.'));
+  filtrosWrap.appendChild(avisoPeriodo);
   main.appendChild(filtrosWrap);
+
+  function chavePeriodoAtual(){
+    if(!filtroPeriodo.dataIni && !filtroPeriodo.dataFim) return '';
+    const prontos = periodosPredefinidos();
+    for(const k of Object.keys(prontos)){
+      if(prontos[k].ini === filtroPeriodo.dataIni && prontos[k].fim === filtroPeriodo.dataFim) return k;
+    }
+    return 'personalizado';
+  }
+  // Mantém a caixinha, o "Limpar" e o aviso em dia com as datas, sem refazer a tela inteira
+  // (refazer tiraria o foco do campo de data enquanto a pessoa ainda está digitando).
+  function atualizarControlesPeriodo(manterPersonalizado){
+    const chave = chavePeriodoAtual();
+    selectPeriodo.value = (manterPersonalizado && chave === '') ? 'personalizado' : chave;
+    limparBtn.style.display = (filtroPeriodo.dataIni || filtroPeriodo.dataFim) ? '' : 'none';
+    avisoPeriodo.style.display = (filtroPeriodo.dataIni && filtroPeriodo.dataFim && filtroPeriodo.dataIni > filtroPeriodo.dataFim) ? 'block' : 'none';
+  }
+  function aoMudarData(){
+    filtroPeriodo.dataIni = dataValidaISO(inputDe.value);
+    filtroPeriodo.dataFim = dataValidaISO(inputAte.value);
+    atualizarControlesPeriodo(selectPeriodo.value === 'personalizado');
+    refreshTabela();
+  }
+  inputDe.oninput = aoMudarData; inputDe.onchange = aoMudarData;
+  inputAte.oninput = aoMudarData; inputAte.onchange = aoMudarData;
+  selectPeriodo.onchange = () => {
+    const v = selectPeriodo.value;
+    if(v === ''){ filtroPeriodo = { dataIni:'', dataFim:'' }; }
+    else if(v !== 'personalizado'){ const pronto = periodosPredefinidos()[v]; filtroPeriodo = { dataIni:pronto.ini, dataFim:pronto.fim }; }
+    inputDe.value = filtroPeriodo.dataIni;
+    inputAte.value = filtroPeriodo.dataFim;
+    atualizarControlesPeriodo(v === 'personalizado');
+    refreshTabela();
+    if(v === 'personalizado') inputDe.focus();
+  };
+  limparBtn.onclick = () => {
+    filtroPeriodo = { dataIni:'', dataFim:'' };
+    inputDe.value = ''; inputAte.value = '';
+    atualizarControlesPeriodo();
+    refreshTabela();
+  };
+  atualizarControlesPeriodo();
 
   // ---- Resumo (respeitando o filtro de período) ----
   const resumoWrap = el('div', { class:'summary-grid', id:'resumoGastos' });
@@ -268,7 +345,7 @@ function gastosFiltrados(){
 }
 
 function refreshTabela(){
-  const hojeISO = new Date().toISOString().slice(0,10);
+  const hojeISO = dataLocalISO(new Date());
   const lista = gastosFiltrados();
 
   const resumoWrap = document.getElementById('resumoGastos');
