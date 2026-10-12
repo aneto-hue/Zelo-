@@ -223,7 +223,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5Z"></path><path d="M10 19a2 2 0 0 0 4 0"></path></svg>
             <span class="bell-dot" id="bellDot" style="display:none;"></span>
           </a>
-          <a class="novo-btn" href="agendamento.html">
+          <a class="novo-btn" id="novoAgendamentoBtn" href="agendamento.html">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
             Novo agendamento
           </a>
@@ -665,7 +665,17 @@ function abrirModalTrocarSenha(){
   document.body.appendChild(overlay);
 }
 
+// "Novo agendamento" leva direto ao dia de hoje (onde está o botão de criar consulta). Sem isso,
+// como a Agenda agora abre no mês, a pessoa teria que clicar no dia de hoje antes de poder criar.
+function ajustarLinkNovoAgendamento(){
+  const btn = document.getElementById('novoAgendamentoBtn');
+  if(!btn) return;
+  const h = new Date();
+  btn.href = 'agendamento.html?data=' + h.getFullYear() + '-' + String(h.getMonth()+1).padStart(2,'0') + '-' + String(h.getDate()).padStart(2,'0');
+}
+
 async function iniciar(){
+  ajustarLinkNovoAgendamento();
   montarSidebarNav();
   const perfil = await aplicarIdentidadeClinica();
   if(perfil && perfil.nome){

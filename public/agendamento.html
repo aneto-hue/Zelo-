@@ -184,12 +184,14 @@
   }
   .view-toggle button.active{background:var(--blue-dark); color:#fff;}
 
-  .month-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:10px;}
+  /* minmax(0,1fr): sem o "0", a coluna nunca fica menor que o texto da consulta (que não quebra linha),
+     e as 7 colunas ficavam de larguras diferentes e estouravam a tela — o texto longo agora termina em "…". */
+  .month-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; margin-bottom:10px;}
   .month-weekday{text-align:center; font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; padding-bottom:4px;}
   .month-cell{
     border-radius:8px; border:1.5px solid var(--line-light); background:#fff;
     display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; padding:4px 3px;
-    cursor:pointer; position:relative; min-height:66px; gap:2px;
+    cursor:pointer; position:relative; min-height:66px; gap:2px; min-width:0;
   }
   .month-cell.outside{opacity:0.4;}
   .month-cell.today{box-shadow:inset 0 0 0 3px var(--blue-dark);}
@@ -801,7 +803,13 @@ function renderConsultaForm(container, consulta, dataFixa, onSalvar, onCancelar)
 }
 
 // ============ RENDER: AGENDA ============
-let viewMode = 'dia'; // dia | semana | mes | ano
+// A Agenda sempre abre na visão do MÊS; depois a pessoa escolhe Dia, Semana, Mês ou Ano.
+// Única exceção: quando chega com uma data específica no endereço (por exemplo, ao clicar num dia
+// do calendário do Painel), abre direto na visão desse dia, que é o que a pessoa acabou de pedir.
+let viewMode = (() => {
+  const dataDaUrl = new URLSearchParams(window.location.search).get('data');
+  return (dataDaUrl && /^\d{4}-\d{2}-\d{2}$/.test(dataDaUrl)) ? 'dia' : 'mes'; // dia | semana | mes | ano
+})();
 let currentDate = (() => {
   const dataDaUrl = new URLSearchParams(window.location.search).get('data');
   if(dataDaUrl && /^\d{4}-\d{2}-\d{2}$/.test(dataDaUrl)){
