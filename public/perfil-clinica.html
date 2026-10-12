@@ -192,6 +192,8 @@ function colorField(label, key, onSave){
 // ============ Profissionais da equipe (contas de acesso) ============
 let novoProfissionalAberto = false;
 let profissionalEditandoId = null;
+let profissionalRedefinindoSenhaId = null; // id de quem está tendo a senha redefinida (painel aberto)
+let senhaRecemRedefinida = null;           // { id, nome, email, senha } — mostrada uma vez, logo após redefinir
 const CHAVE_PROFISSIONAIS_AGENDA = 'clinica_profissionais_agenda_v1';
 function formatMoney(n){ return (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 const CORES_PRESET_AGENDA = ['#0B5FD9','#1FAE5C','#F5A623','#8E44AD','#E53935','#16A085','#D35400','#2C3E50'];
@@ -467,6 +469,13 @@ function renderProfissionais(container){
           editarBtn.onclick = () => { profissionalEditandoId = (profissionalEditandoId===p.id) ? null : p.id; carregar(); };
           acoesWrap.appendChild(editarBtn);
         }
+        // Redefinir a senha de OUTRA pessoa: só administrador, e vale pra qualquer pessoa da
+        // equipe — inclusive outro administrador (a edição de acesso acima não cobre admins).
+        if(souAdminLogado && !souEuMesmo){
+          const resetBtn = el('span', { style:'color:#B9770E;cursor:pointer;font-weight:700;font-size:12.5px;' }, document.createTextNode('🔑 Redefinir senha'));
+          resetBtn.onclick = () => { profissionalRedefinindoSenhaId = (profissionalRedefinindoSenhaId===p.id) ? null : p.id; senhaRecemRedefinida = null; carregar(); };
+          acoesWrap.appendChild(resetBtn);
+        }
         if(souAdminLogado && p.papel !== 'admin'){
           const del = el('span', { class:'pac-del' }, document.createTextNode('Desativar'));
           del.onclick = async () => {
@@ -520,6 +529,62 @@ function renderProfissionais(container){
           carregar();
         };
         card.appendChild(salvarEdicaoBtn);
+      }
+
+      // Confirmação logo depois de redefinir: mostra a senha nova UMA vez, pra o admin passar pra pessoa.
+      if(senhaRecemRedefinida && senhaRecemRedefinida.id === p.id){
+        const ok = el('div', { style:'margin-top:12px;padding:12px;background:#E8F7EE;border:1.5px solid #1FAE5C;border-radius:10px;' });
+        ok.appendChild(el('div', { style:'font-weight:700;font-size:13px;color:#1B7F45;margin-bottom:6px;' }, document.createTextNode('✓ Senha de '+senhaRecemRedefinida.nome+' redefinida')));
+        ok.appendChild(el('div', { style:'font-size:12.5px;line-height:1.6;' }, document.createTextNode('E-mail de acesso: '+senhaRecemRedefinida.email)));
+        ok.appendChild(el('div', { style:'font-size:12.5px;line-height:1.6;' }, [
+          document.createTextNode('Nova senha: '),
+          el('strong', { style:'font-size:15px;letter-spacing:.5px;user-select:all;' }, document.createTextNode(senhaRecemRedefinida.senha)),
+        ]));
+        ok.appendChild(el('div', { style:'font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.45;' },
+          document.createTextNode('Anote agora — ela não aparece de novo depois que você sair desta tela. Passe pra pessoa com segurança e peça pra trocar logo ao entrar (🔑 Senha, na tela inicial). Os acessos que ela já tinha abertos foram encerrados.')));
+        const entendi = el('span', { style:'display:inline-block;margin-top:8px;color:var(--blue-dark);cursor:pointer;font-weight:700;font-size:12.5px;text-decoration:underline;' }, document.createTextNode('Entendi'));
+        entendi.onclick = () => { senhaRecemRedefinida = null; carregar(); };
+        ok.appendChild(entendi);
+        card.appendChild(ok);
+      }
+
+      // Formulário de redefinição de senha (só aparece pro admin, em outra pessoa)
+      if(profissionalRedefinindoSenhaId === p.id && window._clinicaMe && window._clinicaMe.papel === 'admin' && window._clinicaMe.id !== p.id){
+        const box = el('div', { style:'margin-top:12px;padding-top:12px;border-top:1px solid var(--line-light);' });
+        box.appendChild(el('div', { style:'font-weight:700;font-size:13px;margin-bottom:4px;' }, document.createTextNode('Redefinir a senha de '+p.nome)));
+        box.appendChild(el('p', { class:'hint', style:'margin-top:0;' }, document.createTextNode(
+          'Defina uma senha provisória (mínimo 6 caracteres) e passe pra pessoa. Quem estava logado com a senha antiga será desconectado.'
+        )));
+        const campo = el('div', { class:'field' });
+        campo.appendChild(el('label', {}, document.createTextNode('Nova senha provisória')));
+        const input = el('input', { type:'text', placeholder:'mínimo 6 caracteres', autocomplete:'off' });
+        campo.appendChild(input);
+        box.appendChild(campo);
+        const linha = el('div', { style:'display:flex;gap:12px;align-items:center;flex-wrap:wrap;' });
+        const gerar = el('span', { style:'color:var(--blue-dark);cursor:pointer;font-weight:700;font-size:12.5px;text-decoration:underline;' }, document.createTextNode('Gerar uma senha pra mim'));
+        gerar.onclick = () => {
+          // sem caracteres parecidos (0/O, 1/l/I), pra ser fácil de ditar por telefone
+          const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+          const bytes = new Uint32Array(8); crypto.getRandomValues(bytes);
+          input.value = Array.from(bytes).map(b => alfabeto[b % alfabeto.length]).join('');
+        };
+        linha.appendChild(gerar);
+        box.appendChild(linha);
+        const salvar = el('div', { class:'add-row-btn', style:'margin-top:10px;' }, document.createTextNode('Salvar nova senha'));
+        salvar.onclick = async () => {
+          const novaSenha = (input.value||'').trim();
+          if(novaSenha.length < 6){ alert('A senha precisa ter pelo menos 6 caracteres.'); return; }
+          const resp = await fetch('/api/profissionais/'+p.id, {
+            method:'PUT', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ senha: novaSenha })
+          });
+          if(!resp.ok){ const d = await resp.json().catch(()=>({})); alert(d.erro || 'Não foi possível redefinir a senha.'); return; }
+          senhaRecemRedefinida = { id:p.id, nome:p.nome, email:p.email, senha:novaSenha };
+          profissionalRedefinindoSenhaId = null;
+          carregar();
+        };
+        box.appendChild(salvar);
+        card.appendChild(box);
       }
       wrap.appendChild(card);
     });
