@@ -54,6 +54,10 @@
 <div class="toast" id="toast" style="position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-20px);background:#1A1A1A;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:all .25s;z-index:50;pointer-events:none;text-align:center;max-width:90%;"></div>
 
 <script>
+// Data de hoje no horário LOCAL (AAAA-MM-DD). toISOString() conta em horário universal e, à noite no Brasil
+// (depois das 21h), já devolve o dia seguinte — parcelas que vencem hoje apareciam vencidas e o recebimento saía com a data de amanhã.
+function hojeLocalISO(dt){ const d = dt ? new Date(dt) : new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
 function el(tag, attrs={}, children=[]){
   const e=document.createElement(tag);
   for(const k in attrs){
@@ -212,7 +216,7 @@ async function montarAlertas(){
     // 4) Orçamentos não fechados: um orçamento é considerado "fechado" se existe um lançamento
     // no Financeiro pra esse paciente com data de contrato igual ou posterior à data do orçamento.
     (ficha.historicoOrcamentos||[]).forEach(orc => {
-      const dataOrcISO = new Date(orc.dataGeracao).toISOString().slice(0,10);
+      const dataOrcISO = hojeLocalISO(orc.dataGeracao);
       const fechou = lancamentos.some(l => (l.paciente||'').trim().toLowerCase() === (p.nome||'').trim().toLowerCase() && l.dataContrato && l.dataContrato >= dataOrcISO);
       if(fechou) return;
       const diasAberto = diasEntre(dataOrcISO, hoje);
@@ -417,7 +421,7 @@ async function render(){
       const tdNome = el('td', { style:'padding:8px 6px;border-bottom:1px solid var(--line-light);font-weight:700;color:var(--ink);' }, document.createTextNode(r.nome));
       const corVisita = (r.diasSemVisita!==null && r.diasSemVisita>180) ? 'var(--amber)' : 'var(--ink)';
       const tdVisita = el('td', { style:'padding:8px 6px;border-bottom:1px solid var(--line-light);color:'+corVisita+';' },
-        document.createTextNode(r.ultimaVisita ? (formatDateBRISO(r.ultimaVisita)+(r.diasSemVisita!==null?' ('+Math.floor(r.diasSemVisita/30.44)+' meses atrás)':'')) : '—'));
+        document.createTextNode(r.ultimaVisita ? (formatDateBRISO(r.ultimaVisita)+(r.diasSemVisita!==null?(r.diasSemVisita<0?' (consulta futura confirmada)':' ('+Math.floor(r.diasSemVisita/30.44)+' meses atrás)'):'')) : '—'));
       const tdProc = el('td', { style:'padding:8px 6px;border-bottom:1px solid var(--line-light);color:var(--muted);' }, document.createTextNode(r.ultimoProcedimento || '—'));
       tr.appendChild(tdNome); tr.appendChild(tdVisita); tr.appendChild(tdProc);
       table.appendChild(tr);

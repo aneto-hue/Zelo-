@@ -109,12 +109,14 @@
   }
   .cal-nav button:hover{ background:var(--accent-100); }
   .cal-grid{
-    display:grid; grid-template-columns:repeat(7,1fr); gap:6px;
+    /* minmax(0,1fr): sem o "0", a coluna nunca fica menor que o texto das consultas (que não quebra linha),
+       e com a agenda cheia a página inteira passava da largura da tela, cortando o calendário. */
+    display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px;
     background:color-mix(in srgb, var(--surface) 55%, white); border-radius:var(--radius-lg); padding:14px;
   }
   .cal-weekday{ text-align:center; font-size:11px; font-weight:700; color:var(--txt-muted); text-transform:uppercase; padding-bottom:6px; }
   .cal-day{
-    min-height:64px; border-radius:10px; padding:6px 6px; background:#fff; cursor:pointer;
+    min-height:64px; min-width:0; border-radius:10px; padding:6px 6px; background:#fff; cursor:pointer;
     display:flex; flex-direction:column; gap:4px; transition:box-shadow .12s;
     border:1.5px solid transparent;
   }
@@ -159,7 +161,8 @@
 
   .bottom-grid{display:grid; grid-template-columns:1fr; gap:14px;}
   @media(min-width:900px){ .bottom-grid{grid-template-columns:1.4fr 1fr;} }
-  .panel-card{display:flex; flex-direction:column; gap:10px; padding:18px; border-radius:var(--radius-lg); background:color-mix(in srgb, var(--surface) 88%, transparent); box-shadow:var(--shadow-sm);}
+  /* min-width:0 + overflow-x:auto: no celular a tabela "Agenda de hoje" é mais larga que o cartão; assim ela rola dentro do cartão em vez de alargar a página inteira. */
+  .panel-card{min-width:0; max-width:100%; overflow-x:auto; display:flex; flex-direction:column; gap:10px; padding:18px; border-radius:var(--radius-lg); background:color-mix(in srgb, var(--surface) 88%, transparent); box-shadow:var(--shadow-sm);}
   .panel-card .ph{display:flex;align-items:center;justify-content:space-between;}
   .panel-card .ph h4{font-size:18px;}
   .panel-card .ph a{color:var(--accent);font-size:14px;text-decoration:none;}

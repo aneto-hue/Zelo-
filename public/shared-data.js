@@ -94,6 +94,15 @@ function lixeiraUid(){ return 'lix'+Date.now().toString(36)+Math.random().toStri
 // Reúne tudo que existe hoje sobre um paciente, em todos os módulos, sem apagar nada ainda —
 // usado tanto pra montar o retrato antes de excluir quanto pra mostrar ao gestor, na hora de
 // confirmar, exatamente o que vai ser apagado (quantas fichas, lançamentos, consultas).
+// O índice de fichas guarda uma entrada por paciente no formato { pacienteId, criadoEm, atualizadoEm }
+// (e, em dados muito antigos, só o id em texto) — estes dois ajudantes cobrem os dois formatos.
+function _entradaDoIndice(indice, pacienteId){
+  return Array.isArray(indice) ? (indice.find(f => f === pacienteId || (f && f.pacienteId === pacienteId)) || null) : null;
+}
+function _semEntradaDoPaciente(indice, pacienteId){
+  return (indice||[]).filter(f => !(f === pacienteId || (f && f.pacienteId === pacienteId)));
+}
+
 async function coletarDadosCompletosDoPaciente(pacienteId){
   const [
     fichaAnamnese, indiceAnamnese,
@@ -112,9 +121,11 @@ async function coletarDadosCompletosDoPaciente(pacienteId){
   return {
     paciente: clinicaFindPacienteById(pacienteId),
     fichaAnamnese: fichaAnamnese || null,
-    estavaNoIndiceAnamnese: Array.isArray(indiceAnamnese) ? indiceAnamnese.includes(pacienteId) : false,
+    entradaIndiceAnamnese: _entradaDoIndice(indiceAnamnese, pacienteId),
+    estavaNoIndiceAnamnese: !!_entradaDoIndice(indiceAnamnese, pacienteId),
     fichaProntuario: fichaProntuario || null,
-    estavaNoIndiceProntuario: Array.isArray(indiceProntuario) ? indiceProntuario.includes(pacienteId) : false,
+    entradaIndiceProntuario: _entradaDoIndice(indiceProntuario, pacienteId),
+    estavaNoIndiceProntuario: !!_entradaDoIndice(indiceProntuario, pacienteId),
     lancamentosFinanceiro: lancamentosDoPaciente,
     consultasAgendamento: consultasDoPaciente,
   };
@@ -155,12 +166,12 @@ async function clinicaExcluirTudoDoPaciente(pacienteId, motivo){
   if(dados.fichaAnamnese) await ClinicaStorage.save('ficha_anamnese_paciente_' + pacienteId, null);
   if(dados.estavaNoIndiceAnamnese){
     const indice = await ClinicaStorage.load('ficha_anamnese_indice_v1') || [];
-    await ClinicaStorage.save('ficha_anamnese_indice_v1', indice.filter(id => id !== pacienteId));
+    await ClinicaStorage.save('ficha_anamnese_indice_v1', _semEntradaDoPaciente(indice, pacienteId));
   }
   if(dados.fichaProntuario) await ClinicaStorage.save('ficha_prontuario_paciente_' + pacienteId, null);
   if(dados.estavaNoIndiceProntuario){
     const indice = await ClinicaStorage.load('ficha_prontuario_indice_v1') || [];
-    await ClinicaStorage.save('ficha_prontuario_indice_v1', indice.filter(id => id !== pacienteId));
+    await ClinicaStorage.save('ficha_prontuario_indice_v1', _semEntradaDoPaciente(indice, pacienteId));
   }
   if(dados.lancamentosFinanceiro.length){
     const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1');
@@ -281,7 +292,11 @@ async function clinicaRestaurarPartesDaLixeira(registroLixeiraId, partesPedidas)
     await ClinicaStorage.save(chave, dadosFicha);
     if(estavaNoIndice){
       const indice = await ClinicaStorage.load(chaveIndice) || [];
-      if(!indice.includes(pacienteId)){ indice.push(pacienteId); await ClinicaStorage.save(chaveIndice, indice); }
+      if(!_entradaDoIndice(indice, pacienteId)){
+        // devolve a entrada original; em itens antigos da Lixeira (só um "sim"), cria uma nova
+        indice.push(typeof estavaNoIndice === 'object' ? estavaNoIndice : { pacienteId, criadoEm: Date.now(), atualizadoEm: Date.now() });
+        await ClinicaStorage.save(chaveIndice, indice);
+      }
     }
     registro.restaurado[parte.id] = true; restauradas.push(parte.rotulo);
   }
@@ -298,9 +313,9 @@ async function clinicaRestaurarPartesDaLixeira(registroLixeiraId, partesPedidas)
       }
       registro.restaurado.cadastro = true;
     } else if(parte.id === 'anamnese'){
-      await restaurarFicha(parte, 'ficha_anamnese_paciente_' + pacienteId, snap.fichaAnamnese, 'ficha_anamnese_indice_v1', snap.estavaNoIndiceAnamnese);
+      await restaurarFicha(parte, 'ficha_anamnese_paciente_' + pacienteId, snap.fichaAnamnese, 'ficha_anamnese_indice_v1', snap.entradaIndiceAnamnese || snap.estavaNoIndiceAnamnese);
     } else if(parte.id === 'prontuario'){
-      await restaurarFicha(parte, 'ficha_prontuario_paciente_' + pacienteId, snap.fichaProntuario, 'ficha_prontuario_indice_v1', snap.estavaNoIndiceProntuario);
+      await restaurarFicha(parte, 'ficha_prontuario_paciente_' + pacienteId, snap.fichaProntuario, 'ficha_prontuario_indice_v1', snap.entradaIndiceProntuario || snap.estavaNoIndiceProntuario);
     } else if(parte.id === 'financeiro'){
       const dadosFin = await ClinicaStorage.load('controle_pagamentos_comissoes_v1') || { lancamentos:[], profissionais:[], rateiosFixos:[] };
       if(!Array.isArray(dadosFin.lancamentos)) dadosFin.lancamentos = [];
