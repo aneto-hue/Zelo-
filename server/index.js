@@ -18,6 +18,7 @@ const auth = require('./auth');
 const lembretes = require('./lembretes');
 const whatsapp = require('./whatsapp');
 const backupDrive = require('./backup-drive');
+const voz = require('./voz');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -378,6 +379,36 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ---- Assistente de voz (transcrição de áudio) ----
+  if(pathname === '/api/voz/estado' && req.method === 'GET'){
+    if(!profissionalLogado){ enviarJSON(res, 401, { erro:'Não autenticado' }); return; }
+    enviarJSON(res, 200, voz.estado(profissionalLogado.clinicaId));
+    return;
+  }
+  if(pathname === '/api/voz/transcrever' && req.method === 'POST'){
+    if(!profissionalLogado){ enviarJSON(res, 401, { erro:'Não autenticado' }); return; }
+    lerCorpo(req, async (err, body) => {
+      if(err || !body){ enviarJSON(res, 400, { erro:'Pedido inválido.', codigo:'pedido_invalido' }); return; }
+      try{
+        const r = await voz.transcrever({ clinicaId: profissionalLogado.clinicaId, usuarioId: profissionalLogado.id,
+          audioBase64: body.audio, mime: body.mime, duracao: body.duracao });
+        enviarJSON(res, r.status, r.corpo);
+      }catch(e){
+        console.error('[voz] erro inesperado:', e.message);
+        enviarJSON(res, 500, { erro:'Erro inesperado no assistente de voz.', codigo:'erro_interno' });
+      }
+    });
+    return;
+  }
+  if(pathname === '/api/sistema/uso-voz' && req.method === 'GET'){
+    if(!superAdminLogado){ enviarJSON(res, 401, { erro:'Não autenticado' }); return; }
+    const nomes = {}; db.readTable('clinicas').forEach(c => { nomes[c.id] = c.nome; });
+    enviarJSON(res, 200, { mes: voz.mesAtual(), configurada: voz.configurada(),
+      limiteMinutos: voz.estado('').limiteMinutos,
+      clinicas: voz.usoDeTodas().map(u => ({ id: u.clinicaId, nome: nomes[u.clinicaId] || u.clinicaId, minutos: Math.round(u.minutos * 10) / 10, chamadas: u.chamadas })) });
+    return;
+  }
+
   if(pathname === '/api/minha-senha' && req.method === 'POST'){
     if(!profissionalLogado){ enviarJSON(res, 401, { erro:'Não autenticado' }); return; }
     lerCorpo(req, (err, body) => {
@@ -424,7 +455,8 @@ const server = http.createServer((req, res) => {
     const lista = db.readTable('profissionais')
       .filter(p => p.clinicaId === profissionalLogado.clinicaId)
       .map(p => ({
-        id: p.id, nome: p.nome, email: p.email, papel: p.papel, cargo: p.cargo || '', comissaoPercent: p.comissaoPercent, ativo: p.ativo !== false,
+        id: p.id, nome: p.nome, email: p.email, papel: p.papel, cargo: p.cargo || '', cro: p.cro || '',
+        telefone: p.telefone || '', comissaoPercent: p.comissaoPercent, ativo: p.ativo !== false,
         modulosPermitidos: Array.isArray(p.modulosPermitidos) ? p.modulosPermitidos : []
       }));
     enviarJSON(res, 200, { profissionais: lista });
@@ -448,6 +480,8 @@ const server = http.createServer((req, res) => {
         senhaHash: auth.hashSenha(body.senha),
         papel: body.papel === 'admin' ? 'admin' : 'profissional',
         cargo: body.cargo || '',
+        cro: body.cro || '',
+        telefone: body.telefone || '',
         comissaoPercent: body.comissaoPercent || '',
         modulosPermitidos: Array.isArray(body.modulosPermitidos) ? body.modulosPermitidos : [], // vazio = acesso a tudo
         ativo: true, criadoEm: Date.now()
@@ -460,8 +494,14 @@ const server = http.createServer((req, res) => {
   }
 
   if(pathname.startsWith('/api/profissionais/') && (req.method === 'PUT' || req.method === 'DELETE')){
-    if(!profissionalLogado || profissionalLogado.papel !== 'admin'){ enviarJSON(res, 403, { erro:'Apenas administradores podem gerenciar profissionais' }); return; }
     const id = pathname.replace('/api/profissionais/', '');
+    const souAdminProf = !!(profissionalLogado && profissionalLogado.papel === 'admin');
+    const souEuMesmoProf = !!(profissionalLogado && profissionalLogado.id === id);
+    // Um profissional pode editar os PRÓPRIOS dados básicos (nome, cargo, CRO, telefone), mesmo
+    // sem ser admin — mas só o administrador pode mexer em acesso, papel, comissão, senha de
+    // outra pessoa, ou desativar alguém.
+    if(!profissionalLogado || (!souAdminProf && !souEuMesmoProf)){ enviarJSON(res, 403, { erro:'Você só pode editar o seu próprio cadastro. Para outros ajustes, fale com um administrador.' }); return; }
+    if(req.method === 'DELETE' && !souAdminProf){ enviarJSON(res, 403, { erro:'Apenas administradores podem desativar profissionais' }); return; }
     const profissionais = db.readTable('profissionais');
     const idx = profissionais.findIndex(p => p.id === id);
     if(idx === -1 || profissionais[idx].clinicaId !== profissionalLogado.clinicaId){ enviarJSON(res, 404, { erro:'Profissional não encontrado' }); return; }
@@ -474,12 +514,32 @@ const server = http.createServer((req, res) => {
     }
     lerCorpo(req, (err, bodyMod) => {
       if(err){ enviarJSON(res, 400, { erro:'Requisição inválida' }); return; }
+      // Redefinir senha por aqui é coisa do administrador. Quem quer trocar a PRÓPRIA senha usa
+      // "🔑 Senha" na tela inicial (/api/minha-senha), que exige saber a senha atual. Valida tudo
+      // antes de gravar qualquer campo, pra não ficar uma edição pela metade se a senha for recusada.
+      if(bodyMod.senha){
+        if(!souAdminProf){ enviarJSON(res, 403, { erro:'Só o administrador pode redefinir senhas. Para trocar a sua, use o botão 🔑 Senha na tela inicial.' }); return; }
+        if(String(bodyMod.senha).length < 6){ enviarJSON(res, 400, { erro:'A senha precisa ter pelo menos 6 caracteres.' }); return; }
+      }
+      // Campos que qualquer pessoa pode editar no próprio cadastro
       if(bodyMod.nome) profissionais[idx].nome = bodyMod.nome;
-      if(bodyMod.papel) profissionais[idx].papel = bodyMod.papel === 'admin' ? 'admin' : 'profissional';
-      if(bodyMod.comissaoPercent !== undefined) profissionais[idx].comissaoPercent = bodyMod.comissaoPercent;
-      if(bodyMod.modulosPermitidos !== undefined) profissionais[idx].modulosPermitidos = Array.isArray(bodyMod.modulosPermitidos) ? bodyMod.modulosPermitidos : [];
-      if(bodyMod.senha) profissionais[idx].senhaHash = auth.hashSenha(bodyMod.senha);
-      if(bodyMod.ativo !== undefined) profissionais[idx].ativo = !!bodyMod.ativo;
+      if(bodyMod.cargo !== undefined) profissionais[idx].cargo = bodyMod.cargo;
+      if(bodyMod.cro !== undefined) profissionais[idx].cro = bodyMod.cro;
+      if(bodyMod.telefone !== undefined) profissionais[idx].telefone = bodyMod.telefone;
+      if(bodyMod.senha){
+        profissionais[idx].senhaHash = auth.hashSenha(bodyMod.senha);
+        // Se foi o admin mexendo na senha de OUTRA pessoa, desconecta essa pessoa dos aparelhos
+        // onde ela já estava logada (a sessão do próprio admin continua normal).
+        if(!souEuMesmoProf) auth.encerrarSessoesDoProfissional(id);
+      }
+      // Campos sensíveis: só administrador mexe, inclusive na própria conta (evita se auto-rebaixar
+      // ou se dar mais comissão sem ninguém perceber)
+      if(souAdminProf){
+        if(bodyMod.papel) profissionais[idx].papel = bodyMod.papel === 'admin' ? 'admin' : 'profissional';
+        if(bodyMod.comissaoPercent !== undefined) profissionais[idx].comissaoPercent = bodyMod.comissaoPercent;
+        if(bodyMod.modulosPermitidos !== undefined) profissionais[idx].modulosPermitidos = Array.isArray(bodyMod.modulosPermitidos) ? bodyMod.modulosPermitidos : [];
+        if(bodyMod.ativo !== undefined) profissionais[idx].ativo = !!bodyMod.ativo;
+      }
       db.writeTable('profissionais', profissionais);
       enviarJSON(res, 200, { ok:true });
     });

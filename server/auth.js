@@ -52,6 +52,13 @@ function validarSessao(token){
   if(!prof) return null;
   return prof;
 }
+// Encerra TODAS as sessões abertas de um profissional (em qualquer aparelho). Usado quando o
+// administrador redefine a senha de alguém: quem estava logado com a senha antiga é desconectado.
+function encerrarSessoesDoProfissional(profissionalId){
+  const sessoes = db.readTable('sessoes').filter(s => s.profissionalId !== profissionalId);
+  db.writeTable('sessoes', sessoes);
+}
+
 function encerrarSessao(token){
   const sessoes = db.readTable('sessoes').filter(s => s.token !== token);
   db.writeTable('sessoes', sessoes);
@@ -170,7 +177,7 @@ function avisoPrimeiroUso(){
 
 module.exports = {
   hashSenha, conferirSenha, gerarToken,
-  criarSessao, validarSessao, encerrarSessao,
+  criarSessao, validarSessao, encerrarSessao, encerrarSessoesDoProfissional,
   criarTokenPaciente, validarTokenPaciente, marcarTokenUsado,
   criarClinica, buscarClinica,
   criarSuperAdminInicial, conferirLoginSuperAdmin, criarSessaoAdmin, validarSessaoAdmin, encerrarSessaoAdmin,
