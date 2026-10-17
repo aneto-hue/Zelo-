@@ -727,3 +727,131 @@ h1, h2, h3, h4{ font-family:var(--fl-font-heading) !important; font-weight:400 !
 
 body header.topbar h1{ font-family:var(--fl-font-heading) !important; font-weight:400 !important; }
 body .add-row-btn{ border-radius:999px !important; font-family:var(--fl-font-heading) !important; font-weight:400 !important; background:var(--fl-accent) !important; }
+
+
+/* ============================================================
+   CABEÇALHO COMPACTO DOS MÓDULOS (montado pelo nav-home.js)
+   ------------------------------------------------------------
+   Uma barra só, fixa no topo: logo Zelo · voltar/avançar/início ·
+   título do módulo · abas · clínica logada. Usa a cor principal
+   da clínica (--ios-blue, definida pelo Perfil da Clínica).
+   Vem por último, então prevalece sobre as camadas acima.
+   ============================================================ */
+body header.topbar.zb-topbar{
+  --zb-cor: var(--ios-blue, #2C4BFF);
+  --zb-linha: var(--fl-line, #EAD9C4);
+  --zb-suave: color-mix(in srgb, var(--fl-surface, #ebddc5) 45%, white);
+  position:sticky !important; top:0 !important; z-index:40 !important;
+  overflow:visible !important;
+  display:flex !important; flex-wrap:wrap; align-items:center; gap:10px 16px;
+  padding:10px 24px !important;
+  background:#fff !important;
+  border-bottom:1px solid var(--zb-linha) !important;
+  box-shadow:0 2px 10px -6px rgba(32,30,29,0.25) !important;
+  text-align:left !important;
+}
+body header.topbar.zb-topbar > *{ position:static; }
+
+/* Logo Zelo */
+.zb-topbar .zb-logo-sistema{ display:flex; align-items:center; flex-shrink:0; text-decoration:none !important; order:1; }
+.zb-topbar .zb-logo-sistema img{ height:30px; width:auto; display:block; }
+.zb-topbar .zb-logo-texto{ font-family:var(--fl-font-body, system-ui) !important; font-size:20px; font-weight:700; color:var(--fl-ink, #201e1d); }
+
+/* Voltar / Avançar / Início */
+.zb-topbar .zb-nav{
+  display:flex; align-items:center; gap:4px; flex-shrink:0; order:2;
+  padding:4px; background:var(--zb-suave);
+  border:1px solid var(--zb-linha); border-radius:12px;
+}
+.zb-topbar .zb-btn{
+  width:34px; height:34px; padding:0;
+  display:grid; place-items:center;
+  border:0; border-radius:8px; background:transparent;
+  color:var(--zb-cor) !important; cursor:pointer; text-decoration:none !important;
+  transition:background .15s, color .15s, transform .05s;
+}
+.zb-topbar .zb-btn:hover{ background:color-mix(in srgb, var(--zb-cor) 12%, white); }
+.zb-topbar .zb-btn:active{ transform:scale(0.94); }
+.zb-topbar .zb-btn:disabled{ color:#C9BBAE !important; background:transparent; cursor:default; transform:none; }
+.zb-topbar .zb-btn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.3; stroke-linecap:round; stroke-linejoin:round; }
+.zb-topbar .zb-btn:focus-visible{ outline:2px solid var(--fl-accent, #F0611C); outline-offset:2px; }
+.zb-topbar .zb-btn.zb-inicio{
+  width:auto; display:flex; align-items:center; gap:6px; padding:0 12px 0 10px;
+  background:var(--zb-cor); color:#fff !important;
+  font-family:var(--fl-font-body, system-ui); font-size:13px; font-weight:600;
+}
+.zb-topbar .zb-btn.zb-inicio:hover{ background:color-mix(in srgb, var(--zb-cor) 80%, black); }
+.zb-topbar .zb-divisor{ width:1px; height:22px; background:var(--zb-linha); margin:0 2px; }
+
+/* Título do módulo (conteúdo original do cabeçalho) */
+.zb-topbar .zb-titulo{ order:3; min-width:0; flex:0 1 auto; line-height:1.25; }
+body header.topbar.zb-topbar h1{
+  font-size:18px !important; line-height:1.2 !important; margin:0 !important;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+body header.topbar.zb-topbar h1 img{ width:22px !important; height:22px !important; vertical-align:-5px !important; }
+body header.topbar.zb-topbar p{ font-size:12px !important; margin:1px 0 0 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.zb-topbar .zb-titulo > a{ margin-bottom:2px !important; font-size:12px !important; }
+/* A logo antiga dentro do título dá lugar à logo da clínica no canto direito */
+@media screen{ body header.topbar.zb-topbar .logo-box{ display:none !important; } }
+
+/* Abas do módulo dentro do cabeçalho */
+.zb-topbar .zb-extra{ order:4; margin-left:auto; min-width:0; display:flex; }
+.zb-topbar .zb-extra:empty{ display:none; }
+body header.topbar.zb-topbar nav.steps{
+  position:static !important; top:auto !important;
+  background:transparent !important; border:0 !important;
+  padding:0 !important; margin:0 !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+  display:flex; gap:6px; overflow-x:auto; max-width:100%;
+  scrollbar-width:none;
+}
+body header.topbar.zb-topbar nav.steps::-webkit-scrollbar{ display:none; }
+body header.topbar.zb-topbar nav.steps button{
+  padding:7px 14px !important; font-size:13px !important; white-space:nowrap;
+  border-radius:999px !important; border:0 !important;
+  background:var(--zb-suave) !important; color:var(--fl-muted, #6B6157) !important;
+  box-shadow:none !important;
+}
+body header.topbar.zb-topbar nav.steps button:hover{ color:var(--zb-cor) !important; }
+body header.topbar.zb-topbar nav.steps button.active{ background:var(--zb-cor) !important; color:#fff !important; }
+
+/* Clínica logada */
+.zb-topbar .zb-clinica{
+  order:5; display:flex; align-items:center; gap:10px; flex-shrink:0;
+  padding-left:16px; border-left:1px solid var(--zb-linha);
+}
+.zb-topbar .zb-clinica[hidden]{ display:none; }
+.zb-topbar .zb-extra:empty ~ .zb-clinica{ margin-left:auto; }
+.zb-topbar .zb-clinica-logo{
+  width:38px; height:38px; flex-shrink:0; border-radius:10px; overflow:hidden;
+  display:grid; place-items:center;
+  border:1px solid var(--zb-linha); background:color-mix(in srgb, var(--zb-cor) 12%, white);
+  color:var(--zb-cor); font-size:13px; font-weight:700; font-family:var(--fl-font-body, system-ui);
+}
+.zb-topbar .zb-clinica-logo img{ width:100%; height:100%; object-fit:cover; display:block; }
+.zb-topbar .zb-clinica-info{ line-height:1.2; max-width:190px; font-family:var(--fl-font-body, system-ui); }
+.zb-topbar .zb-clinica-nome{ font-size:13px; font-weight:600; color:var(--fl-ink, #201e1d); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.zb-topbar .zb-clinica-usuario{ font-size:11.5px; color:var(--fl-muted, #8A7F73); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Abas que não cabem na linha: descem para uma 2ª linha, clínica fica no topo à direita */
+.zb-topbar.zb-quebra .zb-clinica{ order:4; margin-left:auto; }
+.zb-topbar.zb-quebra .zb-extra{ order:6; flex-basis:100%; margin-left:0; }
+
+@media (max-width:1100px){
+  .zb-topbar .zb-clinica-info{ display:none; }
+  .zb-topbar .zb-clinica{ padding-left:10px; }
+}
+@media (max-width:760px){
+  body header.topbar.zb-topbar{ padding:10px 14px !important; gap:10px; }
+  .zb-topbar .zb-logo-sistema img{ height:24px; }
+  .zb-topbar .zb-btn.zb-inicio span{ display:none; }
+  .zb-topbar .zb-btn.zb-inicio{ width:34px; padding:0; justify-content:center; }
+  .zb-topbar .zb-clinica, .zb-topbar.zb-quebra .zb-clinica{ order:3; margin-left:auto; border-left:0; padding-left:0; }
+  .zb-topbar .zb-titulo{ order:4; flex-basis:100%; }
+  .zb-topbar .zb-extra, .zb-topbar.zb-quebra .zb-extra{ order:5; flex-basis:100%; margin-left:0; }
+}
+@media print{
+  .zb-topbar .zb-logo-sistema, .zb-topbar .zb-nav, .zb-topbar .zb-clinica{ display:none !important; }
+  body header.topbar.zb-topbar{ position:static !important; box-shadow:none !important; }
+}
