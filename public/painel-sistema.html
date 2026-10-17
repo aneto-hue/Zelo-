@@ -174,6 +174,32 @@ async function render(){
   cardWpp.appendChild(testarBtn);
   main.appendChild(cardWpp);
 
+  main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Assistente de voz (transcrição)')));
+  const cardVoz = el('div', { class:'clinica-card' });
+  try{
+    const vozResp = await fetch('/api/sistema/uso-voz', { credentials:'same-origin' });
+    const vozData = await vozResp.json();
+    cardVoz.appendChild(el('span', { class:'badge ' + (vozData.configurada ? 'ativa' : 'status-atrasada') },
+      document.createTextNode(vozData.configurada ? '🟢 Transcrição por voz ativada' : '🟡 Ainda não configurada — o botão de voz fica desativado nas clínicas')));
+    cardVoz.appendChild(el('p', { style:'font-size:11.5px;color:var(--muted);margin:10px 0 10px;' },
+      document.createTextNode('Para ativar, configure OPENAI_API_KEY no servidor (veja o PASSO 6.3 do DEPLOY.md). Limite atual: ' + vozData.limiteMinutos + ' minutos por clínica por mês (variável VOZ_MINUTOS_MES). O áudio não é guardado.')));
+    const usos = (vozData.clinicas || []).slice().sort((x, y) => y.minutos - x.minutos);
+    if(usos.length){
+      cardVoz.appendChild(el('div', { style:'font-size:12px;font-weight:700;margin-bottom:4px;' }, document.createTextNode('Uso em ' + vozData.mes + ':')));
+      usos.forEach(u => {
+        const linha = el('div', { style:'display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:6px 0;border-top:1px solid var(--line-light);' });
+        linha.appendChild(el('span', {}, document.createTextNode(u.nome)));
+        linha.appendChild(el('span', {}, document.createTextNode(u.minutos.toFixed(1) + ' de ' + vozData.limiteMinutos + ' min (' + u.chamadas + ' gravação(ões))')));
+        cardVoz.appendChild(linha);
+      });
+    }else{
+      cardVoz.appendChild(el('p', { style:'font-size:12.5px;margin:0;' }, document.createTextNode('Nenhuma clínica usou a voz neste mês ainda.')));
+    }
+  }catch(e){
+    cardVoz.appendChild(el('p', { style:'font-size:12.5px;margin:0;' }, document.createTextNode('Não foi possível carregar o uso da voz agora.')));
+  }
+  main.appendChild(cardVoz);
+
   main.appendChild(el('div', { class:'section-title' }, document.createTextNode('Backup dos dados') ));
   const cardBackup = el('div', { class:'clinica-card' });
   const statusBackupResp = await fetch('/api/sistema/backup-status', { credentials:'same-origin' });

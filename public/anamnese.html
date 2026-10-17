@@ -7,6 +7,8 @@
 <script src="client-storage.js"></script>
 <script src="clinic-branding.js"></script>
 <script src="voice-dictation.js"></script>
+<script src="voz-parser.js"></script>
+<script src="assistente-voz.js"></script>
 <script src="wake-lock.js"></script>
 <script src="shared-data.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="
@@ -1444,6 +1446,32 @@ function syncTotalToPayInfo(){
   if(total>0) state.payInfo.total = formatMoney(total);
 }
 
+// Grava na ficha o que o assistente de voz entendeu (já conferido pela pessoa no cartão de confirmação).
+function aplicarVozNoOdontograma(res){
+  let nDentes = 0, nTrat = 0;
+  (res.itens||[]).forEach(it => {
+    const d = td(it.dente);
+    if(it.estado !== null && it.estado !== undefined) d.status = it.estado;
+    const lista = it.tratamentos || [];
+    if(!lista.length && it.situacao){
+      d.tratamentos.push({ id: novoTratamentoId(), situacao: it.situacao, tratamento:'', valor:'', procedimentoId:'', estoqueBaixado:'' });
+    }
+    lista.forEach((t, i) => {
+      d.tratamentos.push({ id: novoTratamentoId(), situacao: i === 0 ? (it.situacao||'') : '', tratamento: t.tratamento||'',
+        valor: (t.valor === null || t.valor === undefined) ? '' : 'R$ ' + formatMoney(t.valor), procedimentoId:'', estoqueBaixado:'' });
+      nTrat++;
+    });
+    nDentes++;
+  });
+  if(!state.outrosTratamentos) state.outrosTratamentos = [];
+  (res.outros||[]).forEach(o => {
+    state.outrosTratamentos.push({ descricao: o.descricao, valor: (o.valor === null || o.valor === undefined) ? '' : 'R$ ' + formatMoney(o.valor) });
+    nTrat++;
+  });
+  syncTotalToPayInfo(); saveProgressDebounced(); refreshPanel();
+  toast('Voz aplicada: ' + nDentes + ' dente(s)' + (nTrat ? ', ' + nTrat + ' tratamento(s)' : '') + '.');
+}
+
 function renderOdontograma(container){
   migrateTeeth();
   if(!state.outrosTratamentos) state.outrosTratamentos=[];
@@ -1456,6 +1484,14 @@ function renderOdontograma(container){
     style:'text-align:center;padding:12px;color:var(--muted);font-size:12px;background:#fff;border:1.5px dashed var(--line-light);border-radius:10px;margin-top:10px;'
   }, document.createTextNode('Toque num dente para selecionar o estado e anotar.'));
   container.appendChild(hint);
+
+  // ── Assistente de voz: fala/escreve uma frase e o sistema preenche o odontograma (com confirmação) ──
+  if(window.criarPainelAssistenteVoz && window.VozParser){
+    container.appendChild(criarPainelAssistenteVoz({
+      obterProcedimentos: () => (estoqueCache && estoqueCache.procedimentos) || [],
+      aplicar: aplicarVozNoOdontograma
+    }));
+  }
 
   // ── Botão Outros tratamentos logo abaixo do odontograma ──
   const addOutroBtn = el('div',{
